@@ -29,6 +29,21 @@ wasm-pack.log
 # wasm-pack build output (serve from public/ for the Next.js demo)
 web-demo/src/lib/wasm-pkg/
 web-demo/public/wasm-pkg/
+# Emscripten-compiled WASM modules (committed separately to web-demo/public/)
+wasm/dist/
+# Keep the compiled .wasm binaries that ship with the web demo
+!web-demo/public/smaug.wasm
+!web-demo/public/haetae.wasm
+# Keep the Emscripten JS loaders bundled into the app
+!web-demo/src/crypto/wasm/smaug.js
+!web-demo/src/crypto/wasm/haetae.js
+
+# ------------------------------
+# Vendor sources (large C reference implementations)
+# Clone / extract them locally before running wasm/build.sh — see README
+# ------------------------------
+wasm/vendor/
+/vendor/
 
 # ------------------------------
 # Environment files

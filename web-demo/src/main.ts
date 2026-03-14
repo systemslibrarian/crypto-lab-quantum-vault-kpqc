@@ -2,6 +2,7 @@
 
 import './styles/vault.css';
 
+import { initCrypto } from './crypto/init';
 import { loadVaultState, saveVaultState, clearVaultState, emptyVaultState, serializeSealedBox, deserializeSealedBox } from './vault/state';
 import type { VaultState } from './vault/state';
 import { generateDemoBoxes } from './vault/demo';
@@ -19,6 +20,12 @@ import { revealMessage, showGibberish } from './ui/reveal';
 import { sleep } from './crypto/utils';
 
 async function init(): Promise<void> {
+  // Load both KpqC WASM modules (SMAUG-T + HAETAE) before any vault operations
+  const loaderEl = document.getElementById('wasm-loader');
+  if (loaderEl) loaderEl.style.display = 'block';
+  await initCrypto();
+  if (loaderEl) loaderEl.style.display = 'none';
+
   let state: VaultState;
 
   const existing = loadVaultState();
