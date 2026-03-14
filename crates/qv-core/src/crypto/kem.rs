@@ -35,6 +35,6 @@ pub trait Kem: Send + Sync {
     /// Returns `(public_key, private_key)`.
     fn generate_keypair(&self) -> Result<(Vec<u8>, Vec<u8>)>;
 
-    /// A short human-readable algorithm identifier, e.g. `"dev-stub"` or `"SMAUG-T"`.
+    /// A short human-readable algorithm identifier, e.g. `"dev-kem"` or `"SMAUG-T-3"`.
     fn algorithm_id(&self) -> &'static str;
 }

@@ -146,7 +146,7 @@ Used for all current testing.  Not cryptographically secure.
 | KEM keypair | privkey = 32 rand bytes; pubkey = SHA-256(privkey) |
 | Encapsulate | ss = 32 rand bytes; ct = ss XOR pubkey |
 | Decapsulate | pubkey = SHA-256(privkey); ss = ct XOR pubkey |
-| Sign | SHA-256(privkey \|\| message) |
+| Sign | SHA-256(SHA-256(privkey) \|\| message) — i.e. SHA-256(pubkey \|\| message) |
 | Verify | SHA-256(pubkey \|\| message) == signature |
 
 ### KPQC backend (`kpqc.rs` + `kpqc_ffi.rs`)

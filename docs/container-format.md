@@ -84,8 +84,8 @@ The `signature` field itself is excluded.  The signing implementation is in
 `qv-core::encrypt::container_signing_bytes`.
 
 In version 1 the signature is produced by whatever backend is active.  The
-dev backend uses `SHA-256(privkey || canonical_json)`.  Production containers
-will use HAETAE.
+dev backend uses `SHA-256(SHA-256(privkey) || canonical_json)` so that
+verification only requires the public key.  Production containers will use HAETAE.
 
 ---
 
