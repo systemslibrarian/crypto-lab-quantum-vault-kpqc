@@ -43,3 +43,8 @@ jobs:
 
       - name: Clippy (default features)
         run: cargo clippy --workspace -- -W clippy::all
+
+      - name: Security audit
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit

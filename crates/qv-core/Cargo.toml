@@ -39,6 +39,9 @@ dev-backend = []
 kpqc-native = ["dep:cc"]   # activates FFI + build.rs linkage
 kpqc-wasm   = []           # browser KpqC scaffold (stub only for now)
 wasm        = ["dep:wasm-bindgen"]
+# Opt-in to allow the dev-backend in release builds (L-002 escape hatch).
+# Never set this in production.
+allow_dev_backend_in_release = []
 
 [dependencies]
 aes-gcm.workspace = true
@@ -48,6 +51,7 @@ rand.workspace = true
 serde = { workspace = true }
 serde_json.workspace = true
 sha2.workspace = true
+subtle.workspace = true
 zeroize = { workspace = true }
 # Only compiled when kpqc-native is enabled (needed by build.rs at compile time).
 cc = { workspace = true, optional = true }

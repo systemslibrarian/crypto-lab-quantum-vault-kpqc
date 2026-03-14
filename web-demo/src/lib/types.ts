@@ -29,6 +29,10 @@ export interface VaultContainer {
   version: number;
   threshold: number;
   shareCount: number;
+  /** KEM algorithm identifier — authenticated by the container signature. */
+  kemAlgorithm: string;
+  /** Signature algorithm identifier — authenticated by the container signature. */
+  sigAlgorithm: string;
   nonce: Uint8Array;
   ciphertext: Uint8Array;   // includes GCM auth tag
   shares: EncryptedShare[];

@@ -44,7 +44,11 @@ fn gf_mul(mut a: u8, mut b: u8) -> u8 {
 }
 
 /// Multiplicative inverse in GF(256) via Fermat's little theorem: a^254.
-/// Panics (returns 0) for the input 0, which has no inverse.
+///
+/// Returns 0 for input 0 (which has no inverse in GF(2^8)). The caller is
+/// responsible for ensuring this function is never called with 0 — the Lagrange
+/// reconstruction loop guarantees this by checking for duplicate and zero share
+/// indices before computing denominators.
 fn gf_inv(a: u8) -> u8 {
     // a^(2^8 - 2) = a^254
     let mut result: u8 = 1;
@@ -155,7 +159,8 @@ pub fn split_secret(secret: &[u8], share_count: u8, threshold: u8) -> Result<Vec
 /// the caller is responsible for supplying enough shares.
 ///
 /// # Errors
-/// Returns an error if `shares` is empty or share payloads have unequal lengths.
+/// Returns an error if `shares` is empty, share indices are not unique, any
+/// share has index 0 (reserved for the secret), or payloads have unequal lengths.
 pub fn reconstruct_secret(shares: &[Share]) -> Result<Vec<u8>> {
     if shares.is_empty() {
         return Err(anyhow!("at least one share is required"));
@@ -163,6 +168,17 @@ pub fn reconstruct_secret(shares: &[Share]) -> Result<Vec<u8>> {
     let len = shares[0].data.len();
     if shares.iter().any(|s| s.data.len() != len) {
         return Err(anyhow!("shares have inconsistent payload lengths"));
+    }
+
+    // Validate indices: none may be 0 (reserved for the secret) and all must be unique.
+    let mut seen = std::collections::HashSet::new();
+    for s in shares {
+        if s.index == 0 {
+            return Err(anyhow!("share index 0 is invalid (reserved for the secret polynomial constant term)"));
+        }
+        if !seen.insert(s.index) {
+            return Err(anyhow!("duplicate share index {}", s.index));
+        }
     }
 
     let mut secret = vec![0u8; len];

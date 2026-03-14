@@ -3,12 +3,12 @@
 use crate::{
     container::QuantumVaultContainer,
     crypto::{kem::Kem, signature::Signature},
-    encrypt::{container_signing_bytes, xor_protect},
+    encrypt::{aes_aad, container_signing_bytes, xor_protect},
     shamir::{reconstruct_secret, Share},
     DecryptOptions,
 };
 use aes_gcm::{
-    aead::{Aead, KeyInit},
+    aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Key, Nonce,
 };
 use anyhow::{anyhow, Result};
@@ -18,15 +18,31 @@ use zeroize::Zeroize;
 ///
 /// Steps:
 /// 1. Verify the container signature.
-/// 2. Recover as many Shamir shares as private keys are available.
+/// 2. Recover Shamir shares by matching each private key to its share index.
 /// 3. Reconstruct the file key.
-/// 4. AES-256-GCM decrypt the ciphertext.
+/// 4. AES-256-GCM decrypt the ciphertext (with AAD).
 pub fn decrypt_file(
     container: &QuantumVaultContainer,
     options: &DecryptOptions,
     kem: &dyn Kem,
     signer: &dyn Signature,
 ) -> Result<Vec<u8>> {
+    // Validate that key list and index list are paired.
+    if options.recipient_private_keys.len() != options.share_indices.len() {
+        return Err(anyhow!(
+            "recipient_private_keys length ({}) must equal share_indices length ({})",
+            options.recipient_private_keys.len(),
+            options.share_indices.len(),
+        ));
+    }
+    if options.share_indices.len() < container.threshold as usize {
+        return Err(anyhow!(
+            "only {} share(s) supplied; need at least {} for the threshold",
+            options.share_indices.len(),
+            container.threshold,
+        ));
+    }
+
     // 1. Verify the signature before touching any ciphertext material.
     let to_sign = container_signing_bytes(container)?;
     let valid = signer.verify(&options.signer_public_key, &to_sign, &container.signature)?;
@@ -34,23 +50,19 @@ pub fn decrypt_file(
         return Err(anyhow!("container signature verification failed"));
     }
 
-    // 2. Recover the share for each supplied private key.
-    //    Callers provide one private key per share they hold; they do not need
-    //    all shares, only `threshold` of them.
-    if options.recipient_private_keys.len() < container.threshold as usize {
-        return Err(anyhow!(
-            "only {} private key(s) supplied; need at least {} for the threshold",
-            options.recipient_private_keys.len(),
-            container.threshold,
-        ));
-    }
-
-    let mut shares: Vec<Share> = Vec::with_capacity(options.recipient_private_keys.len());
-    for (privkey, enc_share) in options
+    // 2. Recover each share by matching the supplied private key to its share index (H-005).
+    let mut shares: Vec<Share> = Vec::with_capacity(options.share_indices.len());
+    for (privkey, &share_idx) in options
         .recipient_private_keys
         .iter()
-        .zip(container.shares.iter())
+        .zip(options.share_indices.iter())
     {
+        let enc_share = container
+            .shares
+            .iter()
+            .find(|s| s.index == share_idx)
+            .ok_or_else(|| anyhow!("no encrypted share found with index {share_idx}"))?;
+
         let mut ss = kem.decapsulate(privkey, &enc_share.kem_ciphertext)?;
         let share_data = xor_protect(&enc_share.encrypted_share, &ss)?;
         ss.zeroize();
@@ -68,12 +80,28 @@ pub fn decrypt_file(
         s.data.zeroize();
     }
 
-    // 4. AES-256-GCM decryption.
+    // Defensive nonce length check (container.rs::from_bytes already validates this,
+    // but protect against containers constructed programmatically without going
+    // through from_bytes).
+    if container.nonce.len() != 12 {
+        return Err(anyhow!(
+            "invalid nonce length: expected 12, got {}",
+            container.nonce.len()
+        ));
+    }
+
+    // 4. AES-256-GCM decryption with the same AAD used during encryption (M-001).
+    let aad = aes_aad(
+        container.version,
+        container.threshold,
+        &container.kem_algorithm,
+        &container.sig_algorithm,
+    );
     let aes_key = Key::<Aes256Gcm>::from_slice(&file_key);
     let cipher = Aes256Gcm::new(aes_key);
     let nonce = Nonce::from_slice(&container.nonce);
     let plaintext = cipher
-        .decrypt(nonce, container.ciphertext.as_slice())
+        .decrypt(nonce, Payload { msg: container.ciphertext.as_slice(), aad: &aad })
         .map_err(|_| anyhow!("AES-256-GCM decryption failed — wrong key or tampered data"))?;
 
     file_key.zeroize();

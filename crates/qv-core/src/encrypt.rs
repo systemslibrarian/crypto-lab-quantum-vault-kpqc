@@ -7,7 +7,7 @@ use crate::{
     EncryptOptions, CONTAINER_VERSION,
 };
 use aes_gcm::{
-    aead::{Aead, KeyInit},
+    aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Key, Nonce,
 };
 use anyhow::{anyhow, Result};
@@ -46,12 +46,18 @@ pub fn encrypt_file(
     let mut nonce_bytes = [0u8; 12];
     rng.fill_bytes(&mut nonce_bytes);
 
-    // 3. AES-256-GCM encryption.
+    // 3. AES-256-GCM encryption with AAD covering security-relevant context.
+    let aad = aes_aad(
+        CONTAINER_VERSION,
+        options.threshold,
+        kem.algorithm_id(),
+        signer.algorithm_id(),
+    );
     let aes_key = Key::<Aes256Gcm>::from_slice(&file_key);
     let cipher = Aes256Gcm::new(aes_key);
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ciphertext = cipher
-        .encrypt(nonce, plaintext)
+        .encrypt(nonce, Payload { msg: plaintext, aad: &aad })
         .map_err(|_| anyhow!("AES-256-GCM encryption failed"))?;
 
     // 4. Shamir split.
@@ -91,6 +97,24 @@ pub fn encrypt_file(
     container.signature = signer.sign(&options.signer_private_key, &to_sign)?;
 
     Ok(container)
+}
+
+/// Compute the AES-GCM Additional Authenticated Data (AAD).
+///
+/// Binds the ciphertext to its security-relevant context: algorithm choice,
+/// threshold, and container version.  Both encrypt and decrypt must supply
+/// the same bytes for the GCM authentication tag to verify.
+///
+/// **Field order is significant** — it must match the TypeScript `computeAad`
+/// function in `vault.ts` exactly.
+pub(crate) fn aes_aad(version: u8, threshold: u8, kem_alg: &str, sig_alg: &str) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({
+        "kem_algorithm": kem_alg,
+        "sig_algorithm": sig_alg,
+        "threshold":     threshold,
+        "version":       version,
+    }))
+    .expect("AAD serialisation is infallible")
 }
 
 /// Returns the canonical byte string covered by the container signature.
@@ -176,6 +200,7 @@ mod tests {
 
         let dec_opts = DecryptOptions {
             recipient_private_keys: vec![sk1, sk2],
+            share_indices: vec![1, 2],
             signer_public_key: sig_pub,
         };
 
@@ -209,6 +234,7 @@ mod tests {
         // Signature covers the ciphertext, so this must fail at verification.
         let dec_opts = DecryptOptions {
             recipient_private_keys: vec![_sk1, _sk2],
+            share_indices: vec![1, 2],
             signer_public_key: _sig_pub,
         };
         let result = crate::decrypt::decrypt_file(&container, &dec_opts, &kem, &sig);

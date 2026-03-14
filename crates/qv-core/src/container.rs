@@ -75,6 +75,15 @@ impl QuantumVaultContainer {
 
     /// Deserialize a container from JSON bytes.
     pub fn from_bytes(data: &[u8]) -> anyhow::Result<Self> {
+        // Guard against memory exhaustion via oversized containers (M-002).
+        const MAX_CONTAINER_BYTES: usize = 64 * 1024 * 1024; // 64 MiB
+        if data.len() > MAX_CONTAINER_BYTES {
+            return Err(anyhow::anyhow!(
+                "container exceeds maximum allowed size ({} bytes)",
+                MAX_CONTAINER_BYTES,
+            ));
+        }
+
         let c: Self = serde_json::from_slice(data)?;
         if c.magic != MAGIC {
             return Err(anyhow::anyhow!(
@@ -87,6 +96,33 @@ impl QuantumVaultContainer {
             return Err(anyhow::anyhow!(
                 "unsupported container version {}",
                 c.version
+            ));
+        }
+        // Structural validation (M-003 / H-002).
+        if c.threshold < 2 {
+            return Err(anyhow::anyhow!(
+                "container threshold must be >= 2, got {}",
+                c.threshold
+            ));
+        }
+        if c.share_count < c.threshold {
+            return Err(anyhow::anyhow!(
+                "share_count ({}) must be >= threshold ({})",
+                c.share_count,
+                c.threshold
+            ));
+        }
+        if c.shares.len() != c.share_count as usize {
+            return Err(anyhow::anyhow!(
+                "shares.len() ({}) != share_count ({})",
+                c.shares.len(),
+                c.share_count
+            ));
+        }
+        if c.nonce.len() != 12 {
+            return Err(anyhow::anyhow!(
+                "nonce must be 12 bytes, got {}",
+                c.nonce.len()
             ));
         }
         Ok(c)

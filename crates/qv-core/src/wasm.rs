@@ -28,12 +28,12 @@ use crate::{
     crypto::backend::dev::{DevKem, DevSignature},
     crypto::kem::Kem,
     crypto::signature::Signature,
-    encrypt::{container_signing_bytes, encrypt_file, xor_protect},
+    encrypt::{aes_aad, container_signing_bytes, encrypt_file, xor_protect},
     shamir::{reconstruct_secret, Share},
     EncryptOptions,
 };
 use aes_gcm::{
-    aead::{Aead, KeyInit},
+    aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Key, Nonce,
 };
 
@@ -211,12 +211,18 @@ pub fn qv_decrypt(
     let mut file_key =
         reconstruct_secret(&shares).map_err(|e| JsError::new(&e.to_string()))?;
 
-    // 4. AES-256-GCM decrypt.
+    // 4. AES-256-GCM decrypt with the same AAD used during encryption (M-001).
+    let aad = aes_aad(
+        container.version,
+        container.threshold,
+        &container.kem_algorithm,
+        &container.sig_algorithm,
+    );
     let aes_key = Key::<Aes256Gcm>::from_slice(&file_key);
     let cipher = Aes256Gcm::new(aes_key);
     let nonce = Nonce::from_slice(&container.nonce);
     let plaintext = cipher
-        .decrypt(nonce, container.ciphertext.as_slice())
+        .decrypt(nonce, Payload { msg: container.ciphertext.as_slice(), aad: &aad })
         .map_err(|_| JsError::new("AES-256-GCM decryption failed — wrong key or tampered data"))?;
 
     file_key.zeroize();

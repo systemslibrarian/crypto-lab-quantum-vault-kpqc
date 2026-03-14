@@ -121,79 +121,90 @@ fn compile_kpqc_native() {
     compile_haetae(&haetae_src, haetae_level);
 }
 
+/// Walk `base` one level deep to find the single versioned sub-directory
+/// (e.g. `SMAUG-T-1.1.1/` or `HAETAE-1.1.2/`).  The build fails with a
+/// helpful message if zero or more than one sub-directory is found.
+#[cfg(feature = "kpqc-native")]
+fn find_versioned_subdir(base: &std::path::Path) -> std::path::PathBuf {
+    let mut dirs: Vec<_> = std::fs::read_dir(base)
+        .unwrap_or_else(|e| panic!("cannot read directory {}: {}", base.display(), e))
+        .flatten()
+        .filter(|e| e.file_type().map_or(false, |t| t.is_dir()))
+        .collect();
+    match dirs.len() {
+        0 => panic!(
+            "no sub-directories found under {}; expected a versioned directory like SMAUG-T-1.1.1/",
+            base.display()
+        ),
+        1 => dirs.remove(0).path(),
+        _ => panic!(
+            "expected exactly one versioned sub-directory under {}, found {}; \
+             set SMAUG_T_SRC / HAETAE_SRC to the exact versioned path",
+            base.display(), dirs.len()
+        ),
+    }
+}
+
 /// Compile SMAUG-T reference C code using the `cc` crate.
 ///
-/// # Source layout assumption
+/// # Source layout
 ///
-/// The SMAUG-T reference repository is expected to have the following layout
-/// (based on the KpqC competition reference submission layout):
-///
-/// ```
+/// ```text
 /// vendor/smaug-t/
-/// ├── Reference_Implementation/
-/// │   └── crypto_kem/
-/// │       └── smaug-t<LEVEL>/
-/// │           ├── api.h
-/// │           ├── bch.c / bch.h
-/// │           ├── drbg.c / drbg.h
-/// │           ├── indcpa.c / indcpa.h
-/// │           ├── kem.c
-/// │           ├── pack.c / pack.h
-/// │           ├── poly.c / poly.h
-/// │           ├── ringct.c / ringct.h
-/// │           └── symmetric.c / symmetric.h
+/// └── SMAUG-T-1.1.1/                   ← versioned subdir
+///     └── reference_implementation/
+///         ├── include/                 ← headers
+///         └── src/                    ← .c files (randombytes.c excluded)
 /// ```
 ///
-/// If the layout differs (e.g. a cmake-based subproject), adjust this function
-/// accordingly.
+/// `randombytes.c` is excluded and replaced by `randombytes_shim.c` in the
+/// crate root, which sources OS entropy instead of the NIST KAT DRBG.
 #[cfg(feature = "kpqc-native")]
-fn compile_smaug_t(src: &std::path::Path, level: u8) {
-    use std::path::Path;
+fn compile_smaug_t(src: &std::path::Path, _level: u8) {
+    use std::ffi::OsStr;
 
-    // Validate security level.
-    assert!(
-        matches!(level, 1 | 3 | 5),
-        "SMAUG_T_LEVEL must be 1, 3, or 5; got {level}"
-    );
+    let versioned = find_versioned_subdir(src);
+    let ref_dir = versioned.join("reference_implementation");
+    let src_dir = ref_dir.join("src");
+    let inc_dir = ref_dir.join("include");
 
-    let ref_dir = src
-        .join("Reference_Implementation")
-        .join("crypto_kem")
-        .join(format!("smaug-t{level}"));
-
-    if !ref_dir.exists() {
+    if !src_dir.exists() {
         eprintln!(
-            "build.rs: SMAUG-T level-{level} reference directory not found: {}",
-            ref_dir.display()
+            "build.rs: SMAUG-T src dir not found: {}\n\
+             Expected layout: vendor/smaug-t/<version>/reference_implementation/src/",
+            src_dir.display()
         );
-        eprintln!("build.rs: Available paths under {}:", src.display());
-        if let Ok(entries) = std::fs::read_dir(src) {
-            for e in entries.flatten() {
-                eprintln!("  {}", e.path().display());
-            }
-        }
         std::process::exit(1);
     }
 
-    // Collect .c files from the level directory.
-    let c_files: Vec<_> = std::fs::read_dir(&ref_dir)
-        .expect("could not read SMAUG-T source dir")
+    // Collect .c files, excluding randombytes.c (replaced by our OS-entropy shim).
+    let c_files: Vec<_> = std::fs::read_dir(&src_dir)
+        .expect("could not read SMAUG-T src dir")
         .flatten()
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "c"))
+        .filter(|e| {
+            let p = e.path();
+            p.extension().map_or(false, |ext| ext == "c")
+                && p.file_name() != Some(OsStr::new("randombytes.c"))
+        })
         .map(|e| e.path())
         .collect();
 
     if c_files.is_empty() {
         eprintln!(
-            "build.rs: no .c files found in {} — check the SMAUG-T source layout",
-            ref_dir.display()
+            "build.rs: no .c files found in {} — check SMAUG-T source layout",
+            src_dir.display()
         );
         std::process::exit(1);
     }
 
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let shim = manifest_dir.join("randombytes_shim.c");
+
     let mut build = cc::Build::new();
     build
-        .include(&ref_dir)
+        .include(&inc_dir)
+        // Select SMAUGT_MODE3 (enum value 1) — level-3 security.
+        .define("SMAUGT_CONFIG_MODE", Some("SMAUGT_MODE3"))
         .flag_if_supported("-O2")
         .flag_if_supported("-std=c99")
         .flag_if_supported("-Wall");
@@ -202,6 +213,9 @@ fn compile_smaug_t(src: &std::path::Path, level: u8) {
         build.file(f);
         println!("cargo:rerun-if-changed={}", f.display());
     }
+    build.file(&shim);
+    println!("cargo:rerun-if-changed={}", shim.display());
+    println!("cargo:rerun-if-changed={}", inc_dir.display());
 
     build.compile("smaug_t");
     println!("cargo:rustc-link-lib=static=smaug_t");
@@ -209,68 +223,67 @@ fn compile_smaug_t(src: &std::path::Path, level: u8) {
 
 /// Compile HAETAE reference C code using the `cc` crate.
 ///
-/// # Source layout assumption
+/// # Source layout
 ///
-/// ```
+/// ```text
 /// vendor/haetae/
-/// ├── Reference_Implementation/
-/// │   └── crypto_sign/
-/// │       └── haetae<LEVEL>/
-/// │           ├── api.h
-/// │           ├── aes256ctr.c / .h
-/// │           ├── fips202.c / .h
-/// │           ├── haetae.c
-/// │           ├── ntt.c / .h
-/// │           ├── packing.c / .h
-/// │           ├── params.h
-/// │           ├── poly.c / .h
-/// │           ├── polymat.c / .h
-/// │           ├── polyvec.c / .h
-/// │           ├── randombytes.c / .h
-/// │           ├── reduce.c / .h
-/// │           ├── rounding.c / .h
-/// │           ├── sampler.c / .h
-/// │           └── sign.c
+/// └── HAETAE-1.1.2/                    ← versioned subdir
+///     └── reference_implementation/
+///         ├── include/                 ← headers (params.h, api.h, …)
+///         └── src/                    ← .c files (randombytes.c excluded)
 /// ```
+///
+/// The default mode in `config.h` is `HAETAE_MODE2`; we explicitly pass
+/// `-DHAETAE_CONFIG_MODE=HAETAE_MODE3` to select Level 3.
+///
+/// `randombytes.c` is excluded and replaced by `randombytes_shim.c` in the
+/// crate root, which sources OS entropy instead of the NIST KAT DRBG.
 #[cfg(feature = "kpqc-native")]
-fn compile_haetae(src: &std::path::Path, level: u8) {
-    // Validate security level.
-    assert!(
-        matches!(level, 2 | 3 | 5),
-        "HAETAE_LEVEL must be 2, 3, or 5; got {level}"
-    );
+fn compile_haetae(src: &std::path::Path, _level: u8) {
+    use std::ffi::OsStr;
 
-    let ref_dir = src
-        .join("Reference_Implementation")
-        .join("crypto_sign")
-        .join(format!("haetae{level}"));
+    let versioned = find_versioned_subdir(src);
+    let ref_dir = versioned.join("reference_implementation");
+    let src_dir = ref_dir.join("src");
+    let inc_dir = ref_dir.join("include");
 
-    if !ref_dir.exists() {
+    if !src_dir.exists() {
         eprintln!(
-            "build.rs: HAETAE level-{level} reference directory not found: {}",
-            ref_dir.display()
+            "build.rs: HAETAE src dir not found: {}\n\
+             Expected layout: vendor/haetae/<version>/reference_implementation/src/",
+            src_dir.display()
         );
         std::process::exit(1);
     }
 
-    let c_files: Vec<_> = std::fs::read_dir(&ref_dir)
-        .expect("could not read HAETAE source dir")
+    // Collect .c files, excluding randombytes.c (replaced by our OS-entropy shim).
+    let c_files: Vec<_> = std::fs::read_dir(&src_dir)
+        .expect("could not read HAETAE src dir")
         .flatten()
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "c"))
+        .filter(|e| {
+            let p = e.path();
+            p.extension().map_or(false, |ext| ext == "c")
+                && p.file_name() != Some(OsStr::new("randombytes.c"))
+        })
         .map(|e| e.path())
         .collect();
 
     if c_files.is_empty() {
         eprintln!(
-            "build.rs: no .c files found in {} — check the HAETAE source layout",
-            ref_dir.display()
+            "build.rs: no .c files found in {} — check HAETAE source layout",
+            src_dir.display()
         );
         std::process::exit(1);
     }
 
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let shim = manifest_dir.join("randombytes_shim.c");
+
     let mut build = cc::Build::new();
     build
-        .include(&ref_dir)
+        .include(&inc_dir)
+        // config.h defaults to HAETAE_MODE2; override to HAETAE_MODE3 (enum value 1).
+        .define("HAETAE_CONFIG_MODE", Some("HAETAE_MODE3"))
         .flag_if_supported("-O2")
         .flag_if_supported("-std=c99")
         .flag_if_supported("-Wall");
@@ -279,6 +292,9 @@ fn compile_haetae(src: &std::path::Path, level: u8) {
         build.file(f);
         println!("cargo:rerun-if-changed={}", f.display());
     }
+    build.file(&shim);
+    println!("cargo:rerun-if-changed={}", shim.display());
+    println!("cargo:rerun-if-changed={}", inc_dir.display());
 
     build.compile("haetae");
     println!("cargo:rustc-link-lib=static=haetae");

@@ -37,12 +37,27 @@ use anyhow::Result;
 use crypto::backend::dev::{DevKem, DevSignature};
 use crypto::kem::Kem as _;
 use crypto::signature::Signature as _;
+use std::fmt;
+
+// [L-002] Prevent dev-backend from shipping in release builds.
+// Add feature `allow_dev_backend_in_release` to explicitly opt-in if needed
+// (e.g. for benchmarking), but it must never be the default.
+#[cfg(all(
+    not(debug_assertions),
+    feature = "dev-backend",
+    not(feature = "allow_dev_backend_in_release")
+))]
+compile_error!(
+    "dev-backend is active in a release build. \
+     Compile with --features kpqc-native for a production build, or add \
+     feature `allow_dev_backend_in_release` to acknowledge the insecurity."
+);
 
 /// Container format version used by the current implementation.
 pub const CONTAINER_VERSION: u8 = 1;
 
 /// Input options controlling key splitting and metadata during encryption.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EncryptOptions {
     /// Minimum number of shares required to reconstruct the file key.
     pub threshold: u8,
@@ -54,13 +69,40 @@ pub struct EncryptOptions {
     pub signer_private_key: Vec<u8>,
 }
 
+/// Redacted Debug implementation — never prints private key material (H-004).
+impl fmt::Debug for EncryptOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EncryptOptions")
+            .field("threshold", &self.threshold)
+            .field("share_count", &self.share_count)
+            .field("recipient_public_keys_count", &self.recipient_public_keys.len())
+            .field("signer_private_key", &"[redacted]")
+            .finish()
+    }
+}
+
 /// Input options for decrypting and validating a container.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DecryptOptions {
     /// Recipient KEM private keys used to recover protected key shares.
+    /// Element `i` decrypts the share with index `share_indices[i]`.
     pub recipient_private_keys: Vec<Vec<u8>>,
+    /// Share indices parallel to `recipient_private_keys`.
+    /// `share_indices[i]` is the 1-based share index that `recipient_private_keys[i]` unlocks.
+    pub share_indices: Vec<u8>,
     /// Signature public key used to verify container authenticity.
     pub signer_public_key: Vec<u8>,
+}
+
+/// Redacted Debug implementation — never prints private key material (H-004).
+impl fmt::Debug for DecryptOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DecryptOptions")
+            .field("recipient_private_keys_count", &self.recipient_private_keys.len())
+            .field("share_indices", &self.share_indices)
+            .field("signer_public_key_len", &self.signer_public_key.len())
+            .finish()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -177,8 +219,16 @@ pub fn decrypt_with_threshold(
     let kem = DevKem;
     let sig = DevSignature;
     let container = QuantumVaultContainer::from_bytes(container_json)?;
+    // Derive share indices from the container's shares in order (positional match).
+    let share_indices: Vec<u8> = container
+        .shares
+        .iter()
+        .take(kem_privkeys.len())
+        .map(|s| s.index)
+        .collect();
     let options = DecryptOptions {
         recipient_private_keys: kem_privkeys.to_vec(),
+        share_indices,
         signer_public_key: sig_pubkey.to_vec(),
     };
     decrypt::decrypt_file(&container, &options, &kem, &sig)

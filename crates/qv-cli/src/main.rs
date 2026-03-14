@@ -276,11 +276,21 @@ fn cmd_decrypt(
         .map(|s| B64.decode(s.trim()).map_err(|e| anyhow!("invalid base64 privkey: {e}")))
         .collect::<Result<_>>()?;
 
+    // Default: assume keys are supplied for the first N shares in container order.
+    // For non-consecutive share subsets, use the library API directly.
+    let share_indices: Vec<u8> = container
+        .shares
+        .iter()
+        .take(recipient_private_keys.len())
+        .map(|s| s.index)
+        .collect();
+
     let signer_public_key = read_b64(verify_key_path)
         .with_context(|| format!("failed to read verify key {}", verify_key_path.display()))?;
 
     let options = DecryptOptions {
         recipient_private_keys,
+        share_indices,
         signer_public_key,
     };
 
@@ -301,10 +311,28 @@ fn cmd_decrypt(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Write `bytes` as base64 (standard, padded) to `path`.
+/// Write `bytes` as base64 (standard, padded) to `path` with owner-only
+/// read/write permissions (0o600) to protect private key material (H-006).
 fn write_b64(path: &Path, bytes: &[u8]) -> Result<()> {
-    fs::write(path, B64.encode(bytes))
-        .with_context(|| format!("failed to write {}", path.display()))
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)
+            .with_context(|| format!("failed to open {} for writing", path.display()))?;
+        file.write_all(B64.encode(bytes).as_bytes())
+            .with_context(|| format!("failed to write {}", path.display()))
+    }
+    #[cfg(not(unix))]
+    {
+        fs::write(path, B64.encode(bytes))
+            .with_context(|| format!("failed to write {}", path.display()))
+    }
 }
 
 /// Read base64 bytes from `path`.

@@ -12,6 +12,7 @@ use crate::crypto::{kem::Kem, signature::Signature};
 use anyhow::{anyhow, Result};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 
 // ---------------------------------------------------------------------------
 // DevKem
@@ -127,8 +128,8 @@ impl Signature for DevSignature {
         h.update(pubkey);
         h.update(message);
         let expected = h.finalize();
-        // Constant-time comparison.
-        Ok(expected.as_slice() == signature)
+        // Constant-time comparison to prevent timing side-channel (M-005).
+        Ok(bool::from(expected.as_slice().ct_eq(signature)))
     }
 
     fn algorithm_id(&self) -> &'static str {

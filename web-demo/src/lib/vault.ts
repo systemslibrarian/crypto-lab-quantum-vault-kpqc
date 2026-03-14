@@ -97,10 +97,12 @@ export async function sigGenerateKeypair(): Promise<SigKeyPair> {
 }
 
 async function sign(privKey: Uint8Array, message: Uint8Array): Promise<Uint8Array> {
-  const combined = new Uint8Array(privKey.length + message.length);
-  combined.set(privKey);
-  combined.set(message, privKey.length);
-  return sha256(combined);
+  // Derive the MAC key = SHA-256(privKey) = pubKey, matching DevSignature in Rust.
+  const macKey = await sha256(privKey);
+  const combined = new Uint8Array(macKey.length + message.length);
+  combined.set(macKey);
+  combined.set(message, macKey.length);
+  return sha256(combined); // SHA-256(pubKey ‖ message) — same as verify()
 }
 
 async function verify(
@@ -124,9 +126,10 @@ async function aesEncrypt(
   key: Uint8Array,
   nonce: Uint8Array,
   plaintext: Uint8Array,
+  aad: Uint8Array,
 ): Promise<Uint8Array> {
   const cryptoKey = await crypto.subtle.importKey('raw', toAB(key), 'AES-GCM', false, ['encrypt']);
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: toAB(nonce) }, cryptoKey, toAB(plaintext));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: toAB(nonce), additionalData: toAB(aad) }, cryptoKey, toAB(plaintext));
   return new Uint8Array(ct);
 }
 
@@ -134,25 +137,42 @@ async function aesDecrypt(
   key: Uint8Array,
   nonce: Uint8Array,
   ciphertext: Uint8Array,
+  aad: Uint8Array,
 ): Promise<Uint8Array> {
   const cryptoKey = await crypto.subtle.importKey('raw', toAB(key), 'AES-GCM', false, ['decrypt']);
-  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: toAB(nonce) }, cryptoKey, toAB(ciphertext));
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: toAB(nonce), additionalData: toAB(aad) }, cryptoKey, toAB(ciphertext));
   return new Uint8Array(pt);
 }
+// ── AES-GCM Additional Authenticated Data ──────────────────────────────────────────
 
+/**
+ * Compute the AES-GCM Additional Authenticated Data. Must match the Rust
+ * `aes_aad()` function in encrypt.rs exactly (same field order, same encoding).
+ */
+function computeAad(version: number, threshold: number, kemAlgorithm: string, sigAlgorithm: string): Uint8Array {
+  // Field order must match the Rust serde_json::json! call in encrypt.rs.
+  const obj = { kem_algorithm: kemAlgorithm, sig_algorithm: sigAlgorithm, threshold, version };
+  return new TextEncoder().encode(JSON.stringify(obj));
+}
 // ── Signing bytes (canonical representation, mirrors container_signing_bytes) ─
 
-function canonicalBytes(c: Omit<VaultContainer, 'signature'>): Uint8Array {
+function canonicalBytes(c: VaultContainer): Uint8Array {
+  // Must match Rust container_signing_bytes() in encrypt.rs exactly:
+  // same field names (snake_case), same field order, same JSON encoding.
   const obj = {
-    version: c.version,
-    threshold: c.threshold,
-    shareCount: c.shareCount,
-    nonce: Array.from(c.nonce),
-    ciphertext: Array.from(c.ciphertext),
-    shares: c.shares.map((s) => ({
-      index: s.index,
-      kemCiphertext: Array.from(s.kemCiphertext),
-      encryptedData: Array.from(s.encryptedData),
+    magic:         'QVLT1',
+    version:       c.version,
+    cipher:        'Aes256Gcm',
+    kem_algorithm: c.kemAlgorithm,
+    sig_algorithm: c.sigAlgorithm,
+    threshold:     c.threshold,
+    share_count:   c.shareCount,
+    nonce:         Array.from(c.nonce),
+    ciphertext:    Array.from(c.ciphertext),
+    shares:        c.shares.map((s) => ({
+      index:           s.index,
+      kem_ciphertext:  Array.from(s.kemCiphertext),
+      encrypted_share: Array.from(s.encryptedData),
     })),
   };
   return new TextEncoder().encode(JSON.stringify(obj));
@@ -169,7 +189,8 @@ export async function encryptPayload(
   const fileKey = crypto.getRandomValues(new Uint8Array(32));
   const nonce   = crypto.getRandomValues(new Uint8Array(12));
 
-  const ciphertext = await aesEncrypt(fileKey, nonce, plaintext);
+  const aad = computeAad(1, threshold, 'dev-kem', 'dev-sig');
+  const ciphertext = await aesEncrypt(fileKey, nonce, plaintext, aad);
   const rawShares  = splitSecret(fileKey, participants.length, threshold);
 
   const encShares: EncryptedShare[] = await Promise.all(
@@ -186,12 +207,14 @@ export async function encryptPayload(
     version: 1,
     threshold,
     shareCount: participants.length,
+    kemAlgorithm: 'dev-kem',
+    sigAlgorithm: 'dev-sig',
     nonce,
     ciphertext,
     shares: encShares,
   };
 
-  const toSign = canonicalBytes(partial);
+  const toSign = canonicalBytes({ ...partial, signature: new Uint8Array(0) });
   const signature = await sign(signerPrivKey, toSign);
 
   return { ...partial, signature };
@@ -225,5 +248,11 @@ export async function decryptPayload(
   );
 
   const fileKey = reconstructSecret(shares);
-  return aesDecrypt(fileKey, container.nonce, container.ciphertext);
+  const aad = computeAad(
+    container.version,
+    container.threshold,
+    container.kemAlgorithm,
+    container.sigAlgorithm,
+  );
+  return aesDecrypt(fileKey, container.nonce, container.ciphertext, aad);
 }
