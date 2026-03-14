@@ -15,7 +15,6 @@
 //   4. AES-GCM decrypt wrappedShare using sharedSecret → Shamir share bytes
 
 import { smaugKeypair, smaugEncapsulate, smaugDecapsulate } from './smaug';
-import { aesEncrypt, aesDecrypt } from './aes';
 import { buf } from './utils';
 
 export interface WrappedShare {

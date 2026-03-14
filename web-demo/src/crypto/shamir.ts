@@ -1,5 +1,8 @@
 // Shamir Secret Sharing over GF(2^8)
-// Irreducible polynomial: 0x11B  (x^8 + x^4 + x^3 + x + 1 — same as AES)
+// Irreducible polynomial: 0x11D  (x^8 + x^4 + x^3 + x^2 + 1)
+// Generator: 2 — has order 255 with this polynomial, making it a primitive
+// element and ensuring the EXP/LOG tables cover all 255 non-zero elements.
+// (0x11B = AES polynomial is irreducible but 2 has order 51 there, not 255.)
 //
 // Critical property: reconstructing with fewer than `threshold` shares produces
 // mathematically incorrect output (wrong bytes), NOT an error. This is the
@@ -15,7 +18,7 @@ const LOG = new Uint8Array(256); // LOG[x] = i  where  generator^i = x
     EXP[i] = x;
     LOG[x] = i;
     x = x << 1;
-    if (x & 0x100) x ^= 0x11b; // reduce by irreducible polynomial
+    if (x & 0x100) x ^= 0x11d; // reduce by irreducible polynomial (0x11d: generator 2 has order 255)
   }
   // Extended table so gfMul can index LOG[a]+LOG[b] without extra modular step
   for (let i = 255; i < 512; i++) {
@@ -53,6 +56,9 @@ export function splitSecret(
   threshold: number,
   totalShares: number,
 ): Share[] {
+  if (secret.length === 0) {
+    throw new Error('Secret must not be empty');
+  }
   if (threshold < 2 || threshold > totalShares) {
     throw new Error('Invalid Shamir threshold parameters');
   }

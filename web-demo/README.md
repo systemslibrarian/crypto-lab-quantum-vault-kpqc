@@ -1,8 +1,8 @@
 # Quantum Vault — Web Demo
 
-An interactive browser demo that visualises every layer of the Quantum Vault cryptographic stack using a shuffled deck of 52 playing cards as the payload.
+An interactive browser demo that visualises every layer of the Quantum Vault cryptographic stack using a bank vault of 12 safety deposit boxes.
 
-> **Experimental.** This demo uses a mock backend for KEM and signature operations. It is not production-ready and should not be used to protect real data.
+> **v5.0 — real KpqC cryptography.** All cryptographic operations run as genuine WebAssembly compiled from the official KpqC C reference implementations. SMAUG-T Level 1 handles key encapsulation; HAETAE Mode 2 handles container signing. No mocks, no HMAC substitutes.
 
 ---
 
@@ -12,29 +12,24 @@ An interactive browser demo that visualises every layer of the Quantum Vault cry
 # from the web-demo/ directory
 npm install
 npm run dev
-# open http://localhost:3000
+# open http://localhost:5173
 ```
 
-Tested with Node ≥ 18. All dependencies are installed locally — no global tooling required.
+Requires Node ≥ 18.
 
 ---
 
 ## Running Tests
 
 ```bash
-npm run test          # run all tests once
+npm run test          # run all tests once (Vitest)
 npm run test:watch    # watch mode
 ```
 
-The test suite uses **Vitest** + **@testing-library/react** + **jsdom**.
-
-```
-Test Files  2 passed (2)
-     Tests  18 passed (18)
-```
-
-- `src/crypto/__tests__/mock-backend.test.ts` — 12 tests covering every crypto primitive (AES-GCM round-trip, GF(256) Shamir split/reconstruct, KEM, signatures)
-- `src/components/__tests__/DeckOfCards.test.tsx` — 6 integration tests for the main UI component
+Test coverage:
+- `src/crypto/__tests__/utils.test.ts` — base64 codec, byte helpers, text encode/decode
+- `src/crypto/__tests__/shamir.test.ts` — GF(2⁸) Shamir split/reconstruct, threshold behaviour
+- `src/crypto/__tests__/pipeline.test.ts` — full seal/open pipeline with mocked WASM modules
 
 ---
 
@@ -42,128 +37,97 @@ Test Files  2 passed (2)
 
 ```
 web-demo/
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx          Next.js root layout (dark theme, meta tags)
-│   │   ├── page.tsx            Main demo page
-│   │   └── globals.css         Tailwind + CSS custom properties
-│   ├── components/
-│   │   ├── DeckOfCards.tsx     Main interactive component — orchestrates the full pipeline
-│   │   ├── PlayingCard.tsx     Single card with face-up/face-down flip animation
-│   │   ├── ShareCard.tsx       Shamir share card with lock/unlock and selection state
-│   │   ├── ContainerSeal.tsx   HAETAE signature seal (stamp animation, pass/fail glow)
-│   │   ├── StepIndicator.tsx   Pipeline progress indicator
-│   │   └── CryptoZoo.tsx       Algorithm showcase carousel
-│   ├── crypto/
-│   │   ├── types.ts            Shared TypeScript interfaces (CryptoBackend, Share, …)
-│   │   ├── mock-backend.ts     Browser-native mock backend (real AES-GCM, real GF(256) Shamir)
-│   │   └── index.ts            Active backend export — swap point for future WASM backend
-│   ├── hooks/
-│   │   └── useVault.ts         React hook encapsulating the vault state machine
-│   ├── lib/
-│   │   ├── cards.ts            Deck utilities: buildDeck, shuffleDeck, encode/decodePermutation
-│   │   ├── shamir.ts           GF(256) Shamir Secret Sharing (legacy — superseded by mock-backend)
-│   │   ├── types.ts            Container and vault types (legacy lib layer)
-│   │   ├── vault.ts            TypeScript vault pipeline (encrypt/decrypt with real SubtleCrypto)
-│   │   └── wasm-bridge.ts      Bridge between Rust WASM output and TypeScript types
-│   └── test/
-│       └── setup.ts            Vitest setup file (@testing-library/jest-dom matchers)
+├── index.html
+├── vite.config.ts
 ├── vitest.config.ts
+├── tsconfig.json
 ├── package.json
-└── README.md                   (this file)
+├── public/
+│   ├── smaug.wasm          ← compiled SMAUG-T Level 1 (committed)
+│   └── haetae.wasm         ← compiled HAETAE Mode 2 (committed)
+└── src/
+    ├── main.ts             ← entry point; awaits initCrypto() before vault init
+    ├── crypto/
+    │   ├── init.ts         ← parallel WASM module initialisation
+    │   ├── smaug.ts        ← SMAUG-T Level 1 WASM wrapper
+    │   ├── haetae.ts       ← HAETAE Mode 2 WASM wrapper
+    │   ├── keywrap.ts      ← SMAUG-T KEM + PBKDF2 share wrapping
+    │   ├── pipeline.ts     ← sealMessage / openBox orchestration
+    │   ├── aes.ts          ← AES-256-GCM via Web Crypto API
+    │   ├── shamir.ts       ← Shamir SSS over GF(2⁸)
+    │   ├── utils.ts        ← base64, text codecs, byte helpers
+    │   ├── signature.ts    ← re-export shim for haetae.ts
+    │   └── wasm/
+    │       ├── smaug.js    ← Emscripten JS loader (committed)
+    │       ├── smaug.d.ts
+    │       ├── haetae.js   ← Emscripten JS loader (committed)
+    │       └── haetae.d.ts
+    ├── vault/
+    │   ├── demo.ts         ← generates demo boxes on first visit
+    │   └── state.ts        ← localStorage persistence / serialisation
+    └── ui/
+        ├── wall.ts
+        ├── panel.ts
+        ├── pipeline-ui.ts
+        ├── reveal.ts
+        └── styles/vault.css
 ```
 
 ---
 
-## Architecture: Mock Backend → WASM Backend
+## Cryptographic Pipeline
 
-The demo uses a **two-tier architecture** so the UI can be developed and tested independently of the Rust WASM build:
+### Seal (deposit)
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Browser / Next.js                    │
-│                                                         │
-│  DeckOfCards.tsx ──► useVault hook ──► CryptoBackend    │
-│                                              │          │
-│                              ┌───────────────┤          │
-│                              ▼               ▼          │
-│                       MockBackend      WasmBackend      │
-│                      (current)        (future swap)     │
-│                              │               │          │
-│                              ▼               ▼          │
-│                   Web Crypto API      qv-core.wasm      │
-│                   (real AES-GCM)      (SMAUG-T+HAETAE)  │
-└─────────────────────────────────────────────────────────┘
+AES-256-GCM  →  Shamir split  →  SMAUG-T wrap  →  HAETAE sign
 ```
 
-### What the mock backend does for real
+1. **AES-256-GCM** — encrypt plaintext with a random 256-bit key
+2. **Shamir split** — split the 32-byte AES key into 3 shares, threshold = 2
+3. **SMAUG-T wrap** (×3) — fresh SMAUG-T keypair per participant; encapsulate share; seal SK with PBKDF2(password)
+4. **HAETAE sign** — fresh signing keypair; sign the entire container serialisation
 
-| Operation | Implementation |
-|-----------|---------------|
-| AES-256-GCM encrypt / decrypt | Real `SubtleCrypto.encrypt` / `decrypt` — no mocking |
-| Shamir split / reconstruct | Real GF(256) polynomial arithmetic (Lagrange interpolation) |
-| Key generation | `crypto.getRandomValues(new Uint8Array(32))` |
+### Open (retrieve)
 
-### What the mock backend simulates
-
-| Operation | Simulation |
-|-----------|-----------|
-| KEM keypair | Random bytes of realistic size (PK=1088 B, SK=1312 B = SMAUG-T Level 3) |
-| KEM encapsulate | Returns random CT (992 B) + SS (32 B); stores SS keyed by CT prefix |
-| KEM decapsulate | Looks up the stored SS for the given CT |
-| Signature keypair | Random bytes (VK=1472 B, SK=2112 B = HAETAE Level 3) |
-| Sign | SHA-256(SK ‖ message) as a deterministic 64-byte mock signature |
-| Verify | Re-derives SHA-256(SK ‖ message) and compares — round-trips correctly |
-
-### Swapping in the WASM backend
-
-1. Build the WASM package: `npm run wasm:build`
-2. In [src/crypto/index.ts](src/crypto/index.ts), change the one import line:
-
-```typescript
-// Before (mock):
-export { mockBackend as backend } from './mock-backend';
-
-// After (WASM):
-export { wasmBackend as backend } from './wasm-backend';
+```
+HAETAE verify  →  SMAUG-T unlock  →  Shamir reconstruct  →  AES-256-GCM
 ```
 
-No other code changes are needed.
-
----
-
-## Easter Egg
-
-Type **`meow`** anywhere on the page to toggle cat mode — step labels get cat puns and share cards get cat names.
+1. **HAETAE verify** — reject tampered containers immediately
+2. **SMAUG-T unlock** (for each password) — PBKDF2 → decrypt SK → decapsulate → recover Shamir share
+3. **Shamir reconstruct** — requires ≥ 2 valid shares; fewer → wrong bytes → AES auth fails
+4. **AES-256-GCM** — decrypt ciphertext; wrong key → DOMException
 
 ---
 
 ## Building for Production
 
 ```bash
-npm run build    # Next.js production build
-npm run start    # serve the production build
+npm run build   # TypeScript type-check + Vite production build → dist/
 ```
+
+Deployed to GitHub Pages via `.github/workflows/deploy-pages.yml`.
 
 ---
 
-## WASM Build (optional)
+## WASM Modules
 
-Requires `wasm-pack` and the Rust toolchain:
+The `.wasm` binaries and Emscripten JS loaders are committed to the repository so that CI/CD does not require a C toolchain. To rebuild from the KpqC C reference sources:
 
 ```bash
-# install wasm-pack if not present
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-# build (from web-demo/ or workspace root)
-npm run wasm:build        # release
-npm run wasm:build:dev    # debug
+# From the repository root:
+bash wasm/build.sh
+cp wasm/dist/smaug.js  web-demo/src/crypto/wasm/smaug.js
+cp wasm/dist/haetae.js web-demo/src/crypto/wasm/haetae.js
+cp wasm/dist/smaug.wasm  web-demo/public/smaug.wasm
+cp wasm/dist/haetae.wasm web-demo/public/haetae.wasm
 ```
 
-The WASM package is output to `public/wasm-pkg/`.
+See `wasm/build.sh` for required Emscripten version and flags.
 
 ---
 
 ## License
 
-See root [`LICENSE`](../LICENSE). Experimental — not for production use.
+MIT — see root [`LICENSE`](../LICENSE).
