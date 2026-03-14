@@ -44,6 +44,9 @@ jobs:
       - name: Clippy (default features)
         run: cargo clippy --workspace -- -W clippy::all
 
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
       - name: Security audit
         run: |
           cargo install cargo-audit --locked

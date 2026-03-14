@@ -62,6 +62,16 @@ wasm-bindgen = { version = "0.2", optional = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 
+[dev-dependencies]
+# aes-gcm is already a normal dep, but listing it here makes it available
+# in integration tests without requiring a feature flag dance.
+aes-gcm = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "crypto_bench"
+harness = false
+
 [build-dependencies]
 # build.rs uses cc to compile native KpqC C code — only when kpqc-native is on.
 cc = { workspace = true, optional = true }
