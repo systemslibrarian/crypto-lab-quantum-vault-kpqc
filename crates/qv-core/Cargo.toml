@@ -48,7 +48,6 @@ rand.workspace = true
 serde = { workspace = true }
 serde_json.workspace = true
 sha2.workspace = true
-thiserror.workspace = true
 zeroize = { workspace = true }
 # Only compiled when kpqc-native is enabled (needed by build.rs at compile time).
 cc = { workspace = true, optional = true }

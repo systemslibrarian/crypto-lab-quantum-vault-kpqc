@@ -81,12 +81,10 @@ impl Kem for DevKem {
     }
 
     fn algorithm_id(&self) -> &'static str {
-        "dev-stub"
+        "dev-kem"
     }
 }
 
-// ---------------------------------------------------------------------------
-// DevSignature
 // ---------------------------------------------------------------------------
 
 /// Development signature stub.
@@ -95,11 +93,13 @@ impl Kem for DevKem {
 /// * `privkey` = 32 random bytes
 /// * `pubkey`  = SHA-256(`privkey`)  →  32 bytes
 ///
-/// Sign:   `sig = SHA-256(privkey || message)`
-/// Verify: `SHA-256(pubkey_as_privkey || message) == sig`
+/// Sign:   `sig = SHA-256(SHA-256(privkey) || message)`
+///              = `SHA-256(pubkey || message)`
+/// Verify: `SHA-256(pubkey || message) == sig`
 ///
-/// Because pubkey = SHA-256(privkey), verification re-derives the "signing
-/// key" from the public key — only valid in this symmetric dev context.
+/// Using `pubkey` (= SHA-256(privkey)) as the MAC key means that verification
+/// only needs the public key, which is intentional for this dev-only scheme.
+/// A real signature scheme (HAETAE) does not have this property.
 pub struct DevSignature;
 
 impl Signature for DevSignature {
@@ -132,7 +132,7 @@ impl Signature for DevSignature {
     }
 
     fn algorithm_id(&self) -> &'static str {
-        "dev-stub"
+        "dev-sig"
     }
 }
 

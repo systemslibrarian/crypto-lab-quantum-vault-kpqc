@@ -232,21 +232,43 @@ quantum-vault/
 
 ---
 
-## CLI Usage (Planned)
+## CLI Usage
 
-Generate keys:
-```
-quantum-vault keygen --name alice
-```
-
-Encrypt a file:
-```
-quantum-vault encrypt secret.pdf --threshold 3 --shares 5
+Generate a KEM + signature keypair with the dev backend:
+```sh
+qv keygen --out-dir ./keys --name alice
 ```
 
-Decrypt a file:
+Encrypt a file for 3 recipients with a 2-of-3 threshold:
+```sh
+# First generate a key per recipient:
+qv keygen --out-dir ./keys --name alice
+qv keygen --out-dir ./keys --name bob
+qv keygen --out-dir ./keys --name carol
+
+# Then encrypt (comma-separated KEM public key files, read as base64):
+qv encrypt \
+  --in secret.pdf \
+  --out secret.qvault \
+  --pubkeys "$(cat keys/alice.kem.pub),$(cat keys/bob.kem.pub),$(cat keys/carol.kem.pub)" \
+  --threshold 2 \
+  --sign-key keys/alice.sig.priv
 ```
-quantum-vault decrypt secret.qvault
+
+Decrypt with any 2 of the 3 private keys:
+```sh
+qv decrypt \
+  --in secret.qvault \
+  --out recovered.pdf \
+  --privkeys "$(cat keys/alice.kem.priv),$(cat keys/bob.kem.priv)" \
+  --verify-key keys/alice.sig.pub
+```
+
+The `--backend` flag selects the crypto backend (`dev` by default; `kpqc`
+requires the `kpqc-native` or `kpqc-wasm` feature to be compiled in):
+```sh
+# Show which backend is active:
+qv keygen --backend dev
 ```
 
 ---
@@ -321,4 +343,4 @@ Before production use the project would require:
 
 ## License
 
-Apache-2.0
+MIT

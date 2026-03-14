@@ -142,7 +142,7 @@ fn compile_kpqc_native() {
 /// If the layout differs (e.g. a cmake-based subproject), adjust this function
 /// accordingly.
 #[cfg(feature = "kpqc-native")]
-fn compile_smaug_t(src: &std::path::Path, level: u8) -> () {
+fn compile_smaug_t(src: &std::path::Path, level: u8) {
     use std::path::Path;
 
     // Validate security level.
@@ -228,7 +228,7 @@ fn compile_smaug_t(src: &std::path::Path, level: u8) -> () {
 /// │           └── sign.c
 /// ```
 #[cfg(feature = "kpqc-native")]
-fn compile_haetae(src: &std::path::Path, level: u8) -> () {
+fn compile_haetae(src: &std::path::Path, level: u8) {
     // Validate security level.
     assert!(
         matches!(level, 2 | 3 | 5),

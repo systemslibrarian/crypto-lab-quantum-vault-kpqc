@@ -110,7 +110,7 @@ mod wasm_backend {
             Err(anyhow!("SMAUG-T WASM backend is not yet implemented."))
         }
         fn algorithm_id(&self) -> &'static str {
-            "SMAUG-T-3 (wasm-stub)"
+            "SMAUG-T-3"
         }
     }
 
@@ -131,7 +131,7 @@ mod wasm_backend {
             Err(anyhow!("HAETAE WASM backend is not yet implemented."))
         }
         fn algorithm_id(&self) -> &'static str {
-            "HAETAE-3 (wasm-stub)"
+            "HAETAE-3"
         }
     }
 }
@@ -162,7 +162,7 @@ mod stub {
             Err(not_available("SMAUG-T (KEM)"))
         }
         fn algorithm_id(&self) -> &'static str {
-            "SMAUG-T-3 (unavailable — enable kpqc-native or kpqc-wasm feature)"
+            "SMAUG-T-3"
         }
     }
 
@@ -183,7 +183,7 @@ mod stub {
             Err(not_available("HAETAE (signature)"))
         }
         fn algorithm_id(&self) -> &'static str {
-            "HAETAE-3 (unavailable — enable kpqc-native or kpqc-wasm feature)"
+            "HAETAE-3"
         }
     }
 

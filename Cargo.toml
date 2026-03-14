@@ -19,7 +19,6 @@ categories = ["cryptography", "command-line-utilities", "wasm"]
 
 [workspace.dependencies]
 anyhow = "1.0"
-thiserror = "2.0"
 aes-gcm = "0.10"
 base64 = "0.22"
 cc = "1.2"          # used by build.rs when kpqc-native is enabled

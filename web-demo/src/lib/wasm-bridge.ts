@@ -127,6 +127,8 @@ function rustContainerToTs(containerJson: string): VaultContainer {
     version: number;
     threshold: number;
     share_count: number;
+    kem_algorithm: string;
+    sig_algorithm: string;
     nonce: number[];
     ciphertext: number[];
     shares: Array<{
