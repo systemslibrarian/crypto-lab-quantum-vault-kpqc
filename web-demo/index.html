@@ -149,6 +149,31 @@
         </span>
       </div>
 
+      <!-- Vault management -->
+      <div class="reset-area">
+        <button class="btn-vault-action" id="btn-export-vault"
+                data-en="Export vault"
+                data-ko="볼트 내보내기">
+          Export vault
+        </button>
+        <label class="btn-vault-action btn-import-label" id="btn-import-vault-label"
+               data-en="Import vault"
+               data-ko="볼트 가져오기">
+          Import vault
+          <input type="file" id="input-import-vault" accept=".quantum-vault" hidden />
+        </label>
+        <button class="btn-vault-action btn-danger" id="btn-clear-vault"
+                data-en="Clear vault"
+                data-ko="볼트 초기화">
+          Clear vault
+        </button>
+        <button class="btn-reset" id="btn-reset"
+                data-en="Reset to demo"
+                data-ko="데모로 초기화">
+          Reset to demo
+        </button>
+      </div>
+
       <!-- Research Origin -->
       <section class="kpqc-panel research-origin" aria-labelledby="research-origin-title">
         <h2 class="kpqc-panel-title" id="research-origin-title">
@@ -185,31 +210,6 @@
           The implementations are derived from reference code produced by Korean cryptography researchers as part of the KpqC competition.
         </p>
       </section>
-
-      <!-- Vault management -->
-      <div class="reset-area">
-        <button class="btn-vault-action" id="btn-export-vault"
-                data-en="Export entire vault"
-                data-ko="전체 볼트 내보내기">
-          Export entire vault
-        </button>
-        <label class="btn-vault-action btn-import-label" id="btn-import-vault-label"
-               data-en="Import vault file"
-               data-ko="볼트 파일 가져오기">
-          Import vault file
-          <input type="file" id="input-import-vault" accept=".quantum-vault" hidden />
-        </label>
-        <button class="btn-vault-action btn-danger" id="btn-clear-vault"
-                data-en="Clear vault"
-                data-ko="볼트 초기화">
-          Clear vault
-        </button>
-        <button class="btn-reset" id="btn-reset"
-                data-en="Reset vault to demo state"
-                data-ko="데모 상태로 초기화">
-          Reset vault to demo state
-        </button>
-      </div>
 
       <!-- Footer -->
       <footer class="site-footer">
