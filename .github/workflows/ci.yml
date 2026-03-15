@@ -50,45 +50,35 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Fuzz container parser (short smoke run)
+      - name: Install cargo-fuzz
         run: |
           rustup install nightly --no-self-update
           cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
-          cargo +nightly fuzz run fuzz_container_parse \
-            --manifest-path crates/qv-core/fuzz/Cargo.toml \
-            -- -max_total_time=30 -max_len=4096
+
+      - name: Fuzz container parser (short smoke run)
+        working-directory: crates/qv-core
+        run: |
+          cargo +nightly fuzz run fuzz_container_parse -- -max_total_time=30 -max_len=4096
 
       - name: Fuzz decrypt pipeline (short smoke run)
+        working-directory: crates/qv-core
         run: |
-          rustup install nightly --no-self-update
-          cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
-          cargo +nightly fuzz run fuzz_decrypt_pipeline \
-            --manifest-path crates/qv-core/fuzz/Cargo.toml \
-            -- -max_total_time=30 -max_len=4096
+          cargo +nightly fuzz run fuzz_decrypt_pipeline -- -max_total_time=30 -max_len=4096
 
       - name: Fuzz KEM handshake (short smoke run)
+        working-directory: crates/qv-core
         run: |
-          rustup install nightly --no-self-update
-          cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
-          cargo +nightly fuzz run fuzz_kem_handshake \
-            --manifest-path crates/qv-core/fuzz/Cargo.toml \
-            -- -max_total_time=30 -max_len=4096
+          cargo +nightly fuzz run fuzz_kem_handshake -- -max_total_time=30 -max_len=4096
 
       - name: Fuzz signature verify (short smoke run)
+        working-directory: crates/qv-core
         run: |
-          rustup install nightly --no-self-update
-          cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
-          cargo +nightly fuzz run fuzz_signature_verify \
-            --manifest-path crates/qv-core/fuzz/Cargo.toml \
-            -- -max_total_time=30 -max_len=4096
+          cargo +nightly fuzz run fuzz_signature_verify -- -max_total_time=30 -max_len=4096
 
       - name: Fuzz WASM API boundary (short smoke run)
+        working-directory: crates/qv-core
         run: |
-          rustup install nightly --no-self-update
-          cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
-          cargo +nightly fuzz run fuzz_wasm_api \
-            --manifest-path crates/qv-core/fuzz/Cargo.toml \
-            -- -max_total_time=30 -max_len=4096
+          cargo +nightly fuzz run fuzz_wasm_api -- -max_total_time=30 -max_len=4096
 
       - name: Security audit
         run: |
