@@ -11,6 +11,7 @@ const strings: Record<string, { en: string; ko: string }> = {
   enterPasswords:    { en: 'enter passwords to open',  ko: '비밀번호로 열기' },
   secretMessage:     { en: 'Secret message',           ko: '비밀 메시지' },
   secretPlaceholder: { en: 'Type your secret…',        ko: '비밀을 입력하세요…' },
+  showPasswords:     { en: 'Show passwords',           ko: '비밀번호 표시' },
   aliceKey:          { en: "Alice's key",              ko: 'Alice 키' },
   bobKey:            { en: "Bob's key",                ko: 'Bob 키' },
   carolKey:          { en: "Carol's key",              ko: 'Carol 키' },
