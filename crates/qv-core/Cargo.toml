@@ -67,6 +67,7 @@ getrandom = { version = "0.2", features = ["js"] }
 # in integration tests without requiring a feature flag dance.
 aes-gcm = { workspace = true }
 criterion = { workspace = true }
+proptest = { workspace = true }
 
 [[bench]]
 name = "crypto_bench"

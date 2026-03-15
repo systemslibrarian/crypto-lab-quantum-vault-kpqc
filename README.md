@@ -1,10 +1,10 @@
 # Quantum Vault — v5.0
 
-**A threshold secret-storage demo running real post-quantum cryptography in the browser.**
+**An educational threshold secret-storage demo using Korean post-quantum cryptography in the browser.**
 
 Quantum Vault encrypts short secrets with **AES-256-GCM**, splits the key using **Shamir Secret Sharing (GF(2⁸))**, wraps each share with **SMAUG-T Level 1 KEM** (key encapsulation), and seals the container with a **HAETAE Mode 2 signature**.
 
-Every cryptographic primitive executes inside the browser as WebAssembly — compiled from the official C reference implementations of the KpqC competition finalists. **There are no mocks, no HMAC substitutes, no polyfills.**
+The demo uses browser-executed WebAssembly compiled from the official C reference implementations of the KpqC competition finalists. Cryptographic operations run client-side with committed WASM modules — no server round-trips or mock cryptography.
 
 ---
 
@@ -19,6 +19,8 @@ Three demo boxes are pre-sealed on first visit. Each requires two correct passwo
 | 03 | *The treasure map is under the old oak tree* | `ruby` | `emerald` | `diamond` |
 | 06 | *Launch code: ALPHA-7749-ZULU* | `fortress` | `bastion` | `citadel` |
 | 09 | *The meeting is moved to Friday at noon* | `monday` | `tuesday` | `wednesday` |
+
+> **Note:** These are demo credentials for exploring the UI. They are not part of the `.qvault` security model and do not represent production password practices. In real use, each participant would choose their own strong password.
 
 Unlock any box by entering **any two** of its three passwords.
 
@@ -35,7 +37,7 @@ Unlock any box by entering **any two** of its three passwords.
 
 ### Why KpqC rather than NIST PQC?
 
-The NIST PQC process selected ML-KEM (Kyber) and ML-DSA (Dilithium). This project deliberately chooses the KpqC finalists (SMAUG-T + HAETAE) as an exercise in exploring alternative algorithm families — lattice-based designs with different parameter choices and design tradeoffs. A hybrid mode combining both families is a future goal.
+The NIST PQC process selected ML-KEM (Kyber) and ML-DSA (Dilithium). This project uses the KpqC finalists (SMAUG-T + HAETAE) to explore alternative lattice-based designs with different parameter choices and tradeoffs. The goal is educational — demonstrating that browser-based post-quantum cryptography is feasible with multiple algorithm families.
 
 ---
 
@@ -217,11 +219,13 @@ cargo bench          # criterion benchmarks
 
 ## Security Notes
 
+> **This is an educational/experimental demo, not production software.**
+
 - All secrets and keys stay in the browser — nothing is transmitted to a server.
-- PBKDF2 with 100,000 SHA-256 iterations is used to derive a password-wrapping key for the SMAUG-T secret key. This means brute-forcing a weak password is possible; use strong passwords for real secrets.
+- PBKDF2 with 100,000 SHA-256 iterations derives a password-wrapping key for the SMAUG-T secret key. Weak passwords remain vulnerable to offline brute-force.
 - SMAUG-T does not support deterministic keygen from a seed, so a fresh random keypair is generated per deposit. The secret key is encrypted with the password-derived key; the ciphertext and public key are stored in the container.
 - The HAETAE signing keypair is ephemeral (generated at seal time) and the public key is stored in the container. This provides authentication but not attribution — anyone who reads the public key can verify the seal but cannot determine who created it.
-- The WASM binaries are the official KpqC reference implementations, not production-hardened code. They have not been audited for side-channel resistance.
+- The WASM binaries are compiled from the official KpqC reference implementations. They have not been independently audited for side-channel resistance or production hardening.
 
 ---
 

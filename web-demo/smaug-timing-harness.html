@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMAUG-T Timing Harness — KyberSlash-Style Analysis</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+    h1 { color: #58a6ff; }
+    h2 { color: #8b949e; border-bottom: 1px solid #30363d; padding-bottom: 0.5rem; }
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    .critical-panel {
+      border-color: #f85149;
+      background: #1c1917;
+    }
+    button {
+      background: #238636;
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+    button:hover { background: #2ea043; }
+    button.secondary { background: #30363d; }
+    button.secondary:hover { background: #484f58; }
+    button.danger { background: #f85149; }
+    button.danger:hover { background: #da3633; }
+    button:disabled { background: #484f58; cursor: not-allowed; }
+    #status { margin: 1rem 0; font-size: 0.9rem; color: #8b949e; }
+    .histogram-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .histogram-single { grid-template-columns: 1fr; }
+    canvas {
+      width: 100%;
+      height: 250px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+    }
+    #stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .stat {
+      background: #21262d;
+      padding: 0.75rem;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .stat-label { font-size: 0.75rem; color: #8b949e; }
+    .stat-value { font-size: 1.2rem; color: #58a6ff; margin-top: 0.25rem; }
+    .stat-value.danger { color: #f85149; }
+    .stat-value.success { color: #3fb950; }
+    .interpretation {
+      background: #1c2128;
+      border-left: 3px solid #f0883e;
+      padding: 1rem;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    .interpretation.critical { border-left-color: #f85149; }
+    .interpretation.safe { border-left-color: #3fb950; }
+    .warning { color: #f0883e; }
+    .danger { color: #f85149; }
+    .success { color: #3fb950; }
+    pre {
+      background: #0d1117;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.8rem;
+    }
+    .test-label {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    .test-a { background: #f8514933; color: #f85149; }
+    .test-b { background: #58a6ff33; color: #58a6ff; }
+    .test-c { background: #3fb95033; color: #3fb950; }
+    #welch-result {
+      font-size: 1.1rem;
+      padding: 1rem;
+      border-radius: 6px;
+      margin: 1rem 0;
+    }
+    #welch-result.leak { background: #f8514933; border: 1px solid #f85149; }
+    #welch-result.safe { background: #3fb95033; border: 1px solid #3fb950; }
+  </style>
+</head>
+<body>
+  <h1>🔬 SMAUG-T Level 1 — Timing Side-Channel Harness</h1>
+  <p>This harness tests for timing differences that could enable a <strong>KyberSlash-style attack</strong> against the FO transform's implicit rejection mechanism.</p>
+  
+  <div class="panel critical-panel">
+    <span class="test-label test-a">TEST A — CRITICAL</span>
+    <h2>Valid vs Invalid Ciphertext Timing (KyberSlash Test)</h2>
+    <p><strong>Attack model:</strong> An attacker modifies the KEM ciphertext in <code>localStorage</code> and measures decapsulation time. If valid and invalid ciphertexts have distinguishable timing, the FO transform's implicit rejection leaks information → potential key recovery.</p>
+    <p>
+      <label>Iterations per group: <input type="number" id="iterationsA" value="500" min="100" max="5000"></label>
+    </p>
+    <button id="runBtnA" onclick="runTestA()">▶ Run Test A</button>
+    <button class="secondary" onclick="downloadCSV('A')" id="downloadBtnA" disabled>⬇ CSV</button>
+    <div id="statusA"></div>
+    <div id="statsA" class="stats"></div>
+    <div id="welch-result"></div>
+    <div class="histogram-container" id="histogramsA">
+      <div>
+        <h3>Valid Ciphertext Decapsulation</h3>
+        <canvas id="histogramValidCT"></canvas>
+      </div>
+      <div>
+        <h3>Invalid (Tampered) Ciphertext Decapsulation</h3>
+        <canvas id="histogramInvalidCT"></canvas>
+      </div>
+    </div>
+    <div class="interpretation critical" id="interpretA">
+      <h3>📖 Test A Interpretation</h3>
+      <p><strong>Overlapping distributions + non-significant Welch t-test:</strong> <span class="success">Good.</span> The FO implicit rejection is constant-time at measurable resolution.</p>
+      <p><strong>Separable distributions + significant Welch t-test (p &lt; 0.001):</strong> <span class="danger">CRITICAL.</span> The decapsulation leaks ciphertext validity — this is the KyberSlash attack surface. An attacker can distinguish valid from invalid ciphertexts and potentially recover the secret key via chosen-ciphertext queries.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <span class="test-label test-b">TEST B</span>
+    <h2>Keygen Timing Consistency</h2>
+    <p><strong>Purpose:</strong> Check for timing variance in secret key generation (sparse ternary / HWT sampling).</p>
+    <p>
+      <label>Iterations: <input type="number" id="iterationsB" value="500" min="100" max="5000"></label>
+    </p>
+    <button id="runBtnB" onclick="runTestB()">▶ Run Test B</button>
+    <button class="secondary" onclick="downloadCSV('B')" id="downloadBtnB" disabled>⬇ CSV</button>
+    <div id="statusB"></div>
+    <div id="statsB" class="stats"></div>
+    <div class="histogram-container histogram-single">
+      <div>
+        <canvas id="histogramKeygen"></canvas>
+      </div>
+    </div>
+    <div class="interpretation" id="interpretB">
+      <h3>📖 Test B Interpretation</h3>
+      <p><strong>Tight unimodal:</strong> <span class="success">Good.</span> HWT sampling is constant-time.</p>
+      <p><strong>Bimodal or heavy-tailed:</strong> <span class="warning">Concerning.</span> May indicate rejection sampling variance in sparse secret generation.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <span class="test-label test-c">TEST C</span>
+    <h2>Encapsulation Timing Consistency</h2>
+    <p><strong>Purpose:</strong> Check for timing variance in key encapsulation (r vector sampling, CBD).</p>
+    <p>
+      <label>Iterations: <input type="number" id="iterationsC" value="500" min="100" max="5000"></label>
+    </p>
+    <button id="runBtnC" onclick="runTestC()">▶ Run Test C</button>
+    <button class="secondary" onclick="downloadCSV('C')" id="downloadBtnC" disabled>⬇ CSV</button>
+    <div id="statusC"></div>
+    <div id="statsC" class="stats"></div>
+    <div class="histogram-container histogram-single">
+      <div>
+        <canvas id="histogramEncaps"></canvas>
+      </div>
+    </div>
+    <div class="interpretation" id="interpretC">
+      <h3>📖 Test C Interpretation</h3>
+      <p><strong>Tight unimodal:</strong> <span class="success">Good.</span> CBD sampling and encryption are constant-time.</p>
+      <p><strong>Multimodal:</strong> <span class="warning">Concerning.</span> May indicate data-dependent branching in polynomial operations.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>⚠️ Timer Resolution Note</h2>
+    <p><code>performance.now()</code> resolution depends on Cross-Origin Isolation headers:</p>
+    <pre>Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp</pre>
+    <p>Without these headers (e.g., on GitHub Pages), timer resolution is degraded to ~100µs. Run via <code>npm run dev</code> with Vite to get ~5µs resolution.</p>
+    <p>Current resolution: <strong id="timerRes">measuring...</strong></p>
+  </div>
+
+  <script type="module">
+    // Measure timer resolution
+    function measureTimerResolution() {
+      const samples = [];
+      let last = performance.now();
+      for (let i = 0; i < 1000; i++) {
+        const now = performance.now();
+        if (now !== last) {
+          samples.push(now - last);
+          last = now;
+        }
+      }
+      if (samples.length === 0) return 1000;
+      samples.sort((a, b) => a - b);
+      return samples[Math.floor(samples.length * 0.1)];
+    }
+
+    const resolution = measureTimerResolution();
+    document.getElementById('timerRes').textContent = 
+      resolution < 0.01 ? `~${(resolution * 1000).toFixed(1)}µs (high-res)` :
+      resolution < 0.1 ? `~${(resolution * 1000).toFixed(0)}µs (moderate)` :
+      `~${(resolution * 1000).toFixed(0)}µs (degraded — missing COOP/COEP headers)`;
+
+    let timingDataA = { valid: [], invalid: [] };
+    let timingDataB = [];
+    let timingDataC = [];
+    let smaugModule = null;
+
+    async function initSmaug() {
+      const createModule = (await import('./src/crypto/wasm/smaug.js')).default;
+      smaugModule = await createModule({
+        locateFile: (path) => './' + path,
+      });
+    }
+
+    function smaugKeypair() {
+      const pkSize = smaugModule._smaug_publickeybytes();
+      const skSize = smaugModule._smaug_secretkeybytes();
+      const pkPtr = smaugModule._malloc(pkSize);
+      const skPtr = smaugModule._malloc(skSize);
+      try {
+        smaugModule._smaug_keypair(pkPtr, skPtr);
+        return {
+          publicKey: new Uint8Array(smaugModule.HEAPU8.buffer, pkPtr, pkSize).slice(),
+          secretKey: new Uint8Array(smaugModule.HEAPU8.buffer, skPtr, skSize).slice(),
+        };
+      } finally {
+        smaugModule._smaug_secure_zeroize(pkPtr, pkSize);
+        smaugModule._free(pkPtr);
+        smaugModule._smaug_secure_zeroize(skPtr, skSize);
+        smaugModule._free(skPtr);
+      }
+    }
+
+    function smaugEncapsulate(publicKey) {
+      const pkSize = smaugModule._smaug_publickeybytes();
+      const ctSize = smaugModule._smaug_ciphertextbytes();
+      const ssSize = smaugModule._smaug_sharedsecretbytes();
+      const pkPtr = smaugModule._malloc(pkSize);
+      const ctPtr = smaugModule._malloc(ctSize);
+      const ssPtr = smaugModule._malloc(ssSize);
+      try {
+        smaugModule.HEAPU8.set(publicKey, pkPtr);
+        smaugModule._smaug_encapsulate(ctPtr, ssPtr, pkPtr);
+        return {
+          ciphertext: new Uint8Array(smaugModule.HEAPU8.buffer, ctPtr, ctSize).slice(),
+          sharedSecret: new Uint8Array(smaugModule.HEAPU8.buffer, ssPtr, ssSize).slice(),
+        };
+      } finally {
+        smaugModule._smaug_secure_zeroize(pkPtr, pkSize);
+        smaugModule._free(pkPtr);
+        smaugModule._free(ctPtr);
+        smaugModule._smaug_secure_zeroize(ssPtr, ssSize);
+        smaugModule._free(ssPtr);
+      }
+    }
+
+    function smaugDecapsulate(ciphertext, secretKey) {
+      const ctSize = smaugModule._smaug_ciphertextbytes();
+      const skSize = smaugModule._smaug_secretkeybytes();
+      const ssSize = smaugModule._smaug_sharedsecretbytes();
+      const ctPtr = smaugModule._malloc(ctSize);
+      const skPtr = smaugModule._malloc(skSize);
+      const ssPtr = smaugModule._malloc(ssSize);
+      try {
+        smaugModule.HEAPU8.set(ciphertext, ctPtr);
+        smaugModule.HEAPU8.set(secretKey, skPtr);
+        smaugModule._smaug_decapsulate(ssPtr, ctPtr, skPtr);
+        return new Uint8Array(smaugModule.HEAPU8.buffer, ssPtr, ssSize).slice();
+      } finally {
+        smaugModule._free(ctPtr);
+        smaugModule._smaug_secure_zeroize(skPtr, skSize);
+        smaugModule._free(skPtr);
+        smaugModule._smaug_secure_zeroize(ssPtr, ssSize);
+        smaugModule._free(ssPtr);
+      }
+    }
+
+    // Welch's t-test for unequal variances
+    function welchTTest(a, b) {
+      const n1 = a.length, n2 = b.length;
+      const m1 = a.reduce((x, y) => x + y, 0) / n1;
+      const m2 = b.reduce((x, y) => x + y, 0) / n2;
+      const v1 = a.reduce((s, x) => s + (x - m1) ** 2, 0) / (n1 - 1);
+      const v2 = b.reduce((s, x) => s + (x - m2) ** 2, 0) / (n2 - 1);
+      const se = Math.sqrt(v1 / n1 + v2 / n2);
+      const t = (m1 - m2) / se;
+      const df = ((v1 / n1 + v2 / n2) ** 2) / 
+                 ((v1 / n1) ** 2 / (n1 - 1) + (v2 / n2) ** 2 / (n2 - 1));
+      // Approximate p-value using normal distribution for large df
+      const p = 2 * (1 - normalCDF(Math.abs(t)));
+      return { t, df, p, meanDiff: m1 - m2 };
+    }
+
+    function normalCDF(x) {
+      const a1 =  0.254829592, a2 = -0.284496736, a3 =  1.421413741;
+      const a4 = -1.453152027, a5 =  1.061405429, p  =  0.3275911;
+      const sign = x < 0 ? -1 : 1;
+      x = Math.abs(x) / Math.sqrt(2);
+      const t = 1.0 / (1.0 + p * x);
+      const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+      return 0.5 * (1.0 + sign * y);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TEST A: Valid vs Invalid Ciphertext (KyberSlash Test)
+    // ═══════════════════════════════════════════════════════════════════════════
+    window.runTestA = async function() {
+      const btn = document.getElementById('runBtnA');
+      const status = document.getElementById('statusA');
+      btn.disabled = true;
+      status.textContent = 'Initializing WASM module...';
+
+      try {
+        if (!smaugModule) await initSmaug();
+
+        status.textContent = 'Generating keypair...';
+        const { publicKey, secretKey } = smaugKeypair();
+        
+        status.textContent = 'Creating valid ciphertext...';
+        const { ciphertext: validCT, sharedSecret: validSS } = smaugEncapsulate(publicKey);
+        
+        // Create an invalid ciphertext by flipping one byte
+        const invalidCT = validCT.slice();
+        invalidCT[0] ^= 0x01;
+
+        const iterations = parseInt(document.getElementById('iterationsA').value);
+        timingDataA = { valid: [], invalid: [] };
+
+        // Warm-up
+        status.textContent = 'Warming up (20 iterations each)...';
+        for (let i = 0; i < 20; i++) {
+          smaugDecapsulate(validCT, secretKey);
+          smaugDecapsulate(invalidCT, secretKey);
+        }
+
+        // Interleaved benchmark to minimize systematic drift
+        for (let i = 0; i < iterations; i++) {
+          if (i % 50 === 0) {
+            status.textContent = `Running... ${i}/${iterations}`;
+            await new Promise(r => setTimeout(r, 0));
+          }
+
+          // Randomize order to prevent ordering bias
+          if (Math.random() < 0.5) {
+            // Valid first
+            let start = performance.now();
+            const ssV = smaugDecapsulate(validCT, secretKey);
+            let end = performance.now();
+            timingDataA.valid.push({ iteration: i, timeMs: end - start });
+
+            start = performance.now();
+            const ssI = smaugDecapsulate(invalidCT, secretKey);
+            end = performance.now();
+            timingDataA.invalid.push({ iteration: i, timeMs: end - start });
+          } else {
+            // Invalid first
+            let start = performance.now();
+            const ssI = smaugDecapsulate(invalidCT, secretKey);
+            let end = performance.now();
+            timingDataA.invalid.push({ iteration: i, timeMs: end - start });
+
+            start = performance.now();
+            const ssV = smaugDecapsulate(validCT, secretKey);
+            end = performance.now();
+            timingDataA.valid.push({ iteration: i, timeMs: end - start });
+          }
+        }
+
+        secretKey.fill(0);
+        status.textContent = `Completed ${iterations}×2 decapsulation operations.`;
+        document.getElementById('downloadBtnA').disabled = false;
+
+        displayStatsA();
+        drawHistogramA('histogramValidCT', timingDataA.valid, '#3fb950', 'Valid CT');
+        drawHistogramA('histogramInvalidCT', timingDataA.invalid, '#f85149', 'Invalid CT');
+        runWelchTest();
+
+      } catch (e) {
+        status.textContent = `Error: ${e.message}`;
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function displayStatsA() {
+      const validTimes = timingDataA.valid.map(d => d.timeMs * 1000);
+      const invalidTimes = timingDataA.invalid.map(d => d.timeMs * 1000);
+      
+      const calcStats = (times) => {
+        times.sort((a, b) => a - b);
+        const mean = times.reduce((a, b) => a + b, 0) / times.length;
+        const median = times[Math.floor(times.length / 2)];
+        const stddev = Math.sqrt(times.reduce((s, t) => s + (t - mean) ** 2, 0) / times.length);
+        return { mean, median, stddev };
+      };
+
+      const vs = calcStats(validTimes);
+      const is = calcStats(invalidTimes);
+
+      document.getElementById('statsA').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div>
+            <h4 style="color:#3fb950;margin:0 0 0.5rem">Valid CT</h4>
+            <div class="stat"><div class="stat-label">Mean</div><div class="stat-value">${vs.mean.toFixed(0)} µs</div></div>
+            <div class="stat"><div class="stat-label">Median</div><div class="stat-value">${vs.median.toFixed(0)} µs</div></div>
+            <div class="stat"><div class="stat-label">Std Dev</div><div class="stat-value">${vs.stddev.toFixed(0)} µs</div></div>
+          </div>
+          <div>
+            <h4 style="color:#f85149;margin:0 0 0.5rem">Invalid CT</h4>
+            <div class="stat"><div class="stat-label">Mean</div><div class="stat-value">${is.mean.toFixed(0)} µs</div></div>
+            <div class="stat"><div class="stat-label">Median</div><div class="stat-value">${is.median.toFixed(0)} µs</div></div>
+            <div class="stat"><div class="stat-label">Std Dev</div><div class="stat-value">${is.stddev.toFixed(0)} µs</div></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function runWelchTest() {
+      const validTimes = timingDataA.valid.map(d => d.timeMs * 1000);
+      const invalidTimes = timingDataA.invalid.map(d => d.timeMs * 1000);
+      const { t, df, p, meanDiff } = welchTTest(validTimes, invalidTimes);
+      
+      const resultDiv = document.getElementById('welch-result');
+      const isLeak = p < 0.001;
+      resultDiv.className = isLeak ? 'leak' : 'safe';
+      resultDiv.innerHTML = isLeak
+        ? `<strong class="danger">⚠️ POTENTIAL TIMING LEAK DETECTED</strong><br>
+           Welch t-test: t=${t.toFixed(3)}, df=${df.toFixed(1)}, <strong>p=${p.toExponential(3)}</strong><br>
+           Mean difference: ${meanDiff.toFixed(1)} µs (valid - invalid)<br>
+           <em>The distributions are statistically distinguishable. This could enable a KyberSlash-style attack.</em>`
+        : `<strong class="success">✓ No significant timing difference detected</strong><br>
+           Welch t-test: t=${t.toFixed(3)}, df=${df.toFixed(1)}, p=${p.toFixed(4)}<br>
+           Mean difference: ${meanDiff.toFixed(1)} µs (valid - invalid)<br>
+           <em>The FO implicit rejection appears to be constant-time at this measurement resolution.</em>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TEST B: Keygen Timing
+    // ═══════════════════════════════════════════════════════════════════════════
+    window.runTestB = async function() {
+      const btn = document.getElementById('runBtnB');
+      const status = document.getElementById('statusB');
+      btn.disabled = true;
+      status.textContent = 'Initializing WASM module...';
+
+      try {
+        if (!smaugModule) await initSmaug();
+
+        const iterations = parseInt(document.getElementById('iterationsB').value);
+        timingDataB = [];
+
+        // Warm-up
+        status.textContent = 'Warming up (10 iterations)...';
+        for (let i = 0; i < 10; i++) {
+          const { secretKey } = smaugKeypair();
+          secretKey.fill(0);
+        }
+
+        for (let i = 0; i < iterations; i++) {
+          if (i % 50 === 0) {
+            status.textContent = `Running... ${i}/${iterations}`;
+            await new Promise(r => setTimeout(r, 0));
+          }
+
+          const start = performance.now();
+          const { secretKey } = smaugKeypair();
+          const end = performance.now();
+          secretKey.fill(0);
+
+          timingDataB.push({ iteration: i, timeMs: end - start });
+        }
+
+        status.textContent = `Completed ${iterations} keygen operations.`;
+        document.getElementById('downloadBtnB').disabled = false;
+
+        displayStatsB();
+        drawHistogramSingle('histogramKeygen', timingDataB, '#58a6ff');
+
+      } catch (e) {
+        status.textContent = `Error: ${e.message}`;
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function displayStatsB() {
+      const times = timingDataB.map(d => d.timeMs * 1000);
+      times.sort((a, b) => a - b);
+      const mean = times.reduce((a, b) => a + b, 0) / times.length;
+      const median = times[Math.floor(times.length / 2)];
+      const stddev = Math.sqrt(times.reduce((s, t) => s + (t - mean) ** 2, 0) / times.length);
+      const cv = (stddev / mean) * 100;
+
+      document.getElementById('statsB').innerHTML = `
+        <div id="stats">
+          <div class="stat"><div class="stat-label">Mean</div><div class="stat-value">${mean.toFixed(0)} µs</div></div>
+          <div class="stat"><div class="stat-label">Median</div><div class="stat-value">${median.toFixed(0)} µs</div></div>
+          <div class="stat"><div class="stat-label">Std Dev</div><div class="stat-value">${stddev.toFixed(0)} µs</div></div>
+          <div class="stat"><div class="stat-label">CV</div><div class="stat-value ${cv > 10 ? 'danger' : 'success'}">${cv.toFixed(1)}%</div></div>
+        </div>
+      `;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TEST C: Encapsulation Timing
+    // ═══════════════════════════════════════════════════════════════════════════
+    window.runTestC = async function() {
+      const btn = document.getElementById('runBtnC');
+      const status = document.getElementById('statusC');
+      btn.disabled = true;
+      status.textContent = 'Initializing WASM module...';
+
+      try {
+        if (!smaugModule) await initSmaug();
+
+        status.textContent = 'Generating keypair...';
+        const { publicKey, secretKey } = smaugKeypair();
+        secretKey.fill(0);
+
+        const iterations = parseInt(document.getElementById('iterationsC').value);
+        timingDataC = [];
+
+        // Warm-up
+        status.textContent = 'Warming up (10 iterations)...';
+        for (let i = 0; i < 10; i++) {
+          const { sharedSecret } = smaugEncapsulate(publicKey);
+          sharedSecret.fill(0);
+        }
+
+        for (let i = 0; i < iterations; i++) {
+          if (i % 50 === 0) {
+            status.textContent = `Running... ${i}/${iterations}`;
+            await new Promise(r => setTimeout(r, 0));
+          }
+
+          const start = performance.now();
+          const { sharedSecret } = smaugEncapsulate(publicKey);
+          const end = performance.now();
+          sharedSecret.fill(0);
+
+          timingDataC.push({ iteration: i, timeMs: end - start });
+        }
+
+        status.textContent = `Completed ${iterations} encapsulation operations.`;
+        document.getElementById('downloadBtnC').disabled = false;
+
+        displayStatsC();
+        drawHistogramSingle('histogramEncaps', timingDataC, '#3fb950');
+
+      } catch (e) {
+        status.textContent = `Error: ${e.message}`;
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function displayStatsC() {
+      const times = timingDataC.map(d => d.timeMs * 1000);
+      times.sort((a, b) => a - b);
+      const mean = times.reduce((a, b) => a + b, 0) / times.length;
+      const median = times[Math.floor(times.length / 2)];
+      const stddev = Math.sqrt(times.reduce((s, t) => s + (t - mean) ** 2, 0) / times.length);
+      const cv = (stddev / mean) * 100;
+
+      document.getElementById('statsC').innerHTML = `
+        <div id="stats">
+          <div class="stat"><div class="stat-label">Mean</div><div class="stat-value">${mean.toFixed(0)} µs</div></div>
+          <div class="stat"><div class="stat-label">Median</div><div class="stat-value">${median.toFixed(0)} µs</div></div>
+          <div class="stat"><div class="stat-label">Std Dev</div><div class="stat-value">${stddev.toFixed(0)} µs</div></div>
+          <div class="stat"><div class="stat-label">CV</div><div class="stat-value ${cv > 10 ? 'danger' : 'success'}">${cv.toFixed(1)}%</div></div>
+        </div>
+      `;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HISTOGRAM DRAWING
+    // ═══════════════════════════════════════════════════════════════════════════
+    function drawHistogramA(canvasId, data, color, label) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+      const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+      const plotWidth = width - padding.left - padding.right;
+      const plotHeight = height - padding.top - padding.bottom;
+
+      const times = data.map(d => d.timeMs * 1000);
+      const allTimes = [...timingDataA.valid, ...timingDataA.invalid].map(d => d.timeMs * 1000);
+      const min = Math.min(...allTimes);
+      const max = Math.max(...allTimes);
+      
+      const numBins = 40;
+      const binWidth = (max - min) / numBins || 1;
+      const bins = new Array(numBins).fill(0);
+      
+      for (const t of times) {
+        const binIndex = Math.min(Math.floor((t - min) / binWidth), numBins - 1);
+        bins[binIndex]++;
+      }
+
+      const maxCount = Math.max(...bins, 1);
+
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = color;
+      for (let i = 0; i < numBins; i++) {
+        const x = padding.left + (i / numBins) * plotWidth;
+        const barWidth = plotWidth / numBins - 1;
+        const barHeight = (bins[i] / maxCount) * plotHeight;
+        ctx.fillRect(x, padding.top + plotHeight - barHeight, barWidth, barHeight);
+      }
+
+      ctx.strokeStyle = '#30363d';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, padding.top + plotHeight);
+      ctx.lineTo(padding.left + plotWidth, padding.top + plotHeight);
+      ctx.stroke();
+
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${min.toFixed(0)}`, padding.left, height - 10);
+      ctx.fillText(`${((min + max) / 2).toFixed(0)}`, padding.left + plotWidth / 2, height - 10);
+      ctx.fillText(`${max.toFixed(0)} µs`, padding.left + plotWidth, height - 10);
+    }
+
+    function drawHistogramSingle(canvasId, data, color) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+      const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+      const plotWidth = width - padding.left - padding.right;
+      const plotHeight = height - padding.top - padding.bottom;
+
+      const times = data.map(d => d.timeMs * 1000);
+      const min = Math.min(...times);
+      const max = Math.max(...times);
+      
+      const numBins = 50;
+      const binWidth = (max - min) / numBins || 1;
+      const bins = new Array(numBins).fill(0);
+      
+      for (const t of times) {
+        const binIndex = Math.min(Math.floor((t - min) / binWidth), numBins - 1);
+        bins[binIndex]++;
+      }
+
+      const maxCount = Math.max(...bins, 1);
+
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = color;
+      for (let i = 0; i < numBins; i++) {
+        const x = padding.left + (i / numBins) * plotWidth;
+        const barWidth = plotWidth / numBins - 1;
+        const barHeight = (bins[i] / maxCount) * plotHeight;
+        ctx.fillRect(x, padding.top + plotHeight - barHeight, barWidth, barHeight);
+      }
+
+      ctx.strokeStyle = '#30363d';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, padding.top + plotHeight);
+      ctx.lineTo(padding.left + plotWidth, padding.top + plotHeight);
+      ctx.stroke();
+
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${min.toFixed(0)}`, padding.left, height - 10);
+      ctx.fillText(`${((min + max) / 2).toFixed(0)}`, padding.left + plotWidth / 2, height - 10);
+      ctx.fillText(`${max.toFixed(0)} µs`, padding.left + plotWidth, height - 10);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CSV DOWNLOAD
+    // ═══════════════════════════════════════════════════════════════════════════
+    window.downloadCSV = function(test) {
+      let header, rows, filename;
+      
+      if (test === 'A') {
+        header = 'iteration,valid_time_ms,valid_time_us,invalid_time_ms,invalid_time_us\n';
+        rows = timingDataA.valid.map((v, i) => {
+          const inv = timingDataA.invalid[i];
+          return `${v.iteration},${v.timeMs.toFixed(6)},${(v.timeMs * 1000).toFixed(3)},${inv.timeMs.toFixed(6)},${(inv.timeMs * 1000).toFixed(3)}`;
+        }).join('\n');
+        filename = 'smaug_kyberslash_test.csv';
+      } else if (test === 'B') {
+        header = 'iteration,time_ms,time_us\n';
+        rows = timingDataB.map(d => `${d.iteration},${d.timeMs.toFixed(6)},${(d.timeMs * 1000).toFixed(3)}`).join('\n');
+        filename = 'smaug_keygen_timing.csv';
+      } else {
+        header = 'iteration,time_ms,time_us\n';
+        rows = timingDataC.map(d => `${d.iteration},${d.timeMs.toFixed(6)},${(d.timeMs * 1000).toFixed(3)}`).join('\n');
+        filename = 'smaug_encaps_timing.csv';
+      }
+      
+      const blob = new Blob([header + rows], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>

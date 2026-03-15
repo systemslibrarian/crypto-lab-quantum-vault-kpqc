@@ -3,7 +3,7 @@
 # ------------------------------
 /target/
 **/target/
-Cargo.lock
+# NOTE: Cargo.lock IS committed — required for reproducible builds (this is an app, not a library)
 
 # ------------------------------
 # Node / Next.js

@@ -7,35 +7,37 @@
 // mutations spaced with sleep(), so the user sees each step light up and resolve.
 
 import { sleep } from '../crypto/utils';
+import { t } from '../i18n';
 
 export type PipelineStepId = 'aes' | 'shamir' | 'smaug' | 'haetae';
 export type StepStatus = 'pending' | 'active' | 'done' | 'failed';
 
 interface StepConfig {
   id: PipelineStepId;
-  label: string;
+  labelKey: string;
 }
 
 const SEAL_STEPS: StepConfig[] = [
-  { id: 'aes',    label: 'AES-256-GCM' },
-  { id: 'shamir', label: 'Shamir split' },
-  { id: 'smaug',  label: 'SMAUG-T wrap' },
-  { id: 'haetae', label: 'HAETAE sign' },
+  { id: 'aes',    labelKey: 'pipeAes' },
+  { id: 'shamir', labelKey: 'pipeShamirSplit' },
+  { id: 'smaug',  labelKey: 'pipeSmaugWrap' },
+  { id: 'haetae', labelKey: 'pipeHaetaeSign' },
 ];
 
 const OPEN_STEPS: StepConfig[] = [
-  { id: 'haetae', label: 'HAETAE verify' },
-  { id: 'smaug',  label: 'SMAUG-T unlock' },
-  { id: 'shamir', label: 'Shamir reconstruct' },
-  { id: 'aes',    label: 'AES-256-GCM' },
+  { id: 'haetae', labelKey: 'pipeHaetaeVerify' },
+  { id: 'smaug',  labelKey: 'pipeSmaugUnlock' },
+  { id: 'shamir', labelKey: 'pipeShamirRecon' },
+  { id: 'aes',    labelKey: 'pipeAes' },
 ];
 
 function createPipelineHTML(steps: StepConfig[]): string {
   const parts: string[] = [];
   steps.forEach((s, idx) => {
+    const label = t(s.labelKey);
     parts.push(
-      `<div class="pipeline-step pending" id="ps-${s.id}" role="listitem" aria-label="${s.label}">
-         <span class="step-label">${s.label}</span>
+      `<div class="pipeline-step pending" id="ps-${s.id}" role="listitem" aria-label="${label}">
+         <span class="step-label">${label}</span>
        </div>`,
     );
     if (idx < steps.length - 1) {
