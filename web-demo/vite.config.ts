@@ -8,4 +8,12 @@ export default defineConfig({
     // Enable source maps for easier debugging of production builds
     sourcemap: true,
   },
+  // Enable high-resolution performance.now() for timing analysis
+  // These headers are required for Cross-Origin Isolation
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
 });

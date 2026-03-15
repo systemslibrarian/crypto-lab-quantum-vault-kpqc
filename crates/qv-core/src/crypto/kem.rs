@@ -8,8 +8,8 @@
 //!   and returns `(ciphertext, shared_secret)`.
 //! * [`Kem::decapsulate`] takes a private key and the KEM ciphertext and returns
 //!   the same shared secret.
-//! * The shared secret bytes are used directly as a one-time pad for the Shamir
-//!   share via SHA-256 counter-mode expansion (see [`crate::encrypt::xor_protect`]).
+//! * The shared secret bytes are used as the key for AES-256-GCM AEAD wrapping
+//!   of each Shamir share (see [`crate::encrypt::aead_protect`]).
 
 use anyhow::Result;
 

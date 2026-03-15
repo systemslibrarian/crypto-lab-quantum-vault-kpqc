@@ -95,7 +95,7 @@ async function init(): Promise<void> {
     const pipelineArea = panelEl.querySelector<HTMLElement>('#pipeline-area')!;
 
     // Run crypto and animation concurrently — animation is purely cosmetic (2 s)
-    // and crypto typically completes in ~1–1.5 s (3 × PBKDF2 100k iterations).
+    // and crypto typically completes in ~4–6 s (3 × PBKDF2 600k iterations).
     const [sealedBox] = await Promise.all([
       sealMessage(message, passwords),
       animateSealPipeline(pipelineArea),
@@ -214,10 +214,11 @@ function showHintBanner(): void {
 
 init().catch(err => {
   console.error('Vault initialization failed:', err);
-  document.body.innerHTML = `
-    <div style="padding:2rem;color:#c00;font-family:monospace;">
-      Failed to initialize vault: ${String(err)}<br>
-      Check that your browser supports Web Crypto API (requires HTTPS or localhost).
-    </div>
-  `;
+  const div = document.createElement('div');
+  div.style.cssText = 'padding:2rem;color:#c00;font-family:monospace;';
+  div.textContent = `Failed to initialize vault: ${String(err)}`;
+  const note = document.createElement('p');
+  note.textContent = 'Check that your browser supports Web Crypto API (requires HTTPS or localhost).';
+  div.appendChild(note);
+  document.body.replaceChildren(div);
 });

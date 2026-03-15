@@ -49,19 +49,19 @@ Verifier         — holds the encryptor's signature public key sig_pk
 
 | Parameter | Value | Reference |
 |-----------|-------|-----------|
-| KEM | SMAUG-T Level 3 | KpqC Round 1 |
-| Signature | HAETAE Level 3 | KpqC Round 1 |
+| KEM | SMAUG-T Level 1 | KpqC Round 1 |
+| Signature | HAETAE Mode 2 | KpqC Round 1 |
 | Symmetric cipher | AES-256-GCM | NIST SP 800-38D |
 | Secret sharing | Shamir over GF(2⁸) | Shamir 1979 |
 | Container format | JSON v1 | docs/container-format.md |
-| Key derivation (share XOR) | SHA-256 counter mode | §6.3 |
+| Share wrapping | AES-256-GCM (aead_protect) | §6.3 |
 
 ### 3.3 Key Sizes
 
 | Algorithm | Public key | Private key | Ciphertext / Signature |
 |-----------|-----------|-------------|------------------------|
-| SMAUG-T-3 | 1 088 B | 1 312 B | CT: 992 B, SS: 32 B |
-| HAETAE-3  | 1 472 B | 2 112 B | ≤ 2 349 B |
+| SMAUG-T Level 1 | 672 B | 832 B | CT: 672 B, SS: 32 B |
+| HAETAE Mode 2   | 992 B | 1 408 B | ≤ 1 474 B |
 | AES-256-GCM | — | 32 B | plaintext + 16 B tag |
 
 ---
@@ -110,7 +110,7 @@ For each $i \in [1..n]$:
 
 $$(\text{kem\_ct}_i,\ \text{ss}_i) \leftarrow \text{KEM.Encapsulate}(pk_i)$$
 
-$$E_i \leftarrow \text{XORProtect}(S_i.\text{data},\ \text{ss}_i)$$
+$$E_i \leftarrow \text{AeadProtect}(S_i.\text{data},\ \text{ss}_i)$$
 
 $$\text{ss}_i \xleftarrow{\text{zeroize}} \bot$$
 
@@ -137,7 +137,7 @@ function Encrypt(F, pks, sig_sk, n, t):
   encrypted_shares ← []
   for i in 1..n:
     (ct_i, ss_i) ← KEM.Encapsulate(pks[i-1])
-    E_i          ← XORProtect(shares[i].data, ss_i)
+    E_i          ← AeadProtect(shares[i].data, ss_i)
     zeroize(ss_i)
     encrypted_shares.append({index: i, kem_ciphertext: ct_i, encrypted_share: E_i})
 
@@ -174,7 +174,7 @@ For each supplied $(sk_{ij},\ i_j)$:
 
 $$\text{ss}_{ij} \leftarrow \text{KEM.Decapsulate}(sk_{ij},\ \text{kem\_ct}_{ij})$$
 
-$$S_{ij} \leftarrow \text{XORProtect}(E_{ij},\ \text{ss}_{ij})$$
+$$S_{ij} \leftarrow \text{AeadProtect}^{-1}(E_{ij},\ \text{ss}_{ij})$$
 
 $$\text{ss}_{ij} \xleftarrow{\text{zeroize}} \bot$$
 
@@ -212,42 +212,76 @@ JSON keys are sorted alphabetically; the AAD is the canonical UTF-8 JSON bytes.
 
 ### 6.2 Signing Canonical Byte String
 
-The following fields are serialized (JSON, keys sorted) and signed:
+The signed corpus is the UTF-8 encoding of a JSON object with **keys sorted
+alphabetically at every level** and byte arrays base64-encoded.  The
+`signature` field is excluded.  Using field names as delimiters rather than
+raw byte concatenation makes the encoding injective — no two distinct
+containers can produce the same byte string.
+
+**Web demo (TypeScript) corpus:**
 
 ```json
 {
-  "magic":          "QVLT1",
-  "version":        1,
-  "cipher":         "Aes256Gcm",
-  "kem_algorithm":  "<string>",
-  "sig_algorithm":  "<string>",
-  "threshold":      <uint8>,
-  "share_count":    <uint8>,
-  "nonce":          [<bytes>],
-  "ciphertext":     [<bytes>],
-  "shares":         [{...}]
+  "ciphertext":    "<base64>",
+  "createdAt":     "<ISO 8601 timestamp>",
+  "nonce":         "<base64>",
+  "sigPublicKey":  "<base64>",
+  "wrappedShares": [
+    {
+      "iterations":      <uint32>,
+      "kemCiphertext":   "<base64>",
+      "publicKey":       "<base64>",
+      "salt":            "<base64>",
+      "shareNonce":      "<base64>",
+      "skNonce":         "<base64>",
+      "wrappedSecretKey":"<base64>",
+      "wrappedShare":    "<base64>"
+    }
+  ]
 }
 ```
 
-The `signature` field is not included.
+**Rust core (qv-core) corpus:**
 
-### 6.3 XORProtect Key Derivation
+```json
+{
+  "ciphertext":     [<bytes>],
+  "cipher":         "Aes256Gcm",
+  "kem_algorithm":  "<string>",
+  "magic":          "QVLT1",
+  "nonce":          [<bytes>],
+  "share_count":    <uint8>,
+  "shares":         [{...}],
+  "sig_algorithm":  "<string>",
+  "threshold":      <uint8>,
+  "version":        <uint8>
+}
+```
 
-For data potentially longer than one SHA-256 block:
+Both implementations sort keys alphabetically and sign the UTF-8 JSON bytes.
+The field sets differ because the two implementations use different container
+formats (see §3.2); they are not cross-compatible at the container level.
+
+### 6.3 AeadProtect Share Wrapping
+
+Each Shamir share is wrapped with AES-256-GCM using the KEM shared secret as
+the encryption key:
 
 ```
-function XORProtect(data, key):
-  keystream ← []
-  block     ← 0
-  while len(keystream) < len(data):
-    keystream ← keystream || SHA-256(key || LE32(block))
-    block     ← block + 1
-  return data ⊕ keystream[:len(data)]
+function AeadProtect(share_data, kem_shared_secret):
+  key   ← kem_shared_secret          # 32 bytes
+  nonce ← random(12)                 # 96-bit IV (stored in container)
+  E     ← AES-256-GCM-Encrypt(key, nonce, share_data, AAD="")
+  return (nonce, E)                  # E includes the 16-byte auth tag
+
+function AeadProtect⁻¹(nonce, E, kem_shared_secret):
+  key ← kem_shared_secret
+  return AES-256-GCM-Decrypt(key, nonce, E, AAD="")  # aborts if tag invalid
 ```
 
-`XORProtect` is an involution: applying it twice with the same key recovers the
-original data. The function is *not* a secure PRF on its own; its security
-derives entirely from the secrecy of `key` (the KEM shared secret).
+Authentication tag verification provides integrity and prevents an attacker
+who corrupts a share ciphertext from learning anything about the share content.
+The KEM shared secret is zeroized immediately after wrapping/unwrapping.
 
 ### 6.4 Shamir Secret Sharing over GF(2⁸)
 

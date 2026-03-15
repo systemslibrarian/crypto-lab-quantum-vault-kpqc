@@ -12,14 +12,21 @@
 #include <stdint.h>
 
 #if defined(__linux__)
+# include <errno.h>
 # include <sys/random.h>
 
 void randombytes(uint8_t *x, size_t xlen) {
     size_t done = 0;
     while (done < xlen) {
         ssize_t n = getrandom(x + done, xlen - done, 0);
-        if (n > 0)
+        if (n > 0) {
             done += (size_t)n;
+        } else if (n == 0 || errno != EINTR) {
+            /* EINTR: signal interrupted the syscall — retry.
+             * Anything else (ENOSYS, EFAULT, …): abort rather than
+             * spinning forever or silently returning weak randomness. */
+            abort();
+        }
     }
 }
 

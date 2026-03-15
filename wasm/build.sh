@@ -44,9 +44,21 @@ SMAUG_C_FILES=(
   "$SCRIPT_DIR/src/smaug_exports.c"
 )
 
-echo "▶ Building SMAUG-T Level 1..."
+# ── Constant-Time Hardening Flags ──────────────────────────────────────────────
+# -O1:              Mild optimization; avoids aggressive transforms that break CT
+# -fno-tree-vectorize / -fno-slp-vectorize: Disable auto-vectorization which can
+#                   introduce data-dependent SIMD lane masking
+# -DNDEBUG:         Disable assert() calls in reference implementations
+# INITIAL_MEMORY:   Pre-allocate heap to avoid timing jitter from memory growth
+# ALLOW_MEMORY_GROWTH: Still enabled as a fallback, but should never trigger
+# ───────────────────────────────────────────────────────────────────────────────
+
+echo "▶ Building SMAUG-T Level 1 (constant-time hardened)..."
 emcc \
-  -O2 \
+  -O1 \
+  -fno-tree-vectorize \
+  -fno-slp-vectorize \
+  -DNDEBUG \
   -DSMAUG_MODE=1 \
   -I"$SMAUG_SRC/include" \
   "${SMAUG_C_FILES[@]}" \
@@ -54,6 +66,7 @@ emcc \
   -s MODULARIZE=1 \
   -s EXPORT_NAME='createSmaugModule' \
   -s ENVIRONMENT='web,node' \
+  -s INITIAL_MEMORY=4194304 \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/smaug.js"
@@ -63,34 +76,38 @@ echo "   → $DIST/smaug.js + smaug.wasm"
 HAETAE_SRC="$SCRIPT_DIR/vendor/haetae/HAETAE-1.1.2/reference_implementation"
 
 HAETAE_C_FILES=(
-  "$HAETAE_SRC/decompose.c"
-  "$HAETAE_SRC/encoding.c"
-  "$HAETAE_SRC/fft.c"
-  "$HAETAE_SRC/fips202.c"
-  "$HAETAE_SRC/fixpoint.c"
-  "$HAETAE_SRC/ntt.c"
-  "$HAETAE_SRC/packing.c"
-  "$HAETAE_SRC/poly.c"
-  "$HAETAE_SRC/polyfix.c"
-  "$HAETAE_SRC/polymat.c"
-  "$HAETAE_SRC/polyvec.c"
-  "$HAETAE_SRC/reduce.c"
-  "$HAETAE_SRC/sampler.c"
-  "$HAETAE_SRC/sign.c"
-  "$HAETAE_SRC/symmetric-shake.c"
+  "$HAETAE_SRC/src/decompose.c"
+  "$HAETAE_SRC/src/encoding.c"
+  "$HAETAE_SRC/src/fft.c"
+  "$HAETAE_SRC/src/fips202.c"
+  "$HAETAE_SRC/src/fixpoint.c"
+  "$HAETAE_SRC/src/ntt.c"
+  "$HAETAE_SRC/src/packing.c"
+  "$HAETAE_SRC/src/poly.c"
+  "$HAETAE_SRC/src/polyfix.c"
+  "$HAETAE_SRC/src/polymat.c"
+  "$HAETAE_SRC/src/polyvec.c"
+  "$HAETAE_SRC/src/reduce.c"
+  "$HAETAE_SRC/src/sampler.c"
+  "$HAETAE_SRC/src/sign.c"
+  "$HAETAE_SRC/src/symmetric-shake.c"
   "$SCRIPT_DIR/src/randombytes_wasm.c"
   "$SCRIPT_DIR/src/haetae_exports.c"
 )
 
-echo "▶ Building HAETAE Mode 2..."
+echo "▶ Building HAETAE Mode 2 (constant-time hardened)..."
 emcc \
-  -O2 \
-  -I"$HAETAE_SRC" \
+  -O1 \
+  -fno-tree-vectorize \
+  -fno-slp-vectorize \
+  -DNDEBUG \
+  -I"$HAETAE_SRC/include" \
   "${HAETAE_C_FILES[@]}" \
   -s WASM=1 \
   -s MODULARIZE=1 \
   -s EXPORT_NAME='createHaetaeModule' \
   -s ENVIRONMENT='web,node' \
+  -s INITIAL_MEMORY=4194304 \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/haetae.js"

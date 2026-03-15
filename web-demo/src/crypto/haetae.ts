@@ -33,7 +33,10 @@ export function haetaeKeypair(): { publicKey: Uint8Array; secretKey: Uint8Array 
       secretKey: new Uint8Array(haetaeModule.HEAPU8.buffer as ArrayBuffer, skPtr, skSize).slice(),
     };
   } finally {
+    // Use C-level secure zeroing that cannot be optimized away by JS engines
+    haetaeModule._haetae_secure_zeroize(pkPtr, pkSize);
     haetaeModule._free(pkPtr);
+    haetaeModule._haetae_secure_zeroize(skPtr, skSize);
     haetaeModule._free(skPtr);
   }
 }
@@ -57,9 +60,14 @@ export function haetaeSign(message: Uint8Array, secretKey: Uint8Array): Uint8Arr
     if (ret !== 0) throw new Error(`HAETAE sign failed (ret=${ret})`);
     // Read actual length as a 32-bit value (wasm32 size_t)
     const siglen = haetaeModule.HEAPU32[siglenPtr >> 2] as number;
+    if (siglen === 0 || siglen > maxSigSize) {
+      throw new Error(`HAETAE sign returned invalid signature length: ${siglen} (max ${maxSigSize})`);
+    }
     return new Uint8Array(haetaeModule.HEAPU8.buffer as ArrayBuffer, sigPtr, siglen).slice();
   } finally {
     haetaeModule._free(msgPtr);
+    // Use C-level secure zeroing that cannot be optimized away by JS engines
+    haetaeModule._haetae_secure_zeroize(skPtr, secretKey.length);
     haetaeModule._free(skPtr);
     haetaeModule._free(sigPtr);
     haetaeModule._free(siglenPtr);

@@ -23,7 +23,7 @@ auditing a new backend, or accepting pull requests that touch cryptographic code
 ## 2. Memory Zeroization
 
 - [ ] **Z-001** The file key `K` is zeroized immediately after Shamir splitting (`file_key.zeroize()`).
-- [ ] **Z-002** KEM shared secrets (`ss`) are zeroized after each share is XOR-protected.
+- [ ] **Z-002** KEM shared secrets (`ss`) are zeroized after each share is AEAD-protected.
 - [ ] **Z-003** Reconstructed file key is zeroized after AES decryption.
 - [ ] **Z-004** Recovered Shamir share data is zeroized after reconstruction.
 - [ ] **Z-005** `Share` type implements `ZeroizeOnDrop`.
@@ -107,7 +107,7 @@ auditing a new backend, or accepting pull requests that touch cryptographic code
 - [ ] **CT-001** `DevSignature.verify` compares MACs with `ConstantTimeEq`, not `==`.
 - [ ] **CT-002** Share index comparison in `decrypt.rs` uses iterator finds, not secret-dependent branches on key bytes.
 - [ ] **CT-003** AES-256-GCM authentication tag comparison is performed by the `aes-gcm` crate internals (constant-time).
-- [ ] **CT-004** *(Known limitation)* `xor_protect` keystream XOR is not constant-time with respect to `data` — acceptable as the data is not secret at that point.
+- [ ] **CT-004** Each Shamir share is protected by `aead_protect` (AES-256-GCM); authentication tag verification is performed by the `aes-gcm` crate internals (constant-time).
 
 ---
 

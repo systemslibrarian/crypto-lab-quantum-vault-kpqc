@@ -1,6 +1,9 @@
 //! Shamir Secret Sharing over GF(2^8).
 //!
-//! Uses the standard irreducible polynomial x^8 + x^4 + x^3 + x + 1 (0x11b).
+//! Uses the irreducible polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11d).
+//! This matches the TypeScript web-demo implementation (shamir.ts) so that
+//! share bytes are interoperable between the two backends.
+//!
 //! Each byte of the secret is treated as an independent element of GF(256), so
 //! an N-byte secret produces N-byte share payloads.
 //!
@@ -26,7 +29,8 @@ fn gf_add(a: u8, b: u8) -> u8 {
 }
 
 /// Multiply two GF(256) elements using the Russian-peasant algorithm.
-/// Reduction polynomial: x^8 + x^4 + x^3 + x + 1  →  0x1b (carry byte).
+/// Reduction polynomial: x^8 + x^4 + x^3 + x^2 + 1 (carry byte: 0x1d).
+/// This matches the polynomial used in the TypeScript web-demo (shamir.ts).
 fn gf_mul(mut a: u8, mut b: u8) -> u8 {
     let mut p: u8 = 0;
     while b != 0 {
@@ -36,7 +40,7 @@ fn gf_mul(mut a: u8, mut b: u8) -> u8 {
         let carry = a & 0x80;
         a <<= 1;
         if carry != 0 {
-            a ^= 0x1b;
+            a ^= 0x1d;
         }
         b >>= 1;
     }

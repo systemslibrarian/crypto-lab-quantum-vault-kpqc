@@ -1,7 +1,7 @@
 /*
  * haetae_exports.c — Emscripten-exported wrapper for HAETAE Mode 2 signatures.
  *
- * Compile with default HAETAE_CONFIG_MODE (HAETAE_MODE2 = 0 bit security level).
+ * Compile with default HAETAE_CONFIG_MODE (HAETAE_MODE2 = 128-bit security level, NIST Level 1 equivalent).
  * export_name attribute is the correct mechanism for Emscripten 5 / wasm-ld.
  *
  * HAETAE 1.1.2 uses the context-string API (FIPS 204 style). We always pass
@@ -10,8 +10,31 @@
 
 #include "api.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 #include <emscripten/emscripten.h>
+
+/*
+ * Secure memory zeroing that the compiler cannot optimize away.
+ * Uses volatile to prevent dead-store elimination.
+ * This is critical for zeroizing secret keys in WASM heap.
+ */
+static void secure_memzero(void *ptr, size_t len) {
+    volatile uint8_t *p = (volatile uint8_t *)ptr;
+    while (len--) {
+        *p++ = 0;
+    }
+}
+
+/*
+ * Exported secure zeroing function for TypeScript to call.
+ * TypeScript's HEAPU8.fill() can be optimized away by JS engines;
+ * this C-level zeroing cannot be elided by Emscripten or the JS engine.
+ */
+__attribute__((export_name("haetae_secure_zeroize"), used, visibility("default")))
+void haetae_secure_zeroize(uint8_t *buf, size_t len) {
+    secure_memzero(buf, len);
+}
 
 /*
  * Key Generation

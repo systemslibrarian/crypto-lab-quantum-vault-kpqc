@@ -3,6 +3,31 @@
 import { toBase64, fromBase64 } from '../crypto/utils';
 import type { SealedBox, WrappedShare } from '../crypto/pipeline';
 
+// SMAUG-T Level 1 / HAETAE Mode 2 expected byte lengths
+const EXPECTED = {
+  nonce:          12,
+  salt:           16,
+  kemCiphertext:  672,
+  shareNonce:     12,
+  publicKey:      672,
+  skNonce:        12,
+  sigPublicKey:   992,
+  maxSignature:   1474,
+  maxCiphertext:  64 * 1024 * 1024, // 64 MiB
+} as const;
+
+function assertLen(arr: Uint8Array, expected: number, field: string): void {
+  if (arr.length !== expected) {
+    throw new Error(`Invalid container: field "${field}" must be ${expected} bytes, got ${arr.length}`);
+  }
+}
+
+function assertMaxLen(arr: Uint8Array, max: number, field: string): void {
+  if (arr.length === 0 || arr.length > max) {
+    throw new Error(`Invalid container: field "${field}" length ${arr.length} is out of range [1, ${max}]`);
+  }
+}
+
 export interface WrappedShareSerialized {
   salt: string;             // base64 (16 bytes)
   kemCiphertext: string;    // base64 (672 bytes)
@@ -11,6 +36,7 @@ export interface WrappedShareSerialized {
   publicKey: string;        // base64 (672 bytes)
   wrappedSecretKey: string; // base64
   skNonce: string;          // base64 (12 bytes)
+  iterations?: number;      // PBKDF2 iteration count; absent in v2 containers (defaults to 100_000)
 }
 
 export interface VaultBox {
@@ -73,6 +99,7 @@ export function serializeSealedBox(box: SealedBox): VaultBox {
       publicKey: toBase64(ws.publicKey),
       wrappedSecretKey: toBase64(ws.wrappedSecretKey),
       skNonce: toBase64(ws.skNonce),
+      iterations: ws.iterations,
     })),
     signature: toBase64(box.signature),
     sigPublicKey: toBase64(box.sigPublicKey),
@@ -81,20 +108,46 @@ export function serializeSealedBox(box: SealedBox): VaultBox {
 }
 
 export function deserializeSealedBox(vb: VaultBox): SealedBox {
-  return {
-    ciphertext: fromBase64(vb.ciphertext),
-    nonce: fromBase64(vb.nonce),
-    wrappedShares: vb.wrappedShares.map(ws => ({
-      salt: fromBase64(ws.salt),
-      kemCiphertext: fromBase64(ws.kemCiphertext),
-      wrappedShare: fromBase64(ws.wrappedShare),
-      shareNonce: fromBase64(ws.shareNonce),
-      publicKey: fromBase64(ws.publicKey),
-      wrappedSecretKey: fromBase64(ws.wrappedSecretKey),
-      skNonce: fromBase64(ws.skNonce),
-    })),
-    signature: fromBase64(vb.signature),
-    sigPublicKey: fromBase64(vb.sigPublicKey),
-    createdAt: vb.createdAt,
-  };
+  if (!Array.isArray(vb.wrappedShares) || vb.wrappedShares.length !== 3) {
+    throw new Error('Invalid container: wrappedShares must have exactly 3 elements');
+  }
+
+  const ciphertext    = fromBase64(vb.ciphertext);
+  const nonce         = fromBase64(vb.nonce);
+  const signature     = fromBase64(vb.signature);
+  const sigPublicKey  = fromBase64(vb.sigPublicKey);
+
+  assertMaxLen(ciphertext,   EXPECTED.maxCiphertext, 'ciphertext');
+  assertLen(nonce,           EXPECTED.nonce,         'nonce');
+  assertLen(sigPublicKey,    EXPECTED.sigPublicKey,  'sigPublicKey');
+  assertMaxLen(signature,    EXPECTED.maxSignature,  'signature');
+
+  const wrappedShares = vb.wrappedShares.map((ws, i) => {
+    const salt             = fromBase64(ws.salt);
+    const kemCiphertext    = fromBase64(ws.kemCiphertext);
+    const wrappedShare     = fromBase64(ws.wrappedShare);
+    const shareNonce       = fromBase64(ws.shareNonce);
+    const publicKey        = fromBase64(ws.publicKey);
+    const wrappedSecretKey = fromBase64(ws.wrappedSecretKey);
+    const skNonce          = fromBase64(ws.skNonce);
+
+    assertLen(salt,          EXPECTED.salt,          `wrappedShares[${i}].salt`);
+    assertLen(kemCiphertext, EXPECTED.kemCiphertext, `wrappedShares[${i}].kemCiphertext`);
+    assertLen(shareNonce,    EXPECTED.shareNonce,    `wrappedShares[${i}].shareNonce`);
+    assertLen(publicKey,     EXPECTED.publicKey,     `wrappedShares[${i}].publicKey`);
+    assertLen(skNonce,       EXPECTED.skNonce,       `wrappedShares[${i}].skNonce`);
+
+    return {
+      salt,
+      kemCiphertext,
+      wrappedShare,
+      shareNonce,
+      publicKey,
+      wrappedSecretKey,
+      skNonce,
+      iterations: ws.iterations ?? 100_000,
+    };
+  });
+
+  return { ciphertext, nonce, wrappedShares, signature, sigPublicKey, createdAt: vb.createdAt };
 }

@@ -3,7 +3,7 @@
 use crate::{
     container::QuantumVaultContainer,
     crypto::{kem::Kem, signature::Signature},
-    encrypt::{aes_aad, container_signing_bytes, xor_protect},
+    encrypt::{aead_unprotect, aes_aad, container_signing_bytes},
     shamir::{reconstruct_secret, Share},
     DecryptOptions,
 };
@@ -64,7 +64,7 @@ pub fn decrypt_file(
             .ok_or_else(|| anyhow!("no encrypted share found with index {share_idx}"))?;
 
         let mut ss = kem.decapsulate(privkey, &enc_share.kem_ciphertext)?;
-        let share_data = xor_protect(&enc_share.encrypted_share, &ss)?;
+        let share_data = aead_unprotect(&enc_share.encrypted_share, &ss)?;
         ss.zeroize();
         shares.push(Share {
             index: enc_share.index,
@@ -84,6 +84,7 @@ pub fn decrypt_file(
     // but protect against containers constructed programmatically without going
     // through from_bytes).
     if container.nonce.len() != 12 {
+        file_key.zeroize(); // must not survive an early return
         return Err(anyhow!(
             "invalid nonce length: expected 12, got {}",
             container.nonce.len()
@@ -100,11 +101,13 @@ pub fn decrypt_file(
     let aes_key = Key::<Aes256Gcm>::from_slice(&file_key);
     let cipher = Aes256Gcm::new(aes_key);
     let nonce = Nonce::from_slice(&container.nonce);
-    let plaintext = cipher
-        .decrypt(nonce, Payload { msg: container.ciphertext.as_slice(), aad: &aad })
-        .map_err(|_| anyhow!("AES-256-GCM decryption failed — wrong key or tampered data"))?;
-
+    // Capture the result first so file_key is zeroized unconditionally before
+    // any error is propagated — the key must not survive an auth failure.
+    let decrypt_result = cipher
+        .decrypt(nonce, Payload { msg: container.ciphertext.as_slice(), aad: &aad });
     file_key.zeroize();
+    let plaintext = decrypt_result
+        .map_err(|_| anyhow!("AES-256-GCM decryption failed — wrong key or tampered data"))?;
 
     Ok(plaintext)
 }

@@ -68,10 +68,14 @@ export function splitSecret(
     data: new Uint8Array(secret.length),
   }));
 
+  // Reuse a single buffer for random coefficients so we can wipe it once done
+  // rather than creating a fresh allocation (and GC-visible ghost) each iteration.
+  const rand = new Uint8Array(threshold - 1);
+
   for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
     // Polynomial: f(x) = secret[i] + c1*x + c2*x^2 + ... (over GF(256))
     const coefficients: number[] = [secret[byteIdx]];
-    const rand = crypto.getRandomValues(new Uint8Array(threshold - 1));
+    crypto.getRandomValues(rand);
     for (let i = 0; i < threshold - 1; i++) {
       // Ensure non-zero high-degree coefficient to keep degree = threshold-1
       coefficients.push(rand[i] === 0 ? 1 : rand[i]);
@@ -80,6 +84,10 @@ export function splitSecret(
       shares[s].data[byteIdx] = evaluatePolynomial(coefficients, shares[s].index);
     }
   }
+
+  // Wipe the coefficient buffer — polynomial coefficients are as sensitive as
+  // share data since knowing them plus any one share reveals each secret byte.
+  rand.fill(0);
 
   return shares;
 }

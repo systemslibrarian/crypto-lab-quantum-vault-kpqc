@@ -36,6 +36,34 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web-demo/package-lock.json
 
+      - name: Verify WASM binary integrity
+        working-directory: web-demo
+        run: |
+          # NOTE: This step is a *consistency check* — it verifies that the
+          # committed .wasm files match the committed .wasm.sha256 hashes.
+          # It does NOT prove the WASM was built from the source in this repo.
+          # A full reproducibility guarantee requires rebuilding from source
+          # using Emscripten (see wasm/build.sh) and comparing outputs.
+          # Any change to the .wasm files must be accompanied by a matching
+          # update to the .wasm.sha256 files in the same PR and reviewed.
+          SMAUG_EXPECTED=$(cat public/smaug.wasm.sha256 | tr -d '[:space:]')
+          HAETAE_EXPECTED=$(cat public/haetae.wasm.sha256 | tr -d '[:space:]')
+          SMAUG_ACTUAL=$(sha256sum public/smaug.wasm | awk '{print $1}')
+          HAETAE_ACTUAL=$(sha256sum public/haetae.wasm | awk '{print $1}')
+          if [ "$SMAUG_ACTUAL" != "$SMAUG_EXPECTED" ]; then
+            echo "ERROR: smaug.wasm SHA-256 mismatch"
+            echo "  expected: $SMAUG_EXPECTED"
+            echo "  actual:   $SMAUG_ACTUAL"
+            exit 1
+          fi
+          if [ "$HAETAE_ACTUAL" != "$HAETAE_EXPECTED" ]; then
+            echo "ERROR: haetae.wasm SHA-256 mismatch"
+            echo "  expected: $HAETAE_EXPECTED"
+            echo "  actual:   $HAETAE_ACTUAL"
+            exit 1
+          fi
+          echo "WASM integrity verified."
+
       - name: Install dependencies
         working-directory: web-demo
         run: npm ci

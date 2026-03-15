@@ -142,6 +142,24 @@ See `wasm/build.sh` for required Emscripten version and flags.
 
 ---
 
+## Timing Harness
+
+A timing side-channel analysis tool is available at `timing-harness.html`. It measures:
+
+- **HAETAE signing** timing distribution across multiple iterations
+- Timer resolution (requires Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy headers)
+- Statistical analysis: min, max, mean, standard deviation, coefficient of variation
+
+To use:
+1. Run `npm run dev` (Vite dev server includes required COOP/COEP headers)
+2. Open `http://localhost:5173/timing-harness.html`
+3. Click **Run Timing Test**
+4. Export results as CSV for further analysis
+
+Low coefficient of variation (< 5%) indicates acceptable constant-time behavior.
+
+---
+
 ## License
 
 MIT — see root [`LICENSE`](../LICENSE).

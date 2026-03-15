@@ -18,7 +18,7 @@ import type { Share } from './shamir';
 import { wrapShare, unwrapShare } from './keywrap';
 import type { WrappedShare } from './keywrap';
 import { haetaeKeypair, haetaeSign, haetaeVerify } from './haetae';
-import { encode, decode, concatBytes } from './utils';
+import { encode, decode, toBase64 } from './utils';
 
 export type { WrappedShare };
 
@@ -35,25 +35,41 @@ export type OpenResult =
   | { success: true; message: string; validShareCount: number }
   | { success: false; gibberish: Uint8Array; validShareCount: number };
 
-// -- Container data corpus for signing (everything except the signature itself) --
+// -- Container data corpus for signing --
+//
+// Serialised as canonical JSON with keys sorted alphabetically at every level.
+// Byte arrays are base64-encoded so field names act as delimiters — the
+// encoding is injective and matches the Rust core spec §6.2.
+// The `signature` field is intentionally excluded.
+//
+// sigPublicKey and createdAt are included so the signature binds its own
+// verification key and timestamp and cannot be transplanted to another container.
 function buildContainerData(
   ciphertext: Uint8Array,
   nonce: Uint8Array,
   wrappedShares: WrappedShare[],
+  sigPublicKey: Uint8Array,
+  createdAt: string,
 ): Uint8Array {
-  const parts: Uint8Array[] = [nonce, ciphertext];
-  for (const ws of wrappedShares) {
-    parts.push(
-      ws.salt,
-      ws.kemCiphertext,
-      ws.wrappedShare,
-      ws.shareNonce,
-      ws.publicKey,
-      ws.wrappedSecretKey,
-      ws.skNonce,
-    );
-  }
-  return concatBytes(...parts);
+  // Keys at every level are in strict alphabetical order so that any
+  // compliant JSON serialiser produces the same byte string.
+  const corpus = {
+    ciphertext: toBase64(ciphertext),
+    createdAt,
+    nonce: toBase64(nonce),
+    sigPublicKey: toBase64(sigPublicKey),
+    wrappedShares: wrappedShares.map(ws => ({
+      iterations: ws.iterations,
+      kemCiphertext: toBase64(ws.kemCiphertext),
+      publicKey: toBase64(ws.publicKey),
+      salt: toBase64(ws.salt),
+      shareNonce: toBase64(ws.shareNonce),
+      skNonce: toBase64(ws.skNonce),
+      wrappedSecretKey: toBase64(ws.wrappedSecretKey),
+      wrappedShare: toBase64(ws.wrappedShare),
+    })),
+  };
+  return encode(JSON.stringify(corpus));
 }
 
 // -- Seal: encrypt message, split key, wrap shares, sign container --
@@ -69,6 +85,7 @@ export async function sealMessage(
 
   // Step 2 — Shamir split: split the 32-byte AES key into 3 shares, threshold 2
   const shares: Share[] = splitSecret(rawKey, 2, 3);
+  rawKey.fill(0);
 
   // Step 3 — SMAUG-T wrap: for each participant —
   //   fresh SMAUG-T keypair → encapsulate → AES-GCM wrap share;
@@ -76,11 +93,16 @@ export async function sealMessage(
   const wrappedShares = await Promise.all(
     shares.map((share, i) => wrapShare(share.data, passwords[i])),
   );
+  // Zeroize Shamir share data — sensitive key material, no longer needed.
+  for (const share of shares) share.data.fill(0);
 
-  // Step 4 — HAETAE sign: sign the full container serialization
-  const containerData = buildContainerData(ciphertext, nonce, wrappedShares);
+  // Step 4 — HAETAE sign: sign the full container including sigPublicKey + createdAt
+  // Generate keypair first so sigPublicKey can be included in the signed corpus.
+  const createdAt = new Date().toISOString();
   const { publicKey: sigPublicKey, secretKey: sigSecretKey } = haetaeKeypair();
+  const containerData = buildContainerData(ciphertext, nonce, wrappedShares, sigPublicKey, createdAt);
   const signature = haetaeSign(containerData, sigSecretKey);
+  sigSecretKey.fill(0);
 
   return {
     ciphertext,
@@ -88,7 +110,7 @@ export async function sealMessage(
     wrappedShares,
     signature,
     sigPublicKey,
-    createdAt: new Date().toISOString(),
+    createdAt,
   };
 }
 
@@ -98,7 +120,7 @@ export async function openBox(
   passwords: [string | null, string | null, string | null],
 ): Promise<OpenResult> {
   // Step 1 — HAETAE verify: reject tampered containers outright
-  const containerData = buildContainerData(box.ciphertext, box.nonce, box.wrappedShares);
+  const containerData = buildContainerData(box.ciphertext, box.nonce, box.wrappedShares, box.sigPublicKey, box.createdAt);
   const valid = haetaeVerify(box.signature, containerData, box.sigPublicKey);
   if (!valid) {
     const garbage = crypto.getRandomValues(new Uint8Array(Math.max(8, box.ciphertext.length - 16)));
@@ -132,17 +154,21 @@ export async function openBox(
 
   // Step 3 — Shamir reconstruct: correct only if validShares.length >= threshold (2)
   const reconstructedKey = reconstructSecret(validShares);
+  // Zeroize share data — sensitive key material, no longer needed after reconstruction.
+  for (const share of validShares) share.data.fill(0);
 
   // Step 4 — AES-256-GCM decrypt: auth tag fails if the key is wrong (< 2 shares)
   try {
     const cryptoKey = await importRawKey(reconstructedKey);
     const plaintext = await aesDecrypt(box.ciphertext, box.nonce, cryptoKey);
+    reconstructedKey.fill(0);
     return { success: true, message: decode(plaintext), validShareCount };
   } catch {
-    const gibberish = new Uint8Array(Math.max(8, box.ciphertext.length - 16));
-    for (let i = 0; i < gibberish.length; i++) {
-      gibberish[i] = reconstructedKey[i % reconstructedKey.length] ^ ((i * 7 + 31) & 0xff);
-    }
+    reconstructedKey.fill(0);
+    // Use random bytes for the failure animation — never derive from share material.
+    const gibberish = crypto.getRandomValues(
+      new Uint8Array(Math.max(8, box.ciphertext.length - 16)),
+    );
     return { success: false, gibberish, validShareCount };
   }
 }

@@ -68,7 +68,7 @@ pub fn encrypt_file(
     let mut encrypted_shares: Vec<EncryptedKeyShare> = Vec::with_capacity(raw_shares.len());
     for (share, pubkey) in raw_shares.iter().zip(options.recipient_public_keys.iter()) {
         let (kem_ct, mut ss) = kem.encapsulate(pubkey)?;
-        let protected = xor_protect(&share.data, &ss)?;
+        let protected = aead_protect(&share.data, &ss)?;
         ss.zeroize();
         encrypted_shares.push(EncryptedKeyShare {
             index: share.index,
@@ -105,8 +105,10 @@ pub fn encrypt_file(
 /// threshold, and container version.  Both encrypt and decrypt must supply
 /// the same bytes for the GCM authentication tag to verify.
 ///
-/// **Field order is significant** — it must match the TypeScript `computeAad`
-/// function in `vault.ts` exactly.
+/// Key ordering is stable: `serde_json` serialises object fields via an internal
+/// `BTreeMap`, which sorts keys alphabetically, making the output deterministic
+/// across platforms regardless of the order the fields appear in the `json!()`
+/// macro call.
 pub(crate) fn aes_aad(version: u8, threshold: u8, kem_alg: &str, sig_alg: &str) -> Vec<u8> {
     serde_json::to_vec(&serde_json::json!({
         "kem_algorithm": kem_alg,
@@ -137,30 +139,39 @@ pub(crate) fn container_signing_bytes(c: &QuantumVaultContainer) -> Result<Vec<u
     Ok(repr)
 }
 
-/// XOR `data` with a keystream produced from `key` via SHA-256 counter mode.
+/// Wrap `data` under AES-256-GCM using `key` (32 bytes), replacing the
+/// unauthenticated SHA-256 counter-mode XOR previously used.
 ///
-/// Supports share data that is longer than one SHA-256 block (unlikely in
-/// practice, but handled correctly).
-pub(crate) fn xor_protect(data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
-    use sha2::{Digest, Sha256};
-
-    let mut result = Vec::with_capacity(data.len());
-    let mut keystream: Vec<u8> = Vec::new();
-    let mut block: u32 = 0;
-
-    for (i, &byte) in data.iter().enumerate() {
-        // Extend keystream in 32-byte (SHA-256 output) blocks as needed.
-        while keystream.len() <= i {
-            let mut h = Sha256::new();
-            h.update(key);
-            h.update(block.to_le_bytes());
-            keystream.extend_from_slice(&h.finalize());
-            block += 1;
-        }
-        result.push(byte ^ keystream[i]);
-    }
-
+/// Output layout: `nonce (12 B) || AES-GCM ciphertext+tag (data.len() + 16 B)`.
+/// The random nonce is prepended so callers store only a single opaque blob.
+pub(crate) fn aead_protect(data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+    let mut nonce_bytes = [0u8; 12];
+    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+    let aes_key = Key::<Aes256Gcm>::from_slice(key);
+    let cipher = Aes256Gcm::new(aes_key);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let ct = cipher
+        .encrypt(nonce, data)
+        .map_err(|_| anyhow!("per-share AEAD encryption failed"))?;
+    let mut result = Vec::with_capacity(12 + ct.len());
+    result.extend_from_slice(&nonce_bytes);
+    result.extend_from_slice(&ct);
     Ok(result)
+}
+
+/// Authenticate and decrypt data produced by [`aead_protect`].
+/// Returns an error immediately if the authentication tag does not verify,
+/// pinpointing corruption to this specific share without consulting the outer AES-GCM tag.
+pub(crate) fn aead_unprotect(data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+    if data.len() < 12 {
+        return Err(anyhow!("encrypted share too short: {} bytes", data.len()));
+    }
+    let nonce = Nonce::from_slice(&data[..12]);
+    let aes_key = Key::<Aes256Gcm>::from_slice(key);
+    let cipher = Aes256Gcm::new(aes_key);
+    cipher
+        .decrypt(nonce, &data[12..])
+        .map_err(|_| anyhow!("per-share AEAD authentication failed — share may be corrupted"))
 }
 
 // ---------------------------------------------------------------------------
@@ -242,19 +253,32 @@ mod tests {
     }
 
     #[test]
-    fn xor_protect_round_trip() {
-        // Applying xor_protect twice with the same key must restore the input.
-        let data: Vec<u8> = (0u8..80).collect(); // >32 bytes exercises multi-block
-        let key = b"test-key-material";
-        let protected = xor_protect(&data, key).unwrap();
-        let restored = xor_protect(&protected, key).unwrap();
+    fn aead_protect_round_trip() {
+        // aead_protect produces an authenticated ciphertext; aead_unprotect must recover the input.
+        let data: Vec<u8> = (0u8..80).collect();
+        let key = b"test-key-material-32-bytes-long!";
+        let protected = aead_protect(&data, key).unwrap();
+        let restored = aead_unprotect(&protected, key).unwrap();
         assert_eq!(restored, data);
     }
 
     #[test]
-    fn xor_protect_empty_data() {
-        let result = xor_protect(&[], b"any-key").unwrap();
-        assert!(result.is_empty());
+    fn aead_protect_empty_data() {
+        let key = b"test-key-material-32-bytes-long!";
+        let protected = aead_protect(&[], key).unwrap();
+        let restored = aead_unprotect(&protected, key).unwrap();
+        assert!(restored.is_empty());
+    }
+
+    #[test]
+    fn aead_unprotect_rejects_tampered_tag() {
+        let data = b"secret share bytes";
+        let key = b"test-key-material-32-bytes-long!";
+        let mut protected = aead_protect(data, key).unwrap();
+        // Flip the last byte (part of the GCM auth tag) — must fail.
+        let last = protected.len() - 1;
+        protected[last] ^= 0x01;
+        assert!(aead_unprotect(&protected, key).is_err());
     }
 
     #[test]

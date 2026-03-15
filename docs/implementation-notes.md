@@ -33,7 +33,10 @@ listing it after the vendor sources.
 
 ```bash
 emcc \
-  -O2 \
+  -O1 \
+  -fno-tree-vectorize \
+  -fno-slp-vectorize \
+  -DNDEBUG \
   -DSMAUG_MODE=1 \
   -I"wasm/vendor/smaug-t/reference_implementation/include" \
   [13 vendor .c files] \
@@ -43,10 +46,17 @@ emcc \
   -s MODULARIZE=1 \
   -s EXPORT_NAME='createSmaugModule' \
   -s ENVIRONMENT='web,node' \
+  -s INITIAL_MEMORY=4194304 \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o wasm/dist/smaug.js
 ```
+
+**Constant-time hardening flags:**
+- `-O1`: Mild optimization; avoids aggressive transforms that break constant-time properties
+- `-fno-tree-vectorize -fno-slp-vectorize`: Disable auto-vectorization which can introduce data-dependent SIMD lane masking
+- `-DNDEBUG`: Disable assert() calls in reference implementations
+- `-s INITIAL_MEMORY=4194304`: Pre-allocate 4 MiB heap to eliminate `_malloc` timing jitter
 
 `-DSMAUG_MODE=1` selects the Level 1 (128-bit PQC) parameter set.  The
 reference implementation's preprocessor guards gate the key-size constants on
@@ -56,8 +66,11 @@ this macro.
 
 ```bash
 emcc \
-  -O2 \
-  -I"wasm/vendor/haetae/HAETAE-1.1.2/reference_implementation" \
+  -O1 \
+  -fno-tree-vectorize \
+  -fno-slp-vectorize \
+  -DNDEBUG \
+  -I"wasm/vendor/haetae/HAETAE-1.1.2/reference_implementation/include" \
   [15 vendor .c files] \
   wasm/src/randombytes_wasm.c \
   wasm/src/haetae_exports.c \
@@ -65,6 +78,7 @@ emcc \
   -s MODULARIZE=1 \
   -s EXPORT_NAME='createHaetaeModule' \
   -s ENVIRONMENT='web,node' \
+  -s INITIAL_MEMORY=4194304 \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o wasm/dist/haetae.js
@@ -106,6 +120,7 @@ a conflicting `int`-return declaration.
 | `smaug_secretkeybytes` | `(void) → int` | Returns 832 |
 | `smaug_ciphertextbytes` | `(void) → int` | Returns 672 |
 | `smaug_sharedsecretbytes` | `(void) → int` | Returns 32 |
+| `smaug_secure_zeroize` | `(uint8_t *buf, size_t len) → void` | Secure memory zeroing (volatile, cannot be elided) |
 
 All exports use `__attribute__((export_name(...), used, visibility("default")))`,
 which is the correct mechanism for Emscripten 5 / wasm-ld (the older
@@ -124,6 +139,7 @@ HAETAE 1.1.2 follows the FIPS 204–style context-string API.  The shim passes
 | `haetae_publickeybytes` | `(void) → int` | Returns 992 |
 | `haetae_secretkeybytes` | `(void) → int` | Returns 1408 |
 | `haetae_sigbytes` | `(void) → int` | Returns 1474 (maximum) |
+| `haetae_secure_zeroize` | `(uint8_t *buf, size_t len) → void` | Secure memory zeroing (volatile, cannot be elided) |
 
 `haetae_sign` writes the actual signature length into `*siglen`.  Since wasm32
 uses 32-bit `size_t`, TypeScript reads this 4-byte value with `getValue(ptr,
@@ -183,11 +199,12 @@ smaugMod._free(sk);
 
 `_malloc` / `_free` are Emscripten's wrappers around the WASM heap allocator.
 All allocations are freed immediately after copying the output into a JavaScript
-`Uint8Array`.  There are no persistent WASM-heap allocations across calls.
+`Uint8Array`; secret keys are zeroized via `_*_secure_zeroize()` exports before
+freeing.  There are no persistent WASM-heap allocations across calls.
 
-`ALLOW_MEMORY_GROWTH=1` permits the WASM heap to grow beyond its initial size
-(default 16 MB) if a large key operation requires it.  In practice, Level 1 /
-Mode 2 parameters are small enough that growth is never triggered.
+`INITIAL_MEMORY=4194304` (4 MiB) pre-allocates the WASM heap to avoid timing
+jitter from dynamic memory growth.  `ALLOW_MEMORY_GROWTH=1` remains enabled as
+a fallback but should never trigger in practice.
 
 ---
 
@@ -276,11 +293,10 @@ demo; a production deployment would persist to an encrypted backend.
 during crypto operations.  A compromised browser extension or malicious script
 on the same origin could read it.  The demo assumes a trusted browser context.
 
-**PBKDF2 iteration count:** 100 000 iterations of SHA-256 was the NIST-
-recommended minimum at PBKDF2's introduction.  Current guidance (NIST SP 800-132
-rev 1, 2023) recommends at least 600 000 for SHA-256 in high-value contexts.
-The demo uses 100 000 as a balance between usability (PBKDF2 runs on the main
-thread) and resistance to offline dictionary attacks.
+**PBKDF2 iteration count:** 600 000 iterations of SHA-256 is used for new deposits,
+following current guidance (NIST SP 800-132 rev 1, 2023).  Legacy v2 containers
+with 100 000 iterations are still supported for backward compatibility.  The
+iteration count is stored per-share, allowing gradual migration.
 
 **WASM binary size:** `smaug.wasm` (~180 KB) and `haetae.wasm` (~220 KB) are
 fetched on first use.  They are cached by the browser after the first load.

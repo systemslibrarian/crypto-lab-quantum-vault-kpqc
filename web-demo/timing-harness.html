@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HAETAE Timing Harness</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+    h1 { color: #58a6ff; }
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    button {
+      background: #238636;
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #484f58; cursor: not-allowed; }
+    #status { margin: 1rem 0; font-size: 0.9rem; color: #8b949e; }
+    #histogram {
+      width: 100%;
+      height: 300px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+    }
+    #stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .stat {
+      background: #21262d;
+      padding: 1rem;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .stat-label { font-size: 0.8rem; color: #8b949e; }
+    .stat-value { font-size: 1.5rem; color: #58a6ff; margin-top: 0.25rem; }
+    #interpretation {
+      background: #1c2128;
+      border-left: 3px solid #f0883e;
+      padding: 1rem;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    .warning { color: #f0883e; }
+    .success { color: #3fb950; }
+    pre {
+      background: #0d1117;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔬 HAETAE Mode 2 — Timing Side-Channel Harness</h1>
+  
+  <div class="panel">
+    <h2>Configuration</h2>
+    <p>
+      <label>Iterations: <input type="number" id="iterations" value="500" min="100" max="10000"></label>
+      <label style="margin-left:1rem">Message size: <input type="number" id="msgSize" value="64" min="1" max="4096"> bytes</label>
+    </p>
+    <button id="runBtn" onclick="runBenchmark()">▶ Run Timing Benchmark</button>
+    <button onclick="downloadCSV()" id="downloadBtn" disabled>⬇ Download CSV</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="stats"></div>
+
+  <div class="panel">
+    <h2>Timing Distribution (µs)</h2>
+    <canvas id="histogram"></canvas>
+  </div>
+
+  <div id="interpretation" class="panel">
+    <h2>📖 Interpretation Guide</h2>
+    <p><strong>Tight, unimodal distribution:</strong> <span class="success">Good.</span> The rejection loop iteration count is not the dominant timing factor. JS engine noise masks the signal.</p>
+    <p><strong>Bimodal or multimodal distribution:</strong> <span class="warning">Concerning.</span> Each cluster likely corresponds to a different iteration count (2, 3, 4, ...). The spacing indicates per-iteration cost.</p>
+    <p><strong>Long tail (right-skewed):</strong> <span class="warning">Moderate concern.</span> High-iteration signing operations are distinguishable but harder to exploit than bimodal.</p>
+    <p><strong>Uniform/noisy:</strong> <span class="success">Good for security.</span> The JS engine's execution environment adds enough noise to bury the signal.</p>
+  </div>
+
+  <div class="panel">
+    <h2>⚠️ Timer Resolution Note</h2>
+    <p><code>performance.now()</code> resolution depends on Cross-Origin Isolation headers:</p>
+    <pre>Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp</pre>
+    <p>Without these headers (e.g., on GitHub Pages), timer resolution is degraded to ~100µs. Run via <code>npm run dev</code> with Vite to get ~5µs resolution.</p>
+    <p>Current resolution: <strong id="timerRes">measuring...</strong></p>
+  </div>
+
+  <script type="module">
+    // Measure timer resolution
+    function measureTimerResolution() {
+      const samples = [];
+      let last = performance.now();
+      for (let i = 0; i < 1000; i++) {
+        const now = performance.now();
+        if (now !== last) {
+          samples.push(now - last);
+          last = now;
+        }
+      }
+      if (samples.length === 0) return 1000; // Fallback
+      samples.sort((a, b) => a - b);
+      return samples[Math.floor(samples.length * 0.1)]; // 10th percentile
+    }
+
+    const resolution = measureTimerResolution();
+    document.getElementById('timerRes').textContent = 
+      resolution < 0.01 ? `~${(resolution * 1000).toFixed(1)}µs (high-res)` :
+      resolution < 0.1 ? `~${(resolution * 1000).toFixed(0)}µs (moderate)` :
+      `~${(resolution * 1000).toFixed(0)}µs (degraded — missing COOP/COEP headers)`;
+
+    let timingData = [];
+    let haetaeModule = null;
+
+    async function initHaetae() {
+      const createModule = (await import('./src/crypto/wasm/haetae.js')).default;
+      haetaeModule = await createModule({
+        locateFile: (path) => './' + path,
+      });
+    }
+
+    function haetaeKeypair() {
+      const pkSize = haetaeModule._haetae_publickeybytes();
+      const skSize = haetaeModule._haetae_secretkeybytes();
+      const pkPtr = haetaeModule._malloc(pkSize);
+      const skPtr = haetaeModule._malloc(skSize);
+      try {
+        haetaeModule._haetae_keypair(pkPtr, skPtr);
+        return {
+          publicKey: new Uint8Array(haetaeModule.HEAPU8.buffer, pkPtr, pkSize).slice(),
+          secretKey: new Uint8Array(haetaeModule.HEAPU8.buffer, skPtr, skSize).slice(),
+        };
+      } finally {
+        haetaeModule.HEAPU8.fill(0, pkPtr, pkPtr + pkSize);
+        haetaeModule._free(pkPtr);
+        haetaeModule.HEAPU8.fill(0, skPtr, skPtr + skSize);
+        haetaeModule._free(skPtr);
+      }
+    }
+
+    function haetaeSign(message, secretKey) {
+      const maxSigSize = haetaeModule._haetae_sigbytes();
+      const msgPtr = haetaeModule._malloc(message.length);
+      const skPtr = haetaeModule._malloc(secretKey.length);
+      const sigPtr = haetaeModule._malloc(maxSigSize);
+      const siglenPtr = haetaeModule._malloc(8);
+      try {
+        haetaeModule.HEAPU8.set(message, msgPtr);
+        haetaeModule.HEAPU8.set(secretKey, skPtr);
+        const ret = haetaeModule._haetae_sign(sigPtr, siglenPtr, msgPtr, message.length, skPtr);
+        if (ret !== 0) throw new Error(`HAETAE sign failed (ret=${ret})`);
+        const siglen = haetaeModule.HEAPU32[siglenPtr >> 2];
+        return new Uint8Array(haetaeModule.HEAPU8.buffer, sigPtr, siglen).slice();
+      } finally {
+        haetaeModule._free(msgPtr);
+        haetaeModule.HEAPU8.fill(0, skPtr, skPtr + secretKey.length);
+        haetaeModule._free(skPtr);
+        haetaeModule._free(sigPtr);
+        haetaeModule._free(siglenPtr);
+      }
+    }
+
+    async function runBenchmark() {
+      const btn = document.getElementById('runBtn');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      status.textContent = 'Initializing WASM module...';
+
+      try {
+        if (!haetaeModule) {
+          await initHaetae();
+        }
+
+        status.textContent = 'Generating keypair...';
+        const { secretKey } = haetaeKeypair();
+
+        const iterations = parseInt(document.getElementById('iterations').value);
+        const msgSize = parseInt(document.getElementById('msgSize').value);
+        
+        timingData = [];
+        
+        // Warm-up run (discard first few to avoid JIT compilation artifacts)
+        status.textContent = 'Warming up (10 iterations)...';
+        for (let i = 0; i < 10; i++) {
+          const msg = crypto.getRandomValues(new Uint8Array(msgSize));
+          haetaeSign(msg, secretKey);
+        }
+
+        // Actual benchmark
+        for (let i = 0; i < iterations; i++) {
+          if (i % 50 === 0) {
+            status.textContent = `Running... ${i}/${iterations}`;
+            await new Promise(r => setTimeout(r, 0)); // Yield to UI
+          }
+
+          const msg = crypto.getRandomValues(new Uint8Array(msgSize));
+          
+          const start = performance.now();
+          const sig = haetaeSign(msg, secretKey);
+          const end = performance.now();
+          
+          timingData.push({
+            iteration: i,
+            timeMs: end - start,
+            sigSize: sig.length,
+          });
+        }
+
+        // Zeroize secret key (best effort in JS)
+        secretKey.fill(0);
+
+        status.textContent = `Completed ${iterations} signing operations.`;
+        document.getElementById('downloadBtn').disabled = false;
+
+        displayStats();
+        drawHistogram();
+
+      } catch (e) {
+        status.textContent = `Error: ${e.message}`;
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function displayStats() {
+      const times = timingData.map(d => d.timeMs * 1000); // Convert to µs
+      times.sort((a, b) => a - b);
+      
+      const mean = times.reduce((a, b) => a + b, 0) / times.length;
+      const median = times[Math.floor(times.length / 2)];
+      const min = times[0];
+      const max = times[times.length - 1];
+      const p5 = times[Math.floor(times.length * 0.05)];
+      const p95 = times[Math.floor(times.length * 0.95)];
+      const stddev = Math.sqrt(times.reduce((sum, t) => sum + (t - mean) ** 2, 0) / times.length);
+
+      document.getElementById('stats').innerHTML = `
+        <div class="stat"><div class="stat-label">Mean</div><div class="stat-value">${mean.toFixed(0)} µs</div></div>
+        <div class="stat"><div class="stat-label">Median</div><div class="stat-value">${median.toFixed(0)} µs</div></div>
+        <div class="stat"><div class="stat-label">Std Dev</div><div class="stat-value">${stddev.toFixed(0)} µs</div></div>
+        <div class="stat"><div class="stat-label">Min</div><div class="stat-value">${min.toFixed(0)} µs</div></div>
+        <div class="stat"><div class="stat-label">Max</div><div class="stat-value">${max.toFixed(0)} µs</div></div>
+        <div class="stat"><div class="stat-label">P5–P95 Range</div><div class="stat-value">${p5.toFixed(0)}–${p95.toFixed(0)} µs</div></div>
+      `;
+    }
+
+    function drawHistogram() {
+      const canvas = document.getElementById('histogram');
+      const ctx = canvas.getContext('2d');
+      
+      // Set actual pixel dimensions
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+      const padding = { top: 20, right: 20, bottom: 40, left: 60 };
+      const plotWidth = width - padding.left - padding.right;
+      const plotHeight = height - padding.top - padding.bottom;
+
+      // Convert to µs
+      const times = timingData.map(d => d.timeMs * 1000);
+      const min = Math.min(...times);
+      const max = Math.max(...times);
+      
+      // Create histogram bins
+      const numBins = 50;
+      const binWidth = (max - min) / numBins || 1;
+      const bins = new Array(numBins).fill(0);
+      
+      for (const t of times) {
+        const binIndex = Math.min(Math.floor((t - min) / binWidth), numBins - 1);
+        bins[binIndex]++;
+      }
+
+      const maxCount = Math.max(...bins);
+
+      // Clear
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw bars
+      ctx.fillStyle = '#58a6ff';
+      for (let i = 0; i < numBins; i++) {
+        const x = padding.left + (i / numBins) * plotWidth;
+        const barWidth = plotWidth / numBins - 1;
+        const barHeight = (bins[i] / maxCount) * plotHeight;
+        ctx.fillRect(x, padding.top + plotHeight - barHeight, barWidth, barHeight);
+      }
+
+      // Draw axes
+      ctx.strokeStyle = '#30363d';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, padding.top + plotHeight);
+      ctx.lineTo(padding.left + plotWidth, padding.top + plotHeight);
+      ctx.stroke();
+
+      // X-axis labels
+      ctx.fillStyle = '#8b949e';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${min.toFixed(0)} µs`, padding.left, height - 10);
+      ctx.fillText(`${((min + max) / 2).toFixed(0)} µs`, padding.left + plotWidth / 2, height - 10);
+      ctx.fillText(`${max.toFixed(0)} µs`, padding.left + plotWidth, height - 10);
+
+      // Y-axis labels
+      ctx.textAlign = 'right';
+      ctx.fillText('0', padding.left - 5, padding.top + plotHeight);
+      ctx.fillText(maxCount.toString(), padding.left - 5, padding.top + 10);
+    }
+
+    function downloadCSV() {
+      const header = 'iteration,time_ms,time_us,sig_size_bytes\n';
+      const rows = timingData.map(d => 
+        `${d.iteration},${d.timeMs.toFixed(6)},${(d.timeMs * 1000).toFixed(3)},${d.sigSize}`
+      ).join('\n');
+      
+      const blob = new Blob([header + rows], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `haetae-timing-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Expose to global scope for onclick handlers
+    window.runBenchmark = runBenchmark;
+    window.downloadCSV = downloadCSV;
+  </script>
+</body>
+</html>

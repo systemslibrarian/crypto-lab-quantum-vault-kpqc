@@ -10,14 +10,24 @@
 #include <stdint.h>
 #include <emscripten.h>
 
-EM_JS(void, js_randombytes, (uint8_t *buf, size_t len), {
-    crypto.getRandomValues(new Uint8Array(Module.HEAPU8.buffer, buf, len));
+EM_JS(int, js_randombytes_checked, (uint8_t *buf, size_t len), {
+    try {
+        crypto.getRandomValues(new Uint8Array(Module.HEAPU8.buffer, buf, len));
+        return 0;
+    } catch(e) {
+        return -1;
+    }
 });
 
 /* SMAUG-T uses: int randombytes(uint8_t *x, size_t xlen) */
 /* HAETAE uses:  int randombytes(uint8_t *out, size_t outlen) */
 int randombytes(uint8_t *out, size_t outlen) {
-    js_randombytes(out, outlen);
+    if (js_randombytes_checked(out, outlen) != 0) {
+        /* crypto.getRandomValues failed — abort rather than continuing with
+         * uninitialised entropy. Callers would receive success (0) and proceed
+         * with zero bytes, silently violating §6 requirement 3 of the threat model. */
+        abort();
+    }
     return 0;
 }
 

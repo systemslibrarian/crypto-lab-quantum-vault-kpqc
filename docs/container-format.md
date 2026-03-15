@@ -64,10 +64,10 @@ tampering is detected before any decryption is attempted.
 |-------|-------|
 | `index` | x-coordinate in the Shamir scheme (1-based) |
 | `kem_ciphertext` | Output of `Kem::encapsulate(pubkey)` |
-| `encrypted_share` | `share_data XOR keystream(kem_shared_secret)` |
+| `encrypted_share` | AES-256-GCM ciphertext of `share_data` under the KEM shared secret (includes 16-byte auth tag) |
 
-The keystream is derived from the KEM shared secret using SHA-256 in counter
-mode as implemented in `qv-core::encrypt::xor_protect`.
+The share nonce is stored alongside the ciphertext as implemented in
+`qv-core::encrypt::aead_protect`.
 
 ---
 

@@ -18,8 +18,8 @@ pub enum CipherSuite {
 
 /// A single Shamir key-share after KEM protection.
 ///
-/// The raw share bytes are XOR-encrypted with the KEM shared secret so that
-/// only the holder of the corresponding KEM private key can recover them.
+/// The raw share bytes are AES-256-GCM encrypted under the KEM shared secret
+/// so that only the holder of the corresponding KEM private key can recover them.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedKeyShare {
     /// Shamir share index (x-coordinate, 1-based).
@@ -27,7 +27,8 @@ pub struct EncryptedKeyShare {
     /// KEM ciphertext produced by `Kem::encapsulate`.  The recipient uses their
     /// private key to run `Kem::decapsulate` and recover the shared secret.
     pub kem_ciphertext: Vec<u8>,
-    /// Raw share bytes XOR'd with a keystream derived from the KEM shared secret.
+    /// Raw share bytes AES-256-GCM encrypted under the KEM shared secret
+    /// (nonce prepended; 16-byte authentication tag appended by the AEAD).
     pub encrypted_share: Vec<u8>,
 }
 

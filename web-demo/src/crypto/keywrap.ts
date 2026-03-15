@@ -25,10 +25,11 @@ export interface WrappedShare {
   publicKey: Uint8Array;        // SMAUG-T public key (672 B) — stored for reference
   wrappedSecretKey: Uint8Array; // AES-GCM encrypted SMAUG-T secret key
   skNonce: Uint8Array;          // 12-byte AES-GCM nonce for SK encryption
+  iterations: number;           // PBKDF2 iteration count (600_000 for new deposits)
 }
 
 /** Derive a 256-bit AES key from a password using PBKDF2-SHA-256. */
-async function derivePasswordKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+async function derivePasswordKey(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
   const pwKey = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),
@@ -37,7 +38,7 @@ async function derivePasswordKey(password: string, salt: Uint8Array): Promise<Cr
     ['deriveKey'],
   );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: buf(salt), iterations: 100_000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: buf(salt), iterations, hash: 'SHA-256' },
     pwKey,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -60,6 +61,8 @@ export async function wrapShare(
   shareData: Uint8Array,
   password: string,
 ): Promise<WrappedShare> {
+  const PBKDF2_ITERATIONS = 600_000;
+
   // 1. Generate a fresh SMAUG-T keypair for this share
   const { publicKey, secretKey } = smaugKeypair();
 
@@ -73,25 +76,27 @@ export async function wrapShare(
     { name: 'AES-GCM', iv: buf(shareNonce) }, shareWrapKey, buf(shareData),
   );
   const wrappedShare = new Uint8Array(wrappedShareBuf);
+  sharedSecret.fill(0);
 
   // 4. Encrypt the SMAUG-T secret key with the password-derived AES key
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const passwordKey = await derivePasswordKey(password, salt);
+  const passwordKey = await derivePasswordKey(password, salt, PBKDF2_ITERATIONS);
   const skNonce = crypto.getRandomValues(new Uint8Array(12));
   const wrappedSKBuf = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: buf(skNonce) }, passwordKey, buf(secretKey),
   );
   const wrappedSecretKey = new Uint8Array(wrappedSKBuf);
+  secretKey.fill(0);
 
-  return { salt, kemCiphertext, wrappedShare, shareNonce, publicKey, wrappedSecretKey, skNonce };
+  return { salt, kemCiphertext, wrappedShare, shareNonce, publicKey, wrappedSecretKey, skNonce, iterations: PBKDF2_ITERATIONS };
 }
 
 export async function unwrapShare(
   wrapped: WrappedShare,
   password: string,
 ): Promise<Uint8Array> {
-  // 1. Re-derive the password seal
-  const passwordKey = await derivePasswordKey(password, wrapped.salt);
+  // 1. Re-derive the password seal; fall back to 100_000 for legacy v2 containers
+  const passwordKey = await derivePasswordKey(password, wrapped.salt, wrapped.iterations ?? 100_000);
 
   // 2. Decrypt the SMAUG-T secret key — wrong password → DOMException (caught in pipeline)
   const skBuf = await crypto.subtle.decrypt(
@@ -101,11 +106,13 @@ export async function unwrapShare(
 
   // 3. SMAUG-T decapsulate → recover the KEM shared secret
   const sharedSecret = smaugDecapsulate(wrapped.kemCiphertext, secretKey);
+  secretKey.fill(0);
 
   // 4. AES-GCM decrypt the Shamir share using the recovered shared secret
   const shareWrapKey = await importSharedSecretAsKey(sharedSecret);
   const shareBytes = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: buf(wrapped.shareNonce) }, shareWrapKey, buf(wrapped.wrappedShare),
   );
+  sharedSecret.fill(0);
   return new Uint8Array(shareBytes);
 }

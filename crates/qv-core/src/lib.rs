@@ -38,6 +38,7 @@ use crypto::backend::dev::{DevKem, DevSignature};
 use crypto::kem::Kem as _;
 use crypto::signature::Signature as _;
 use std::fmt;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 // [L-002] Prevent dev-backend from shipping in release builds.
 // Add feature `allow_dev_backend_in_release` to explicitly opt-in if needed
@@ -57,7 +58,11 @@ compile_error!(
 pub const CONTAINER_VERSION: u8 = 1;
 
 /// Input options controlling key splitting and metadata during encryption.
-#[derive(Clone)]
+///
+/// Implements [`ZeroizeOnDrop`]: `signer_private_key` is wiped from memory
+/// when this struct is dropped so private key material does not linger on
+/// the heap after the encrypt operation completes.
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct EncryptOptions {
     /// Minimum number of shares required to reconstruct the file key.
     pub threshold: u8,
@@ -82,7 +87,11 @@ impl fmt::Debug for EncryptOptions {
 }
 
 /// Input options for decrypting and validating a container.
-#[derive(Clone)]
+///
+/// Implements [`ZeroizeOnDrop`]: `recipient_private_keys` are wiped from
+/// memory when this struct is dropped so private key material does not
+/// linger on the heap after the decrypt operation completes.
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct DecryptOptions {
     /// Recipient KEM private keys used to recover protected key shares.
     /// Element `i` decrypts the share with index `share_indices[i]`.

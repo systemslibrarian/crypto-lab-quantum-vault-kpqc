@@ -41,7 +41,7 @@ test = false
 doc = false
 
 [[bin]]
-name = "fuzz_xor_protect"
-path = "fuzz_targets/fuzz_xor_protect.rs"
+name = "fuzz_aead_protect"
+path = "fuzz_targets/fuzz_aead_protect.rs"
 test = false
 doc = false

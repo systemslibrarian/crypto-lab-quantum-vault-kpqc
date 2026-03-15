@@ -94,16 +94,17 @@ quantum-vault-kpqc/
 │   └─ qv-cli/        ← CLI binary
 │
 ├─ wasm/
-│   ├─ build.sh                ← Emscripten build script (read-only; run locally)
+│   ├─ build.sh                ← Emscripten build script (CT-hardened, -O1)
 │   ├─ src/
 │   │   ├─ randombytes_wasm.c  ← routes to crypto.getRandomValues
-│   │   ├─ smaug_exports.c     ← SMAUG-T exported entry points
-│   │   └─ haetae_exports.c    ← HAETAE exported entry points
+│   │   ├─ smaug_exports.c     ← SMAUG-T exports + secure_zeroize
+│   │   └─ haetae_exports.c    ← HAETAE exports + secure_zeroize
 │   ├─ dist/                   ← (gitignored) compiled JS+WASM
 │   └─ vendor/                 ← (gitignored) C reference implementations
 │
 ├─ web-demo/
 │   ├─ index.html
+│   ├─ timing-harness.html     ← timing side-channel analysis tool
 │   ├─ src/
 │   │   ├─ main.ts             ← entry point; calls initCrypto() before vault init
 │   │   ├─ crypto/
@@ -189,7 +190,7 @@ cp wasm/dist/smaug.wasm  web-demo/public/smaug.wasm
 cp wasm/dist/haetae.wasm web-demo/public/haetae.wasm
 ```
 
-### Verified WASM sizes (Emscripten 5.0.3, -O2)
+### Verified WASM sizes (Emscripten 5.0.3, -O1 + CT hardening)
 
 | Module | PK | SK | CT/maxSig | SS |
 |--------|----|----|-----------|-----|

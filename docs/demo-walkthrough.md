@@ -227,7 +227,7 @@ bytes in this case are derived from `reconstructedKey[i % 32] XOR (i * 7 + 31)`.
 | Threshold (t) | 2 |
 | AES key size | 256 bits |
 | GCM nonce | 96 bits (random per seal) |
-| PBKDF2 iterations | 100 000 |
+| PBKDF2 iterations | 600 000 |
 | PBKDF2 salt | 16 bytes (random per participant per seal) |
 | SMAUG-T level | Level 1 (128-bit PQC security) |
 | HAETAE mode | Mode 2 (128-bit PQC security) |

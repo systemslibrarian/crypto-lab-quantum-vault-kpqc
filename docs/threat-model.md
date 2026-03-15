@@ -98,9 +98,14 @@ compromised $t$-share attack.
 - Modify the `threshold` field to weaken the policy.
 
 **Mitigation:**  
-HAETAE signs *all* container fields (nonce, ciphertext, all KEM ciphertexts,
-threshold, algorithm IDs). Any modification invalidates the signature.
+HAETAE signs the following container fields: `nonce`, `ciphertext`, all per-participant
+`kemCiphertext`, `wrappedShare`, `shareNonce`, `publicKey`, `wrappedSecretKey`, and `skNonce`
+values, plus the signature verification key `sigPublicKey` and the `createdAt` timestamp.
+Any modification to these fields invalidates the signature.
 Decryption aborts on signature failure *before* any KEM or AES operation.
+
+The binding of `sigPublicKey` in the signed corpus prevents an attacker from substituting
+the signature and verification key pair while preserving container integrity.
 
 The AAD in AES-256-GCM additionally binds the threshold and algorithm choice to
 the ciphertext, providing a second layer of defense.
@@ -171,13 +176,66 @@ The following are **not** in Quantum Vault's current threat model:
 | Threat | Reason |
 |--------|--------|
 | **Compromise of ≥ t recipients** | Shamir provides no protection if $t$ shares are obtained legitimately or through coercion |
-| **Side-channel attacks** (timing, power, EM) | The dev backend and reference C libraries have not been hardened against timing; xor_protect is not constant-time in general |
+| **Side-channel attacks** (timing, power, EM) | See §5.1 below for detailed analysis |
 | **Memory forensics** | Key material is zeroized but OS page swapping or hibernation may persist it before zeroization |
+| **Offline brute-force against localStorage** | Sealed containers stored in `localStorage` are accessible to anyone with physical or OS-level access to the browser profile. An attacker can exfiltrate the container and mount an offline dictionary attack against participant passwords with no rate limiting or lockout. PBKDF2 (600 000 iterations) raises the cost but does not eliminate the risk. Users should choose strong, unique passwords. |
 | **Malicious encryptor** | The encryptor can embed arbitrary plaintext; Quantum Vault makes no claims about what is encrypted |
 | **Signature key distribution** | The authenticity of `sig_pk` is out of scope — a TOFU or PKI layer is required |
 | **Deniability** | The HAETAE signature creates a non-repudiable binding between the signer and the container |
 | **Key revocation** | There is no mechanism to revoke a recipient's key share |
 | **Quantum attacks on GF(2⁸)** | Quantum algorithms provide a small speedup for Gaussian elimination over finite fields but do not threaten SSS at current parameters |
+
+### 5.1 Timing Side-Channel Analysis
+
+#### Inherent HAETAE Timing Leak
+
+HAETAE (and all Fiat-Shamir with Aborts lattice signatures — including Dilithium/ML-DSA)
+have an **inherent variable-time signing operation**. The core signing loop:
+
+1. Samples a masking vector $\mathbf{y}$
+2. Computes commitment $\mathbf{w}$
+3. Derives challenge $c$
+4. Computes response $\mathbf{z}$
+5. **Rejects and restarts** if $||\mathbf{z}||$ or hints exceed norm bounds
+
+The rejection loop (`goto reject;`) cannot be made constant-time without fundamentally
+changing the algorithm. Iteration count follows a geometric distribution (≈2.5 iterations
+average for HAETAE Mode 2).
+
+#### Why This Is Acceptable
+
+For Quantum Vault's threat model, this timing leak is acceptable because:
+
+- **Ephemeral signature keys**: Each seal() operation generates a fresh HAETAE keypair;
+  the signing key is immediately zeroized and never reused.
+- **Single-use signatures**: Each secret key signs exactly one message, eliminating
+  the timing oracle attack vector that requires observing many signatures under
+  the same key.
+- **No remote timing**: The browser context provides limited timing precision (~5 µs
+  with isolation headers); cross-origin attackers cannot measure seal() duration.
+
+#### Applied Mitigations
+
+The WASM build applies the following timing hardening measures:
+
+| Mitigation | Implementation |
+|------------|----------------|
+| **Reduced optimization** | `-O1` instead of `-O2` to minimize timing-variant instruction scheduling |
+| **Anti-vectorization** | `-fno-tree-vectorize -fno-slp-vectorize` to prevent data-dependent SIMD |
+| **Pre-allocated memory** | `-s INITIAL_MEMORY=4194304` (4 MiB) to eliminate `_malloc` timing jitter |
+| **Secure zeroing** | C-level `volatile` zeroing via `_*_secure_zeroize()` exports, immune to JS engine elision |
+| **Constant-time primitives** | SHAKE256 (deterministic expansion), shift-and-mask norm bounds (no branches per coefficient) |
+
+#### SMAUG-T KEM
+
+SMAUG-T encapsulation and decapsulation are deterministic fixed-iteration algorithms.
+No rejection sampling occurs, so timing is effectively constant for a given ciphertext size.
+
+#### Recommended Monitoring
+
+A timing harness is provided at `timing-harness.html` for empirical validation.
+Distributions with low coefficient of variation (< 5%) indicate acceptable
+constant-time behavior. Higher variance should be investigated.
 
 ---
 

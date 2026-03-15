@@ -36,7 +36,7 @@ export function showDepositPanel(
       <div class="password-row">
         <div class="form-group">
           <label for="pw-alice">${t('aliceKey')}</label>
-          <input type="text" id="pw-alice"
+          <input type="password" id="pw-alice"
                  autocomplete="new-password"
                  placeholder="${t('alicePh')}"
                  aria-required="true"
@@ -45,7 +45,7 @@ export function showDepositPanel(
         </div>
         <div class="form-group">
           <label for="pw-bob">${t('bobKey')}</label>
-          <input type="text" id="pw-bob"
+          <input type="password" id="pw-bob"
                  autocomplete="new-password"
                  placeholder="${t('bobPh')}"
                  aria-required="true"
@@ -54,7 +54,7 @@ export function showDepositPanel(
         </div>
         <div class="form-group">
           <label for="pw-carol">${t('carolKey')}</label>
-          <input type="text" id="pw-carol"
+          <input type="password" id="pw-carol"
                  autocomplete="new-password"
                  placeholder="${t('carolPh')}"
                  aria-required="true"
@@ -199,9 +199,9 @@ export function showRetrievePanel(
   panel.querySelector('#btn-cancel-retrieve')!.addEventListener('click', onCancel);
 
   panel.querySelector('#btn-open')!.addEventListener('click', async () => {
-    const aliceVal = panel.querySelector<HTMLInputElement>('#rpw-alice')!.value;
-    const bobVal = panel.querySelector<HTMLInputElement>('#rpw-bob')!.value;
-    const carolVal = panel.querySelector<HTMLInputElement>('#rpw-carol')!.value;
+    const aliceVal = panel.querySelector<HTMLInputElement>('#rpw-alice')!.value.trim();
+    const bobVal = panel.querySelector<HTMLInputElement>('#rpw-bob')!.value.trim();
+    const carolVal = panel.querySelector<HTMLInputElement>('#rpw-carol')!.value.trim();
 
     const btn = panel.querySelector<HTMLButtonElement>('#btn-open')!;
     btn.disabled = true;
@@ -239,9 +239,7 @@ export function openPanel(panel: HTMLElement): void {
 }
 
 export function closePanel(panel: HTMLElement): void {
+  // Clear sensitive content synchronously before the close animation begins.
+  panel.innerHTML = '';
   panel.classList.remove('open');
-  // Clear content after transition
-  setTimeout(() => {
-    panel.innerHTML = '';
-  }, 320);
 }

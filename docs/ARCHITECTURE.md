@@ -23,10 +23,10 @@ flowchart TD
     subgraph C_HAETAE["vendor C: HAETAE 1.1.2\nreference_implementation/src/*.c"]
     end
 
-    subgraph WASM_BUILD["wasm/ — Emscripten (emcc -O2)"]
+    subgraph WASM_BUILD["wasm/ — Emscripten (emcc -O1 + CT hardening)"]
         RB["randombytes_wasm.c\n→ crypto.getRandomValues"]
-        SE["smaug_exports.c\nkeypair / encapsulate / decapsulate"]
-        HE["haetae_exports.c\nkeypair / sign / verify"]
+        SE["smaug_exports.c\nkeypair / encapsulate / decapsulate / secure_zeroize"]
+        HE["haetae_exports.c\nkeypair / sign / verify / secure_zeroize"]
         DIST["wasm/dist/\nsmaug.{js,wasm}  haetae.{js,wasm}"]
     end
 
