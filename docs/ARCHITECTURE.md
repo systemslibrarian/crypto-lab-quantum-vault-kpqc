@@ -128,6 +128,7 @@ interface WrappedShare {
   publicKey:        Uint8Array; // SMAUG-T public key (672 B)
   wrappedSecretKey: Uint8Array; // AES-GCM encrypted SMAUG-T SK
   skNonce:          Uint8Array; // 12-byte nonce for SK encryption
+  iterations:       number;     // PBKDF2 iteration count (600 000 for new deposits)
 }
 
 type OpenResult =

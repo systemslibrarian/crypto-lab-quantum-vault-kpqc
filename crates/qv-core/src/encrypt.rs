@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Encryption pipeline: plaintext → AES-256-GCM → Shamir split → KEM protect → container.
 
 use crate::{

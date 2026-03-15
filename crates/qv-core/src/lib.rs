@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Quantum Vault core cryptography library.
 //!
 //! This crate provides the foundational pipeline for Quantum Vault:
@@ -39,6 +40,13 @@ use crypto::kem::Kem as _;
 use crypto::signature::Signature as _;
 use std::fmt;
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+/// Result of encrypting plaintext: (container_json, kem_privkeys, sig_pubkey).
+///
+/// - `container_json`: serialized container for storage/transmission
+/// - `kem_privkeys`: one private key per share; any `threshold` keys suffice for decryption
+/// - `sig_pubkey`: public key for verifying the container signature
+pub type EncryptResult = (Vec<u8>, Vec<Vec<u8>>, Vec<u8>);
 
 // [L-002] Prevent dev-backend from shipping in release builds.
 // Add feature `allow_dev_backend_in_release` to explicitly opt-in if needed
@@ -154,7 +162,7 @@ pub fn reconstruct_key(shares: &[KeyShare]) -> Result<Vec<u8>> {
 
 /// Encrypt `plaintext` using the dev backend with a 2-of-2 threshold scheme.
 ///
-/// Returns `(container_json, kem_privkeys, sig_pubkey)`.
+/// Returns `(container_json, kem_privkeys, sig_pubkey)` — see [`EncryptResult`].
 /// Both `kem_privkeys` are required for decryption — pass them to [`decrypt_bytes`].
 ///
 /// For a custom share count or threshold use [`encrypt_with_threshold`].
@@ -162,13 +170,15 @@ pub fn reconstruct_key(shares: &[KeyShare]) -> Result<Vec<u8>> {
 /// # ⚠ Dev backend only
 /// Key material is produced by the development stub (SHA-256/XOR).  Do **not**
 /// use this to protect real data.
-pub fn encrypt_bytes(plaintext: &[u8]) -> Result<(Vec<u8>, Vec<Vec<u8>>, Vec<u8>)> {
+#[must_use = "encryption result contains keys required for decryption"]
+pub fn encrypt_bytes(plaintext: &[u8]) -> Result<EncryptResult> {
     encrypt_with_threshold(plaintext, 2, 2)
 }
 
 /// Decrypt a container produced by [`encrypt_bytes`].
 ///
 /// `kem_privkeys` must be the slice returned by the matching `encrypt_bytes` call.
+#[must_use = "decryption result contains the recovered plaintext"]
 pub fn decrypt_bytes(
     container_json: &[u8],
     kem_privkeys: &[Vec<u8>],
@@ -190,7 +200,7 @@ pub fn encrypt_with_threshold(
     plaintext: &[u8],
     share_count: u8,
     threshold: u8,
-) -> Result<(Vec<u8>, Vec<Vec<u8>>, Vec<u8>)> {
+) -> Result<EncryptResult> {
     let kem = DevKem;
     let sig = DevSignature;
 

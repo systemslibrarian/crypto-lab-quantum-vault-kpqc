@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** 2026-03  
-**Applies to:** Web demo v5.0 (real KpqC WASM)
+**Applies to:** Web demo v5.1 (real KpqC WASM)
 
 ---
 

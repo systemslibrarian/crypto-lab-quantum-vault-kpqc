@@ -1,4 +1,8 @@
-# Quantum Vault — v5.0
+# Quantum Vault — v5.1
+
+[![CI](https://github.com/systemslibrarian/quantum-vault-kpqc/actions/workflows/ci.yml/badge.svg)](https://github.com/systemslibrarian/quantum-vault-kpqc/actions/workflows/ci.yml)
+[![Deploy](https://github.com/systemslibrarian/quantum-vault-kpqc/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/systemslibrarian/quantum-vault-kpqc/actions/workflows/deploy-pages.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **An educational threshold secret-storage demo using Korean post-quantum cryptography in the browser.**
 
@@ -120,6 +124,7 @@ quantum-vault-kpqc/
 │   │   │   └─ wasm/           ← Emscripten JS loaders (committed)
 │   │   ├─ vault/
 │   │   │   ├─ demo.ts         ← generates the three pre-sealed demo boxes
+│   │   │   ├─ file.ts         ← .qvault file export / import with HAETAE verification
 │   │   │   └─ state.ts        ← localStorage persistence / serialization
 │   │   └─ ui/
 │   │       ├─ wall.ts         ← vault-wall rendering
@@ -129,7 +134,9 @@ quantum-vault-kpqc/
 │   │       └─ styles/vault.css
 │   └─ public/
 │       ├─ smaug.wasm          ← compiled SMAUG-T Level 1 binary (committed)
-│       └─ haetae.wasm         ← compiled HAETAE Mode 2 binary (committed)
+│       ├─ smaug.wasm.sha256   ← SHA-256 integrity checksum
+│       ├─ haetae.wasm         ← compiled HAETAE Mode 2 binary (committed)
+│       └─ haetae.wasm.sha256  ← SHA-256 integrity checksum
 │
 ├─ docs/
 │   ├─ ARCHITECTURE.md            ← full stack: C → WASM → TypeScript, Rust FFI
@@ -222,7 +229,7 @@ cargo bench          # criterion benchmarks
 > **This is an educational/experimental demo, not production software.**
 
 - All secrets and keys stay in the browser — nothing is transmitted to a server.
-- PBKDF2 with 100,000 SHA-256 iterations derives a password-wrapping key for the SMAUG-T secret key. Weak passwords remain vulnerable to offline brute-force.
+- PBKDF2 with 600,000 SHA-256 iterations derives a password-wrapping key for the SMAUG-T secret key. Weak passwords remain vulnerable to offline brute-force.
 - SMAUG-T does not support deterministic keygen from a seed, so a fresh random keypair is generated per deposit. The secret key is encrypted with the password-derived key; the ciphertext and public key are stored in the container.
 - The HAETAE signing keypair is ephemeral (generated at seal time) and the public key is stored in the container. This provides authentication but not attribution — anyone who reads the public key can verify the seal but cannot determine who created it.
 - The WASM binaries are compiled from the official KpqC reference implementations. They have not been independently audited for side-channel resistance or production hardening.

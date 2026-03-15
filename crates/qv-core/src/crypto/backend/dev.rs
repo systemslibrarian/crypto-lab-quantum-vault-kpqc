@@ -117,7 +117,7 @@ impl Signature for DevSignature {
         // this MAC with only the public key.
         let mac_key = Sha256::digest(privkey);
         let mut h = Sha256::new();
-        h.update(&mac_key);
+        h.update(mac_key);
         h.update(message);
         Ok(h.finalize().to_vec())
     }

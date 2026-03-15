@@ -397,6 +397,64 @@ body {
   cursor: not-allowed;
 }
 
+/* ---------- Export / Import ---------- */
+.panel-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.btn-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+
+.export-icon {
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.import-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #dee2e9;
+}
+
+.import-divider {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.btn-import {
+  display: inline-block;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+}
+
+.btn-import:hover {
+  background: #e8eef8;
+}
+
+.import-status {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  min-height: 1.5em;
+}
+
+.import-status.success {
+  color: #2a8d5c;
+}
+
+.import-status.error {
+  color: #c04040;
+}
+
 /* ---------- Pipeline Indicator ---------- */
 #pipeline-area {
   margin-top: 16px;

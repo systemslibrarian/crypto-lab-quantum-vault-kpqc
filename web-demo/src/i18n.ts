@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Lightweight i18n — English (default) and Korean UI strings.
 // Call setLang('ko') to switch language globally.
 // Use t(key) anywhere in TypeScript for the current language.
@@ -63,6 +64,24 @@ const strings: Record<string, { en: string; ko: string }> = {
   // Toggle aria
   switchToKorean:    { en: 'Switch to Korean',         ko: '영어로 전환' },
   switchToEnglish:   { en: 'Switch to English',        ko: '영어로 전환' },
+  // Export / Import
+  exportBtn:         { en: 'Export .qvault',           ko: '.qvault 내보내기' },
+  exportSuccess:     { en: 'File downloaded',          ko: '파일 다운로드 완료' },
+  importBtn:         { en: 'Import .qvault',           ko: '.qvault 가져오기' },
+  importOrCreate:    { en: 'or import an existing file',
+                       ko: '또는 기존 파일 가져오기' },
+  importing:         { en: 'Verifying…',               ko: '검증 중…' },
+  importSuccess:     { en: 'Container loaded and verified',
+                       ko: '컨테이너 로드 및 검증 완료' },
+  importErrorJson:   { en: 'Invalid file format',      ko: '잘못된 파일 형식' },
+  importErrorVer:    { en: 'Unsupported vault format', ko: '지원하지 않는 볼트 형식' },
+  importErrorField:  { en: 'Incomplete container',     ko: '불완전한 컨테이너' },
+  importErrorPart:   { en: 'Invalid participant count', ko: '잘못된 참여자 수' },
+  importErrorData:   { en: 'Corrupted data',           ko: '손상된 데이터' },
+  importErrorAlgo:   { en: 'Unsupported algorithm',    ko: '지원하지 않는 알고리즘' },
+  importErrorSig:    { en: 'Container signature invalid — file may be tampered',
+                       ko: '컨테이너 서명이 유효하지 않습니다 — 파일이 변조되었을 수 있습니다' },
+  chooseFile:        { en: 'Choose .qvault file',      ko: '.qvault 파일 선택' },
 };
 
 let _lang: 'en' | 'ko' = 'en';
@@ -85,6 +104,10 @@ function detectInitialLocale(): 'en' | 'ko' {
 // Initialize on module load
 _lang = detectInitialLocale();
 
+/**
+ * Set the active UI language and persist to localStorage.
+ * @param lang - The language code ('en' or 'ko')
+ */
 export function setLang(lang: 'en' | 'ko'): void {
   _lang = lang;
   try {
@@ -94,10 +117,20 @@ export function setLang(lang: 'en' | 'ko'): void {
   }
 }
 
+/**
+ * Get the current UI language.
+ * @returns The active language code
+ */
 export function getLang(): 'en' | 'ko' {
   return _lang;
 }
 
+/**
+ * Translate a key to the current language.
+ * Falls back to English, then to the key itself if not found.
+ * @param key - The translation key (e.g., 'sealBtn', 'openBtn')
+ * @returns The translated string
+ */
 export function t(key: string): string {
   return strings[key]?.[_lang] ?? strings[key]?.en ?? key;
 }

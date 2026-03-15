@@ -205,3 +205,83 @@ Future planned versions:
 |---------|--------|
 | 2 | Optional: base64url byte arrays instead of JSON integer arrays |
 | 3 | HAETAE signature over binary-encoded fields (smaller containers) |
+
+---
+
+## Web Demo Export Format (`.qvault` files)
+
+The web demo uses a separate JSON format for file export/import, distinct from
+the `QVLT1` format used by `qv-core`. This format uses base64-encoded binary
+fields for browser compatibility and human readability.
+
+### Version identifier
+
+```
+version: "qvault-v1"
+```
+
+### Top-level structure
+
+```json
+{
+  "version": "qvault-v1",
+  "algorithm": {
+    "kem": "smaug-t-level1",
+    "sig": "haetae-mode2",
+    "symmetric": "aes-256-gcm",
+    "kdf": "pbkdf2-sha256"
+  },
+  "ciphertext": "<base64>",
+  "nonce": "<base64, 12 bytes>",
+  "participants": [
+    {
+      "label": "Alice",
+      "kemCiphertext": "<base64, 672 bytes>",
+      "wrappedSecretKey": "<base64>",
+      "wrappedShare": "<base64>",
+      "pbkdf2Salt": "<base64, 16 bytes>",
+      "kemPublicKey": "<base64, 672 bytes>",
+      "shareNonce": "<base64, 12 bytes>",
+      "skNonce": "<base64, 12 bytes>",
+      "iterations": 100000
+    },
+    { "label": "Bob", ... },
+    { "label": "Carol", ... }
+  ],
+  "signature": "<base64, max 1474 bytes>",
+  "signaturePublicKey": "<base64, 992 bytes>",
+  "createdAt": "<ISO 8601 timestamp>"
+}
+```
+
+### Field reference
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `version` | string | Must equal `"qvault-v1"` |
+| `algorithm` | object | Algorithm identifiers for verification |
+| `ciphertext` | base64 | AES-256-GCM output including 16-byte auth tag |
+| `nonce` | base64 | 12-byte AES-GCM nonce |
+| `participants` | array | Always 3 elements (Alice, Bob, Carol) |
+| `signature` | base64 | HAETAE Mode 2 signature |
+| `signaturePublicKey` | base64 | HAETAE public key (992 bytes) |
+| `createdAt` | string | ISO 8601 timestamp |
+
+### Import validation
+
+On import, the web demo:
+
+1. Parses JSON and validates `version == "qvault-v1"`
+2. Checks algorithm compatibility (rejects unknown algorithms)
+3. Validates participant count (must be exactly 3)
+4. Verifies byte lengths for all fixed-size fields
+5. **Verifies the HAETAE signature before any decryption attempt**
+6. Rejects containers with invalid or missing signatures
+
+### Security considerations
+
+- Imported containers are cryptographically verified using the embedded
+  HAETAE public key before any KEM or AES operation.
+- The signature binds all container fields including the timestamp.
+- File import does not automatically unlock the vault — passwords are still
+  required to access shares.

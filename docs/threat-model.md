@@ -156,6 +156,43 @@ algorithm.
 
 ---
 
+### 3.7 Malicious `.qvault` File Import
+
+**Capabilities:**  
+- Can craft or modify a `.qvault` export file and trick a user into importing it.
+- May attempt to inject containers with:
+  - Invalid HAETAE signatures
+  - Modified ciphertext or share data
+  - Incorrect byte lengths to trigger parser bugs
+
+**Threat:**  
+- Convince a user to decrypt a tampered container (integrity violation)
+- Exploit parser bugs to cause denial of service or memory corruption
+- Cross-container attacks: splice shares from different containers
+
+**Mitigation:**  
+- **Signature-first verification**: The import path verifies the HAETAE
+  signature before any KEM or AES operation. Invalid signatures abort
+  import with `SIGNATURE_INVALID` error before data enters the vault.
+- **Strict length validation**: All fixed-size fields (nonce, KEM ciphertext,
+  public keys) are validated against expected byte lengths before processing.
+- **Algorithm compatibility check**: Import rejects containers with unrecognized
+  algorithm identifiers (`UNSUPPORTED_ALGORITHM` error).
+- **Participant count validation**: Exactly 3 participants required; other
+  counts are rejected before signature verification.
+- **No silent failures**: All validation errors produce explicit error codes
+  that are surfaced to users.
+
+**Attack surface:**
+- Imported containers execute the same HAETAE verification code as locally-
+  created containers — no additional code paths introduced.
+- Base64 decoding failures are caught and mapped to `CORRUPTED_DATA`.
+- JSON parsing errors are caught and mapped to `INVALID_JSON`.
+
+**Verdict: Defended against integrity attacks; import uses existing verified code paths.**
+
+---
+
 ## 4. Security Properties Summary
 
 | Property | Guarantee | Assumption |

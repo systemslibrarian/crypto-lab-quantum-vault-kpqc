@@ -2,14 +2,14 @@
 
 **Version:** 1.0  
 **Date:** 2026-03  
-**Applies to:** Web demo v5.0 (real KpqC WASM)
+**Applies to:** Web demo v5.1 (real KpqC WASM)
 
 ---
 
 ## Overview
 
 The web demo is a single-page application that presents a 4×3 grid of twelve
-numbered safety deposit boxes (01–12).  Three of them (03, 08, 10) are
+numbered safety deposit boxes (01–12).  Three of them (03, 06, 09) are
 pre-sealed on first load using **real** SMAUG-T Level 1 KEM and HAETAE Mode 2
 signatures — the same algorithms from the KpqC competition.  The remaining nine
 boxes are empty and can be filled with your own secrets.
@@ -99,7 +99,7 @@ For each participant:
    public key, producing a 672-byte KEM ciphertext.
 3. The 32-byte share is AES-256-GCM encrypted using SS as the key.
 4. The SMAUG-T secret key itself is encrypted with a key derived by
-   PBKDF2-SHA-256 (100 000 iterations) from the participant's password.
+   PBKDF2-SHA-256 (600 000 iterations) from the participant's password.
 
 All four SMAUG-T outputs (salt, KEM ciphertext, wrapped share, wrapped SK) plus
 their nonces are stored as a `WrappedShare` record.
@@ -154,7 +154,7 @@ tampering with the stored container bytes.
 
 **SMAUG-T unlock** (per non-empty password)  
 For each field that was filled in:
-1. PBKDF2-SHA-256 (100 000 iterations) over the participant's password and the
+1. PBKDF2-SHA-256 (600 000 iterations) over the participant's password and the
    stored 16-byte salt re-derives the AES key.
 2. AES-256-GCM decrypts the wrapped SMAUG-T SK.  A wrong password causes an
    AES-GCM auth-tag mismatch → `DOMException`; the share is silently skipped.

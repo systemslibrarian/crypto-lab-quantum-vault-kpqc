@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! WebAssembly interface for qv-core.
 //!
 //! Compiled only when the `wasm` feature is active.

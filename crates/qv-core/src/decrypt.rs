@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Decryption pipeline: container → verify → KEM recover → Shamir reconstruct → AES decrypt.
 
 use crate::{

@@ -7,5 +7,17 @@ export default defineConfig({
     globals: true,
     // Resolve bare imports the same way Vite does
     root: '.',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      exclude: [
+        '**/wasm/**',
+        '**/*.d.ts',
+        '**/node_modules/**',
+        'vite.config.ts',
+        'vitest.config.ts',
+        'eslint.config.js',
+      ],
+    },
   },
 });

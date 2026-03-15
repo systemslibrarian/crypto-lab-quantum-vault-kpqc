@@ -7,6 +7,8 @@ import { loadVaultState, saveVaultState, clearVaultState, emptyVaultState, seria
 import type { VaultState } from './vault/state';
 import { generateDemoBoxes } from './vault/demo';
 import { sealMessage, openBox } from './crypto/pipeline';
+import type { SealedBox } from './crypto/pipeline';
+import { exportQvault, vaultBoxToSealedBox } from './vault/file';
 import { renderVaultWall } from './ui/wall';
 import {
   showDepositPanel,
@@ -69,6 +71,7 @@ async function init(): Promise<void> {
         panelEl,
         boxNumber,
         data => handleRetrieve(boxNumber, data.passwords),
+        () => handleExport(boxNumber),
         () => { selectedBox = null; closePanel(panelEl); renderWall(); },
       );
     } else {
@@ -76,6 +79,7 @@ async function init(): Promise<void> {
         panelEl,
         boxNumber,
         data => handleDeposit(boxNumber, data.message, data.passwords),
+        box => handleImport(boxNumber, box),
         () => { selectedBox = null; closePanel(panelEl); renderWall(); },
       );
     }
@@ -157,7 +161,36 @@ async function init(): Promise<void> {
       );
     }
   }
+  // ---- Export a sealed container ----
+  function handleExport(boxNumber: string): void {
+    const vaultBox = state.boxes[boxNumber];
+    if (!vaultBox) return;
+    const sealedBox = vaultBoxToSealedBox(vaultBox);
+    exportQvault(sealedBox, boxNumber);
+  }
 
+  // ---- Import a sealed container ----
+  async function handleImport(boxNumber: string, box: SealedBox): Promise<void> {
+    // Store the imported container (already verified by importQvault)
+    state.boxes[boxNumber] = serializeSealedBox(box);
+    saveVaultState(state);
+    
+    // Close deposit panel and show retrieve panel for the newly imported box
+    closePanel(panelEl);
+    renderWall();
+    
+    // Open retrieve panel so user can enter passwords
+    setTimeout(() => {
+      showRetrievePanel(
+        panelEl,
+        boxNumber,
+        data => handleRetrieve(boxNumber, data.passwords),
+        () => handleExport(boxNumber),
+        () => { selectedBox = null; closePanel(panelEl); renderWall(); },
+      );
+      panelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+  }
   // ---- Reset vault ----
   document.getElementById('btn-reset')?.addEventListener('click', async () => {
     if (!confirm('Reset vault? Your custom secrets will be permanently deleted. Demo boxes will be restored.')) {

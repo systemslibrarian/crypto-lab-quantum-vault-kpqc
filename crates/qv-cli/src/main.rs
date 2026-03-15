@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Quantum Vault CLI — `qv`
 //!
 //! Commands:

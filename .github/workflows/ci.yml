@@ -74,6 +74,10 @@ jobs:
         working-directory: web-demo
         run: npm run test
 
+      - name: Lint (ESLint)
+        working-directory: web-demo
+        run: npm run lint
+
       - name: Type-check + build
         working-directory: web-demo
         run: npm run build

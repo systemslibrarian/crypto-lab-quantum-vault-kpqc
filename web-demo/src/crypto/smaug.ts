@@ -1,13 +1,15 @@
+// SPDX-License-Identifier: MIT
 // TypeScript wrapper for SMAUG-T Level 1 KEM compiled to WebAssembly.
 // All WASM memory management is contained here — callers receive plain Uint8Arrays.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let smaugModule: any = null;
+import type { SmaugModule, EmscriptenModuleFactory } from './wasm-types';
+
+let smaugModule: SmaugModule | null = null;
 
 export async function initSmaug(): Promise<void> {
   // Dynamic import of the Emscripten-generated JS loader.
   // Vite copies the .wasm file to public/ and the loader fetches it from there.
-  const createModule = (await import('./wasm/smaug.js')).default;
+  const createModule = (await import('./wasm/smaug.js')).default as EmscriptenModuleFactory<SmaugModule>;
   smaugModule = await createModule({
     // Tell Emscripten where the .wasm file lives at runtime.
     locateFile: (path: string) => {
@@ -17,29 +19,31 @@ export async function initSmaug(): Promise<void> {
   });
 }
 
-function assertReady(): void {
+/** Get the initialized module or throw. Returns narrowed type for TypeScript. */
+function getModule(): SmaugModule {
   if (!smaugModule) throw new Error('SMAUG-T WASM not initialized — call initSmaug() first');
+  return smaugModule;
 }
 
 /** Generate a SMAUG-T Level 1 keypair (PK: 672 B, SK: 832 B). */
 export function smaugKeypair(): { publicKey: Uint8Array; secretKey: Uint8Array } {
-  assertReady();
-  const pkSize = smaugModule._smaug_publickeybytes() as number;
-  const skSize = smaugModule._smaug_secretkeybytes() as number;
-  const pkPtr = smaugModule._malloc(pkSize) as number;
-  const skPtr = smaugModule._malloc(skSize) as number;
+  const m = getModule();
+  const pkSize = m._smaug_publickeybytes();
+  const skSize = m._smaug_secretkeybytes();
+  const pkPtr = m._malloc(pkSize);
+  const skPtr = m._malloc(skSize);
   try {
-    const ret = smaugModule._smaug_keypair(pkPtr, skPtr) as number;
+    const ret = m._smaug_keypair(pkPtr, skPtr);
     if (ret !== 0) throw new Error(`SMAUG-T keygen failed (ret=${ret})`);
-    const publicKey = new Uint8Array(smaugModule.HEAPU8.buffer as ArrayBuffer, pkPtr, pkSize).slice();
-    const secretKey = new Uint8Array(smaugModule.HEAPU8.buffer as ArrayBuffer, skPtr, skSize).slice();
+    const publicKey = new Uint8Array(m.HEAPU8.buffer as ArrayBuffer, pkPtr, pkSize).slice();
+    const secretKey = new Uint8Array(m.HEAPU8.buffer as ArrayBuffer, skPtr, skSize).slice();
     return { publicKey, secretKey };
   } finally {
     // Use C-level secure zeroing that cannot be optimized away by JS engines
-    smaugModule._smaug_secure_zeroize(pkPtr, pkSize);
-    smaugModule._free(pkPtr);
-    smaugModule._smaug_secure_zeroize(skPtr, skSize);
-    smaugModule._free(skPtr);
+    m._smaug_secure_zeroize(pkPtr, pkSize);
+    m._free(pkPtr);
+    m._smaug_secure_zeroize(skPtr, skSize);
+    m._free(skPtr);
   }
 }
 
@@ -48,31 +52,31 @@ export function smaugKeypair(): { publicKey: Uint8Array; secretKey: Uint8Array }
  * Returns: ciphertext (672 B) + sharedSecret (32 B).
  */
 export function smaugEncapsulate(publicKey: Uint8Array): { ciphertext: Uint8Array; sharedSecret: Uint8Array } {
-  assertReady();
-  const ctSize = smaugModule._smaug_ciphertextbytes() as number;
-  const ssSize = smaugModule._smaug_sharedsecretbytes() as number;
-  const pkSize = smaugModule._smaug_publickeybytes() as number;
+  const m = getModule();
+  const ctSize = m._smaug_ciphertextbytes();
+  const ssSize = m._smaug_sharedsecretbytes();
+  const pkSize = m._smaug_publickeybytes();
   if (publicKey.length !== pkSize) {
     throw new Error(`Invalid SMAUG-T public key length: ${publicKey.length} (expected ${pkSize})`);
   }
-  const pkPtr = smaugModule._malloc(pkSize) as number;
-  const ctPtr = smaugModule._malloc(ctSize) as number;
-  const ssPtr = smaugModule._malloc(ssSize) as number;
+  const pkPtr = m._malloc(pkSize);
+  const ctPtr = m._malloc(ctSize);
+  const ssPtr = m._malloc(ssSize);
   try {
-    smaugModule.HEAPU8.set(publicKey, pkPtr);
-    const ret = smaugModule._smaug_encapsulate(ctPtr, ssPtr, pkPtr) as number;
+    m.HEAPU8.set(publicKey, pkPtr);
+    const ret = m._smaug_encapsulate(ctPtr, ssPtr, pkPtr);
     if (ret !== 0) throw new Error(`SMAUG-T encapsulate failed (ret=${ret})`);
     return {
-      ciphertext: new Uint8Array(smaugModule.HEAPU8.buffer as ArrayBuffer, ctPtr, ctSize).slice(),
-      sharedSecret: new Uint8Array(smaugModule.HEAPU8.buffer as ArrayBuffer, ssPtr, ssSize).slice(),
+      ciphertext: new Uint8Array(m.HEAPU8.buffer as ArrayBuffer, ctPtr, ctSize).slice(),
+      sharedSecret: new Uint8Array(m.HEAPU8.buffer as ArrayBuffer, ssPtr, ssSize).slice(),
     };
   } finally {
     // Use C-level secure zeroing that cannot be optimized away by JS engines
-    smaugModule._smaug_secure_zeroize(pkPtr, pkSize);
-    smaugModule._free(pkPtr);
-    smaugModule._free(ctPtr);
-    smaugModule._smaug_secure_zeroize(ssPtr, ssSize);
-    smaugModule._free(ssPtr);
+    m._smaug_secure_zeroize(pkPtr, pkSize);
+    m._free(pkPtr);
+    m._free(ctPtr);
+    m._smaug_secure_zeroize(ssPtr, ssSize);
+    m._free(ssPtr);
   }
 }
 
@@ -81,31 +85,31 @@ export function smaugEncapsulate(publicKey: Uint8Array): { ciphertext: Uint8Arra
  * Returns: sharedSecret (32 B). Different SK → different (wrong) shared secret.
  */
 export function smaugDecapsulate(ciphertext: Uint8Array, secretKey: Uint8Array): Uint8Array {
-  assertReady();
-  const ctExpected = smaugModule._smaug_ciphertextbytes() as number;
-  const skExpected = smaugModule._smaug_secretkeybytes() as number;
-  const ssSize = smaugModule._smaug_sharedsecretbytes() as number;
+  const m = getModule();
+  const ctExpected = m._smaug_ciphertextbytes();
+  const skExpected = m._smaug_secretkeybytes();
+  const ssSize = m._smaug_sharedsecretbytes();
   if (ciphertext.length !== ctExpected) {
     throw new Error(`Invalid SMAUG-T ciphertext length: ${ciphertext.length} (expected ${ctExpected})`);
   }
   if (secretKey.length !== skExpected) {
     throw new Error(`Invalid SMAUG-T secret key length: ${secretKey.length} (expected ${skExpected})`);
   }
-  const ctPtr = smaugModule._malloc(ciphertext.length) as number;
-  const skPtr = smaugModule._malloc(secretKey.length) as number;
-  const ssPtr = smaugModule._malloc(ssSize) as number;
+  const ctPtr = m._malloc(ciphertext.length);
+  const skPtr = m._malloc(secretKey.length);
+  const ssPtr = m._malloc(ssSize);
   try {
-    smaugModule.HEAPU8.set(ciphertext, ctPtr);
-    smaugModule.HEAPU8.set(secretKey, skPtr);
-    const ret = smaugModule._smaug_decapsulate(ssPtr, ctPtr, skPtr) as number;
+    m.HEAPU8.set(ciphertext, ctPtr);
+    m.HEAPU8.set(secretKey, skPtr);
+    const ret = m._smaug_decapsulate(ssPtr, ctPtr, skPtr);
     if (ret !== 0) throw new Error(`SMAUG-T decapsulate failed (ret=${ret})`);
-    return new Uint8Array(smaugModule.HEAPU8.buffer as ArrayBuffer, ssPtr, ssSize).slice();
+    return new Uint8Array(m.HEAPU8.buffer as ArrayBuffer, ssPtr, ssSize).slice();
   } finally {
-    smaugModule._free(ctPtr);
+    m._free(ctPtr);
     // Use C-level secure zeroing that cannot be optimized away by JS engines
-    smaugModule._smaug_secure_zeroize(skPtr, secretKey.length);
-    smaugModule._free(skPtr);
-    smaugModule._smaug_secure_zeroize(ssPtr, ssSize);
-    smaugModule._free(ssPtr);
+    m._smaug_secure_zeroize(skPtr, secretKey.length);
+    m._free(skPtr);
+    m._smaug_secure_zeroize(ssPtr, ssSize);
+    m._free(ssPtr);
   }
 }

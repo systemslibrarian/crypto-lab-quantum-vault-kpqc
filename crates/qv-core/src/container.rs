@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Quantum Vault container format.
 //!
 //! A `.qvault` file is a JSON-serialized [`QuantumVaultContainer`].  The magic

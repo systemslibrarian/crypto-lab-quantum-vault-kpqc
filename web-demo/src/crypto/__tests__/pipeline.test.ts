@@ -17,8 +17,7 @@
  *   verify  : sk' = pk XOR 0xCD; recompute sig and compare byte-by-byte ✓
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { MockedFunction } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // ---- Mock SMAUG-T ----
 vi.mock('../smaug', () => ({

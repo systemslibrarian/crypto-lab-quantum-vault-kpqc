@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Shamir Secret Sharing over GF(2^8).
 //!
 //! Uses the irreducible polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11d).
@@ -110,6 +111,7 @@ pub struct Share {
 /// # Errors
 /// Returns an error if `threshold < 2`, `share_count < threshold`, or
 /// `secret` is empty.
+#[must_use = "splitting produces shares that must be distributed"]
 pub fn split_secret(secret: &[u8], share_count: u8, threshold: u8) -> Result<Vec<Share>> {
     if threshold < 2 {
         return Err(anyhow!("threshold must be at least 2"));
@@ -165,6 +167,7 @@ pub fn split_secret(secret: &[u8], share_count: u8, threshold: u8) -> Result<Vec
 /// # Errors
 /// Returns an error if `shares` is empty, share indices are not unique, any
 /// share has index 0 (reserved for the secret), or payloads have unequal lengths.
+#[must_use = "reconstruction result contains the recovered secret"]
 pub fn reconstruct_secret(shares: &[Share]) -> Result<Vec<u8>> {
     if shares.is_empty() {
         return Err(anyhow!("at least one share is required"));
@@ -187,7 +190,7 @@ pub fn reconstruct_secret(shares: &[Share]) -> Result<Vec<u8>> {
 
     let mut secret = vec![0u8; len];
 
-    for i in 0..len {
+    for (i, byte) in secret.iter_mut().enumerate() {
         // Lagrange interpolation at x = 0 over GF(256).
         let mut val: u8 = 0;
         for (j, sj) in shares.iter().enumerate() {
@@ -206,7 +209,7 @@ pub fn reconstruct_secret(shares: &[Share]) -> Result<Vec<u8>> {
             }
             val = gf_add(val, gf_mul(yj, gf_div(num, den)));
         }
-        secret[i] = val;
+        *byte = val;
     }
 
     Ok(secret)

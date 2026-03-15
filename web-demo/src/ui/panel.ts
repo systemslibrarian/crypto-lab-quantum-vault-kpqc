@@ -1,6 +1,8 @@
 // Deposit and retrieval panel forms with inline validation
 
 import { t } from '../i18n';
+import { importQvault, QvaultImportError } from '../vault/file';
+import type { SealedBox } from '../crypto/pipeline';
 
 export interface DepositFormData {
   message: string;
@@ -15,6 +17,7 @@ export function showDepositPanel(
   panel: HTMLElement,
   boxNumber: string,
   onSubmit: (data: DepositFormData) => Promise<void>,
+  onImport: (box: SealedBox) => Promise<void>,
   onCancel: () => void,
 ): void {
   panel.innerHTML = `
@@ -69,10 +72,67 @@ export function showDepositPanel(
         <button class="btn-outline" id="btn-cancel-deposit">${t('cancelBtn')}</button>
       </div>
       <div id="deposit-result" aria-live="polite" aria-atomic="true"></div>
+      <div class="import-section">
+        <p class="import-divider">${t('importOrCreate')}</p>
+        <label class="btn-outline btn-import" for="import-file">
+          <input type="file" id="import-file" accept=".qvault,.json" hidden />
+          ${t('importBtn')}
+        </label>
+        <div class="import-status" id="import-status" role="status" aria-live="polite"></div>
+      </div>
     </div>
   `;
 
   openPanel(panel);
+
+  // Import file handling
+  const fileInput = panel.querySelector<HTMLInputElement>('#import-file')!;
+  const importStatus = panel.querySelector<HTMLElement>('#import-status')!;
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+
+    importStatus.className = 'import-status';
+    importStatus.textContent = t('importing');
+
+    try {
+      const box = await importQvault(file);
+      importStatus.textContent = t('importSuccess');
+      importStatus.classList.add('success');
+      await onImport(box);
+    } catch (err) {
+      importStatus.classList.add('error');
+      if (err instanceof QvaultImportError) {
+        switch (err.code) {
+          case 'INVALID_JSON':
+            importStatus.textContent = t('importErrorJson');
+            break;
+          case 'UNSUPPORTED_VERSION':
+            importStatus.textContent = t('importErrorVer');
+            break;
+          case 'MISSING_FIELD':
+            importStatus.textContent = `${t('importErrorField')}: ${err.message}`;
+            break;
+          case 'INVALID_PARTICIPANTS':
+            importStatus.textContent = t('importErrorPart');
+            break;
+          case 'CORRUPTED_DATA':
+            importStatus.textContent = `${t('importErrorData')}: ${err.message}`;
+            break;
+          case 'UNSUPPORTED_ALGORITHM':
+            importStatus.textContent = `${t('importErrorAlgo')}: ${err.message}`;
+            break;
+          case 'SIGNATURE_INVALID':
+            importStatus.textContent = t('importErrorSig');
+            break;
+        }
+      } else {
+        importStatus.textContent = `${t('importErrorJson')}: ${String(err)}`;
+      }
+    }
+    // Reset file input for re-selection
+    fileInput.value = '';
+  });
   // Move focus into the panel so keyboard/screen-reader users land on the first field
   setTimeout(() => {
     const first = panel.querySelector<HTMLElement>('textarea, input');
@@ -150,6 +210,7 @@ export function showRetrievePanel(
   panel: HTMLElement,
   boxNumber: string,
   onSubmit: (data: RetrieveFormData) => Promise<void>,
+  onExport: () => void,
   onCancel: () => void,
 ): void {
   panel.innerHTML = `
@@ -157,6 +218,11 @@ export function showRetrievePanel(
       <div class="panel-header">
         <h2 class="panel-title" id="retrieve-title">Box ${boxNumber} — ${t('enterPasswords')}</h2>
         <button class="btn-cancel-x" aria-label="${t('cancelBtn')}">✕</button>
+      </div>
+      <div class="panel-actions-row">
+        <button class="btn-outline btn-export" id="btn-export" type="button">
+          <span class="export-icon">↓</span> ${t('exportBtn')}
+        </button>
       </div>
       <p class="panel-note">${t('thresholdOpen')}</p>
       <div class="password-row">
@@ -197,6 +263,7 @@ export function showRetrievePanel(
 
   panel.querySelector('.btn-cancel-x')!.addEventListener('click', onCancel);
   panel.querySelector('#btn-cancel-retrieve')!.addEventListener('click', onCancel);
+  panel.querySelector('#btn-export')!.addEventListener('click', onExport);
 
   panel.querySelector('#btn-open')!.addEventListener('click', async () => {
     const aliceVal = panel.querySelector<HTMLInputElement>('#rpw-alice')!.value.trim();

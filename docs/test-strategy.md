@@ -9,10 +9,10 @@ This document describes the testing approach for the Quantum Vault – KPQC proj
 | **Rust Unit/Integration** | `crates/qv-core/tests/test_vectors.rs` | 14 | NIST vectors, Shamir deterministic tests, pipeline roundtrips |
 | **Rust Property Tests** | `crates/qv-core/tests/property_tests.rs` | 21 | proptest-based fuzzing, Shamir & pipeline invariants |
 | **Rust Fuzz Targets** | `crates/qv-core/fuzz/fuzz_targets/*.rs` | 5 | libfuzzer-based crash testing |
-| **TypeScript Unit Tests** | `web-demo/src/crypto/__tests__/*.test.ts` | 49 | Shamir, AES-GCM, cross-impl consistency |
+| **TypeScript Unit Tests** | `web-demo/src/**/__tests__/*.test.ts` | 61 | Shamir, AES-GCM, pipeline integration, .qvault file export/import |
 | **Doc Tests** | `crates/qv-core/src/lib.rs` | 1 | Example code verification |
 
-**Total: 90+ tests**
+**Total: 102+ tests**
 
 ## Property-Based Tests (proptest)
 
@@ -75,7 +75,8 @@ The `.github/workflows/ci.yml` workflow runs on every push/PR:
 5. **Format**: `cargo fmt --all -- --check`
 6. **Audit**: `cargo audit` (dependency vulnerability check)
 7. **Web tests**: `npm run test` (Vitest for TypeScript)
-8. **Build web**: `npm run build` (type-check + vite build)
+8. **Web lint**: `npm run lint` (ESLint)
+9. **Build web**: `npm run build` (type-check + vite build)
 
 Fuzz testing runs on a separate schedule in `.github/workflows/fuzz.yml`.
 
