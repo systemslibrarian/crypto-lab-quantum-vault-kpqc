@@ -146,8 +146,17 @@ async function init(): Promise<void> {
     state.boxes[boxNumber] = serializeSealedBox(sealedBox);
     saveVaultState(state);
 
-    showDepositSuccess(panelEl, boxNumber);
     renderWall();
+
+    // Switch to retrieve panel so the user can immediately export
+    showRetrievePanel(
+      panelEl,
+      boxNumber,
+      data => handleRetrieve(boxNumber, data.passwords),
+      () => handleExport(boxNumber),
+      () => { selectedBox = null; closePanel(panelEl); renderWall(); },
+    );
+    showDepositSuccess(panelEl, boxNumber);
   }
 
   // ---- Open an existing box ----

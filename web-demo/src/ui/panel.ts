@@ -324,12 +324,15 @@ export function updateRetrieveTitle(panel: HTMLElement, title: string): void {
 }
 
 export function showDepositSuccess(panel: HTMLElement, boxNumber: string): void {
-  const resultEl = panel.querySelector<HTMLElement>('#deposit-result')!;
-  resultEl.innerHTML = `
-    <div class="result-box result-success" role="status">
-      ${t('sealedIn')} ${boxNumber}. ${t('sealedCheck')}
-    </div>
-  `;
+  const resultEl = panel.querySelector<HTMLElement>('#deposit-result')
+    ?? panel.querySelector<HTMLElement>('#retrieve-result');
+  if (resultEl) {
+    resultEl.innerHTML = `
+      <div class="result-box result-success" role="status">
+        ${t('sealedIn')} ${boxNumber}. ${t('sealedCheck')}
+      </div>
+    `;
+  }
 }
 
 export function openPanel(panel: HTMLElement): void {
