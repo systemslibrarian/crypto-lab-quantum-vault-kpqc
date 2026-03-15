@@ -68,6 +68,7 @@ emcc \
   -s ENVIRONMENT='web,node' \
   -s INITIAL_MEMORY=4194304 \
   -s ALLOW_MEMORY_GROWTH=1 \
+  -s EXPORTED_FUNCTIONS='["_malloc","_free","_smaug_keypair","_smaug_encapsulate","_smaug_decapsulate","_smaug_publickeybytes","_smaug_secretkeybytes","_smaug_ciphertextbytes","_smaug_sharedsecretbytes","_smaug_secure_zeroize"]' \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/smaug.js"
 echo "   → $DIST/smaug.js + smaug.wasm"
@@ -109,6 +110,7 @@ emcc \
   -s ENVIRONMENT='web,node' \
   -s INITIAL_MEMORY=4194304 \
   -s ALLOW_MEMORY_GROWTH=1 \
+  -s EXPORTED_FUNCTIONS='["_malloc","_free","_haetae_keypair","_haetae_sign","_haetae_verify","_haetae_publickeybytes","_haetae_secretkeybytes","_haetae_sigbytes","_haetae_secure_zeroize"]' \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/haetae.js"
 echo "   → $DIST/haetae.js + haetae.wasm"
