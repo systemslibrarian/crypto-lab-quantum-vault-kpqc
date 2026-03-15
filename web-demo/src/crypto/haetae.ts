@@ -1,59 +1,40 @@
-// SPDX-License-Identifier: MIT
 // TypeScript wrapper for HAETAE Mode 2 digital signatures compiled to WebAssembly.
 // All WASM memory management is contained here — callers receive plain Uint8Arrays.
 
-import type { HaetaeModule, EmscriptenModuleFactory } from './wasm-types';
-
-let haetaeModule: HaetaeModule | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let haetaeModule: any = null;
 
 export async function initHaetae(): Promise<void> {
-  const createModule = (await import('./wasm/haetae.js')).default as EmscriptenModuleFactory<HaetaeModule>;
-  const base = import.meta.env.BASE_URL ?? '/';
-  const wasmUrl = base.replace(/\/$/, '') + '/haetae.wasm';
-  const wasmResp = await fetch(wasmUrl, { cache: 'no-store' });
-  if (!wasmResp.ok) {
-    throw new Error(`Failed to fetch haetae.wasm (${wasmResp.status})`);
-  }
-  const wasmBinary = new Uint8Array(await wasmResp.arrayBuffer());
-
+  const createModule = (await import('./wasm/haetae.js')).default;
   haetaeModule = await createModule({
-    wasmBinary,
     locateFile: (path: string) => {
+      const base = import.meta.env.BASE_URL ?? '/';
       return base.replace(/\/$/, '') + '/' + path;
     },
   });
-
-  if (typeof haetaeModule._malloc !== 'function' || typeof haetaeModule._free !== 'function') {
-    throw new Error('HAETAE module is missing malloc/free exports');
-  }
 }
 
-/** Get the initialized module or throw. Returns narrowed type for TypeScript. */
-function getModule(): HaetaeModule {
+function assertReady(): void {
   if (!haetaeModule) throw new Error('HAETAE WASM not initialized — call initHaetae() first');
-  return haetaeModule;
 }
 
 /** Generate a HAETAE Mode 2 signing keypair (PK: 992 B, SK: 1408 B). */
 export function haetaeKeypair(): { publicKey: Uint8Array; secretKey: Uint8Array } {
-  const m = getModule();
-  const pkSize = m._haetae_publickeybytes();
-  const skSize = m._haetae_secretkeybytes();
-  const pkPtr = m._malloc(pkSize);
-  const skPtr = m._malloc(skSize);
+  assertReady();
+  const pkSize = haetaeModule._haetae_publickeybytes() as number;
+  const skSize = haetaeModule._haetae_secretkeybytes() as number;
+  const pkPtr = haetaeModule._malloc(pkSize) as number;
+  const skPtr = haetaeModule._malloc(skSize) as number;
   try {
-    const ret = m._haetae_keypair(pkPtr, skPtr);
+    const ret = haetaeModule._haetae_keypair(pkPtr, skPtr) as number;
     if (ret !== 0) throw new Error(`HAETAE keygen failed (ret=${ret})`);
     return {
-      publicKey: new Uint8Array(m.HEAPU8.buffer as ArrayBuffer, pkPtr, pkSize).slice(),
-      secretKey: new Uint8Array(m.HEAPU8.buffer as ArrayBuffer, skPtr, skSize).slice(),
+      publicKey: new Uint8Array(haetaeModule.HEAPU8.buffer as ArrayBuffer, pkPtr, pkSize).slice(),
+      secretKey: new Uint8Array(haetaeModule.HEAPU8.buffer as ArrayBuffer, skPtr, skSize).slice(),
     };
   } finally {
-    // Use C-level secure zeroing that cannot be optimized away by JS engines
-    m._haetae_secure_zeroize(pkPtr, pkSize);
-    m._free(pkPtr);
-    m._haetae_secure_zeroize(skPtr, skSize);
-    m._free(skPtr);
+    haetaeModule._free(pkPtr);
+    haetaeModule._free(skPtr);
   }
 }
 
@@ -62,31 +43,26 @@ export function haetaeKeypair(): { publicKey: Uint8Array; secretKey: Uint8Array 
  * Returns the actual signature bytes (up to 1474 B).
  */
 export function haetaeSign(message: Uint8Array, secretKey: Uint8Array): Uint8Array {
-  const m = getModule();
-  const maxSigSize = m._haetae_sigbytes();
-  const msgPtr = m._malloc(message.length);
-  const skPtr = m._malloc(secretKey.length);
-  const sigPtr = m._malloc(maxSigSize);
+  assertReady();
+  const maxSigSize = haetaeModule._haetae_sigbytes() as number;
+  const msgPtr = haetaeModule._malloc(message.length) as number;
+  const skPtr = haetaeModule._malloc(secretKey.length) as number;
+  const sigPtr = haetaeModule._malloc(maxSigSize) as number;
   // size_t (4 bytes in wasm32) to hold the actual signature length
-  const siglenPtr = m._malloc(8);
+  const siglenPtr = haetaeModule._malloc(8) as number;
   try {
-    m.HEAPU8.set(message, msgPtr);
-    m.HEAPU8.set(secretKey, skPtr);
-    const ret = m._haetae_sign(sigPtr, siglenPtr, msgPtr, message.length, skPtr);
+    haetaeModule.HEAPU8.set(message, msgPtr);
+    haetaeModule.HEAPU8.set(secretKey, skPtr);
+    const ret = haetaeModule._haetae_sign(sigPtr, siglenPtr, msgPtr, message.length, skPtr) as number;
     if (ret !== 0) throw new Error(`HAETAE sign failed (ret=${ret})`);
     // Read actual length as a 32-bit value (wasm32 size_t)
-    const siglen = m.HEAPU32[siglenPtr >> 2];
-    if (siglen === 0 || siglen > maxSigSize) {
-      throw new Error(`HAETAE sign returned invalid signature length: ${siglen} (max ${maxSigSize})`);
-    }
-    return new Uint8Array(m.HEAPU8.buffer as ArrayBuffer, sigPtr, siglen).slice();
+    const siglen = haetaeModule.HEAPU32[siglenPtr >> 2] as number;
+    return new Uint8Array(haetaeModule.HEAPU8.buffer as ArrayBuffer, sigPtr, siglen).slice();
   } finally {
-    m._free(msgPtr);
-    // Use C-level secure zeroing that cannot be optimized away by JS engines
-    m._haetae_secure_zeroize(skPtr, secretKey.length);
-    m._free(skPtr);
-    m._free(sigPtr);
-    m._free(siglenPtr);
+    haetaeModule._free(msgPtr);
+    haetaeModule._free(skPtr);
+    haetaeModule._free(sigPtr);
+    haetaeModule._free(siglenPtr);
   }
 }
 
@@ -95,19 +71,19 @@ export function haetaeSign(message: Uint8Array, secretKey: Uint8Array): Uint8Arr
  * Returns true if valid, false if invalid or tampered.
  */
 export function haetaeVerify(signature: Uint8Array, message: Uint8Array, publicKey: Uint8Array): boolean {
-  const m = getModule();
-  const sigPtr = m._malloc(signature.length);
-  const msgPtr = m._malloc(message.length);
-  const pkPtr = m._malloc(publicKey.length);
+  assertReady();
+  const sigPtr = haetaeModule._malloc(signature.length) as number;
+  const msgPtr = haetaeModule._malloc(message.length) as number;
+  const pkPtr = haetaeModule._malloc(publicKey.length) as number;
   try {
-    m.HEAPU8.set(signature, sigPtr);
-    m.HEAPU8.set(message, msgPtr);
-    m.HEAPU8.set(publicKey, pkPtr);
-    const ret = m._haetae_verify(sigPtr, signature.length, msgPtr, message.length, pkPtr);
+    haetaeModule.HEAPU8.set(signature, sigPtr);
+    haetaeModule.HEAPU8.set(message, msgPtr);
+    haetaeModule.HEAPU8.set(publicKey, pkPtr);
+    const ret = haetaeModule._haetae_verify(sigPtr, signature.length, msgPtr, message.length, pkPtr) as number;
     return ret === 0;
   } finally {
-    m._free(sigPtr);
-    m._free(msgPtr);
-    m._free(pkPtr);
+    haetaeModule._free(sigPtr);
+    haetaeModule._free(msgPtr);
+    haetaeModule._free(pkPtr);
   }
 }
