@@ -10,8 +10,8 @@
 /// ```
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use qv_core::{
-    decrypt_with_threshold, encrypt_bytes, encrypt_with_threshold,
-    reconstruct_secret, split_secret, KeyShare,
+    decrypt_with_threshold, encrypt_bytes, encrypt_with_threshold, reconstruct_secret,
+    split_secret, KeyShare,
 };
 
 // ── AES-256-GCM via the high-level API ───────────────────────────────────────
@@ -34,12 +34,9 @@ fn bench_encrypt_decrypt(c: &mut Criterion) {
             // Pre-encrypt once outside the loop to measure decrypt separately.
             let (ct, keys, sig_pub) = encrypt_bytes(p).unwrap();
             b.iter(|| {
-                let _ = decrypt_with_threshold(
-                    black_box(&ct),
-                    black_box(&keys),
-                    black_box(&sig_pub),
-                )
-                .unwrap();
+                let _ =
+                    decrypt_with_threshold(black_box(&ct), black_box(&keys), black_box(&sig_pub))
+                        .unwrap();
             });
         });
     }
@@ -113,5 +110,10 @@ fn bench_threshold_shapes(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_encrypt_decrypt, bench_shamir, bench_threshold_shapes);
+criterion_group!(
+    benches,
+    bench_encrypt_decrypt,
+    bench_shamir,
+    bench_threshold_shapes
+);
 criterion_main!(benches);

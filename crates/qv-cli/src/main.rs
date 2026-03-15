@@ -9,6 +9,8 @@
 use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use clap::{Parser, Subcommand};
+#[cfg(any(feature = "kpqc-native", feature = "kpqc-wasm"))]
+use qv_core::crypto::backend::kpqc::{KpqcKem, KpqcSignature};
 use qv_core::{
     container::QuantumVaultContainer,
     crypto::{
@@ -18,8 +20,6 @@ use qv_core::{
     },
     decrypt_file, encrypt_file, DecryptOptions, EncryptOptions,
 };
-#[cfg(any(feature = "kpqc-native", feature = "kpqc-wasm"))]
-use qv_core::crypto::backend::kpqc::{KpqcKem, KpqcSignature};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -142,7 +142,11 @@ fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Keygen { out_dir, name, backend } => {
+        Command::Keygen {
+            out_dir,
+            name,
+            backend,
+        } => {
             let (kem, sig) = build_backends(&backend)?;
             cmd_keygen(kem.as_ref(), sig.as_ref(), &out_dir, &name)
         }
@@ -155,7 +159,15 @@ fn run() -> Result<()> {
             backend,
         } => {
             let (kem, sig) = build_backends(&backend)?;
-            cmd_encrypt(kem.as_ref(), sig.as_ref(), &r#in, &out, &pubkeys, threshold, &sign_key)
+            cmd_encrypt(
+                kem.as_ref(),
+                sig.as_ref(),
+                &r#in,
+                &out,
+                &pubkeys,
+                threshold,
+                &sign_key,
+            )
         }
         Command::Decrypt {
             r#in,
@@ -165,7 +177,14 @@ fn run() -> Result<()> {
             backend,
         } => {
             let (kem, sig) = build_backends(&backend)?;
-            cmd_decrypt(kem.as_ref(), sig.as_ref(), &r#in, &out, &privkeys, &verify_key)
+            cmd_decrypt(
+                kem.as_ref(),
+                sig.as_ref(),
+                &r#in,
+                &out,
+                &privkeys,
+                &verify_key,
+            )
         }
     }
 }
@@ -218,7 +237,10 @@ fn cmd_encrypt(
 
     let recipient_public_keys: Vec<Vec<u8>> = pubkeys_csv
         .split(',')
-        .map(|s| B64.decode(s.trim()).map_err(|e| anyhow!("invalid base64 pubkey: {e}")))
+        .map(|s| {
+            B64.decode(s.trim())
+                .map_err(|e| anyhow!("invalid base64 pubkey: {e}"))
+        })
         .collect::<Result<_>>()?;
 
     let share_count = recipient_public_keys.len() as u8;
@@ -274,7 +296,10 @@ fn cmd_decrypt(
 
     let recipient_private_keys: Vec<Vec<u8>> = privkeys_csv
         .split(',')
-        .map(|s| B64.decode(s.trim()).map_err(|e| anyhow!("invalid base64 privkey: {e}")))
+        .map(|s| {
+            B64.decode(s.trim())
+                .map_err(|e| anyhow!("invalid base64 privkey: {e}"))
+        })
         .collect::<Result<_>>()?;
 
     // Default: assume keys are supplied for the first N shares in container order.
@@ -317,8 +342,8 @@ fn cmd_decrypt(
 fn write_b64(path: &Path, bytes: &[u8]) -> Result<()> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
         use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -338,8 +363,8 @@ fn write_b64(path: &Path, bytes: &[u8]) -> Result<()> {
 
 /// Read base64 bytes from `path`.
 fn read_b64(path: &Path) -> Result<Vec<u8>> {
-    let s = fs::read_to_string(path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
+    let s =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     B64.decode(s.trim())
         .map_err(|e| anyhow!("failed to decode base64 from {}: {e}", path.display()))
 }

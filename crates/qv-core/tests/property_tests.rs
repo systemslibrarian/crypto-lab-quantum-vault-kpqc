@@ -8,9 +8,12 @@
 use proptest::prelude::*;
 use qv_core::{
     container::QuantumVaultContainer,
-    crypto::{backend::dev::{DevKem, DevSignature}, kem::Kem, signature::Signature},
-    decrypt_bytes, encrypt_bytes,
-    reconstruct_secret, split_secret, KeyShare,
+    crypto::{
+        backend::dev::{DevKem, DevSignature},
+        kem::Kem,
+        signature::Signature,
+    },
+    decrypt_bytes, encrypt_bytes, reconstruct_secret, split_secret, KeyShare,
 };
 
 /// Helper to convert anyhow::Error to proptest::TestCaseError

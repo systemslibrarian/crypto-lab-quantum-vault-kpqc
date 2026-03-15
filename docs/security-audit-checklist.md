@@ -89,6 +89,7 @@ auditing a new backend, or accepting pull requests that touch cryptographic code
 - [ ] **K-006** Buffer sizes in `kpqc_ffi.rs` match the constants in the C header (`pk`, `sk`, `ct`, `ss`, `sig`).
 - [ ] **K-007** `randombytes_shim.c` excludes the NIST DRBG `rng.c` from the build (linker flag in `build.rs`).
 - [ ] **K-008** `kpqc-native` feature guard prevents FFI code from being compiled in default / WASM builds.
+- [ ] **K-009** (Pre-production) FFI boundary inputs are fuzz-tested with malformed data to catch C-side crashes. Note: `catch_unwind` cannot intercept C-level crashes (segfault, abort); consider WASM sandboxing or subprocess isolation for hostile inputs.
 
 ---
 

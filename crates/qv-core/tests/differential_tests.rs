@@ -210,7 +210,10 @@ fn dev_signature_verify_kat() {
 
     // Verify using the implementation.
     let ok = sig.verify(&pubkey, message, &expected_sig).unwrap();
-    assert!(ok, "DevSignature::verify must accept a correct KAT signature");
+    assert!(
+        ok,
+        "DevSignature::verify must accept a correct KAT signature"
+    );
 }
 
 /// DevSignature must reject a signature over a different message.
@@ -226,7 +229,10 @@ fn dev_signature_rejects_wrong_message() {
     let signature = sha256_concat(&pubkey, message);
 
     let ok = sig.verify(&pubkey, tampered, &signature).unwrap();
-    assert!(!ok, "DevSignature::verify must reject a signature over a different message");
+    assert!(
+        !ok,
+        "DevSignature::verify must reject a signature over a different message"
+    );
 }
 
 /// DevSignature must reject a signature with a flipped bit.
@@ -258,7 +264,10 @@ fn dev_signature_rejects_zero_signature() {
     let zero_sig = vec![0u8; 32];
 
     let ok = sig.verify(&pubkey, message, &zero_sig).unwrap();
-    assert!(!ok, "DevSignature::verify must reject an all-zero signature");
+    assert!(
+        !ok,
+        "DevSignature::verify must reject an all-zero signature"
+    );
 }
 
 // ============================================================================
@@ -318,7 +327,10 @@ fn kpqc_native_kem_roundtrip() {
     let (ct, ss_enc) = kem.encapsulate(&pk).unwrap();
     let ss_dec = kem.decapsulate(&sk, &ct).unwrap();
 
-    assert_eq!(ss_enc, ss_dec, "native SMAUG-T roundtrip shared secrets must match");
+    assert_eq!(
+        ss_enc, ss_dec,
+        "native SMAUG-T roundtrip shared secrets must match"
+    );
 }
 
 #[cfg(feature = "kpqc-native")]
@@ -375,9 +387,7 @@ fn smaug_keygen_matches_reference() {
     //   3. Assert pk == pk_ref and sk == sk_ref
     //
     // Stub assertion to confirm the test scaffolding compiles.
-    eprintln!(
-        "SMAUG-T KAT test skipped: enable kpqc-native feature and provide KAT vectors"
-    );
+    eprintln!("SMAUG-T KAT test skipped: enable kpqc-native feature and provide KAT vectors");
 }
 
 /// HAETAE sign/verify KAT against the KpqC reference implementation.
@@ -391,7 +401,5 @@ fn haetae_sign_matches_reference() {
     //   2. For each vector: run HaetaeSignatureBackend::sign_seeded(privkey, msg, seed)
     //   3. Assert signature == sig_ref
     //   4. Run verify(pubkey, msg, sig_ref) → assert true
-    eprintln!(
-        "HAETAE KAT test skipped: enable kpqc-native feature and provide KAT vectors"
-    );
+    eprintln!("HAETAE KAT test skipped: enable kpqc-native feature and provide KAT vectors");
 }

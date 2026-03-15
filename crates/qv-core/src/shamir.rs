@@ -181,7 +181,9 @@ pub fn reconstruct_secret(shares: &[Share]) -> Result<Vec<u8>> {
     let mut seen = std::collections::HashSet::new();
     for s in shares {
         if s.index == 0 {
-            return Err(anyhow!("share index 0 is invalid (reserved for the secret polynomial constant term)"));
+            return Err(anyhow!(
+                "share index 0 is invalid (reserved for the secret polynomial constant term)"
+            ));
         }
         if !seen.insert(s.index) {
             return Err(anyhow!("duplicate share index {}", s.index));
@@ -259,7 +261,7 @@ mod tests {
     fn rejects_bad_params() {
         assert!(split_secret(b"x", 3, 1).is_err()); // threshold < 2
         assert!(split_secret(b"x", 2, 3).is_err()); // share_count < threshold
-        assert!(split_secret(b"", 3, 2).is_err());  // empty secret
+        assert!(split_secret(b"", 3, 2).is_err()); // empty secret
     }
 
     #[test]
@@ -291,15 +293,24 @@ mod tests {
 
     #[test]
     fn rejects_zero_index_share() {
-        let shares = vec![Share { index: 0, data: vec![1, 2, 3] }];
+        let shares = vec![Share {
+            index: 0,
+            data: vec![1, 2, 3],
+        }];
         assert!(reconstruct_secret(&shares).is_err());
     }
 
     #[test]
     fn rejects_duplicate_share_indices() {
         let shares = vec![
-            Share { index: 1, data: vec![10, 20] },
-            Share { index: 1, data: vec![30, 40] },
+            Share {
+                index: 1,
+                data: vec![10, 20],
+            },
+            Share {
+                index: 1,
+                data: vec![30, 40],
+            },
         ];
         assert!(reconstruct_secret(&shares).is_err());
     }
@@ -307,8 +318,14 @@ mod tests {
     #[test]
     fn rejects_inconsistent_payload_lengths() {
         let shares = vec![
-            Share { index: 1, data: vec![10, 20, 30] },
-            Share { index: 2, data: vec![40, 50] },
+            Share {
+                index: 1,
+                data: vec![10, 20, 30],
+            },
+            Share {
+                index: 2,
+                data: vec![40, 50],
+            },
         ];
         assert!(reconstruct_secret(&shares).is_err());
     }

@@ -13,9 +13,8 @@ use std::collections::HashSet;
 
 // Re-export constants for backward compatibility.
 pub use crate::constants::{
-    CONTAINER_ID_BYTES, MAGIC, MAX_ALGORITHM_ID_BYTES, MAX_CIPHERTEXT_BYTES,
-    MAX_CONTAINER_BYTES, MAX_ENCRYPTED_SHARE_BYTES, MAX_KEM_CIPHERTEXT_BYTES,
-    MAX_SHARE_COUNT, MAX_SIGNATURE_BYTES,
+    CONTAINER_ID_BYTES, MAGIC, MAX_ALGORITHM_ID_BYTES, MAX_CIPHERTEXT_BYTES, MAX_CONTAINER_BYTES,
+    MAX_ENCRYPTED_SHARE_BYTES, MAX_KEM_CIPHERTEXT_BYTES, MAX_SHARE_COUNT, MAX_SIGNATURE_BYTES,
 };
 
 /// Symmetric cipher used to encrypt the payload.
@@ -105,7 +104,9 @@ impl QuantumVaultContainer {
             other => return Err(QvError::UnsupportedVersion(other)),
         }
 
-        if c.kem_algorithm.len() > MAX_ALGORITHM_ID_BYTES || c.sig_algorithm.len() > MAX_ALGORITHM_ID_BYTES {
+        if c.kem_algorithm.len() > MAX_ALGORITHM_ID_BYTES
+            || c.sig_algorithm.len() > MAX_ALGORITHM_ID_BYTES
+        {
             return Err(QvError::InvalidContainer("algorithm identifier too long"));
         }
         if !is_supported_kem(&c.kem_algorithm) {
@@ -121,7 +122,9 @@ impl QuantumVaultContainer {
             return Err(QvError::InvalidContainer("share_count exceeds limit"));
         }
         if c.share_count < c.threshold {
-            return Err(QvError::InvalidContainer("share_count must be >= threshold"));
+            return Err(QvError::InvalidContainer(
+                "share_count must be >= threshold",
+            ));
         }
         if c.shares.len() != c.share_count as usize {
             return Err(QvError::InvalidContainer("shares length mismatch"));
@@ -147,11 +150,19 @@ impl QuantumVaultContainer {
             if !seen.insert(share.index) {
                 return Err(QvError::InvalidContainer("duplicate share index"));
             }
-            if share.kem_ciphertext.is_empty() || share.kem_ciphertext.len() > MAX_KEM_CIPHERTEXT_BYTES {
-                return Err(QvError::InvalidContainer("kem ciphertext length out of bounds"));
+            if share.kem_ciphertext.is_empty()
+                || share.kem_ciphertext.len() > MAX_KEM_CIPHERTEXT_BYTES
+            {
+                return Err(QvError::InvalidContainer(
+                    "kem ciphertext length out of bounds",
+                ));
             }
-            if share.encrypted_share.len() < 28 || share.encrypted_share.len() > MAX_ENCRYPTED_SHARE_BYTES {
-                return Err(QvError::InvalidContainer("encrypted share length out of bounds"));
+            if share.encrypted_share.len() < 28
+                || share.encrypted_share.len() > MAX_ENCRYPTED_SHARE_BYTES
+            {
+                return Err(QvError::InvalidContainer(
+                    "encrypted share length out of bounds",
+                ));
             }
         }
 

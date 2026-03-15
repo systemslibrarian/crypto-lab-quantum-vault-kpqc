@@ -50,8 +50,7 @@ fn nonces_are_not_all_zero() {
     for _ in 0..1_000 {
         let nonce = generate_nonce();
         assert_ne!(
-            nonce,
-            [0u8; 12],
+            nonce, [0u8; 12],
             "generate_nonce returned all-zero nonce — RNG may be broken"
         );
     }

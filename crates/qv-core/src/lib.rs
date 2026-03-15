@@ -20,8 +20,8 @@ pub mod constants;
 pub mod container;
 pub mod crypto;
 pub mod decrypt;
-pub mod error;
 pub mod encrypt;
+pub mod error;
 pub mod shamir;
 
 /// WebAssembly bindings — compiled only with the `wasm` feature.
@@ -36,8 +36,8 @@ pub mod wasm;
 
 pub use constants::CONTAINER_VERSION;
 pub use container::{EncryptedKeyShare, QuantumVaultContainer};
-pub use error::{QvError, QvResult};
 pub use encrypt::generate_nonce;
+pub use error::{QvError, QvResult};
 pub use shamir::{reconstruct_secret, split_secret, Share as KeyShare};
 
 use crypto::backend::dev::{DevKem, DevSignature};
@@ -90,7 +90,10 @@ impl fmt::Debug for EncryptOptions {
         f.debug_struct("EncryptOptions")
             .field("threshold", &self.threshold)
             .field("share_count", &self.share_count)
-            .field("recipient_public_keys_count", &self.recipient_public_keys.len())
+            .field(
+                "recipient_public_keys_count",
+                &self.recipient_public_keys.len(),
+            )
             .field("signer_private_key", &"[redacted]")
             .finish()
     }
@@ -117,7 +120,10 @@ pub struct DecryptOptions {
 impl fmt::Debug for DecryptOptions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DecryptOptions")
-            .field("recipient_private_keys_count", &self.recipient_private_keys.len())
+            .field(
+                "recipient_private_keys_count",
+                &self.recipient_private_keys.len(),
+            )
             .field("share_indices", &self.share_indices)
             .field("signer_public_key_len", &self.signer_public_key.len())
             .finish()
@@ -150,7 +156,8 @@ pub fn decrypt_file(
 
 /// Splits a symmetric key into threshold shares.
 pub fn split_key(secret: &[u8], share_count: u8, threshold: u8) -> QvResult<Vec<KeyShare>> {
-    split_secret(secret, share_count, threshold).map_err(|_| QvError::InvalidInput("invalid shamir parameters"))
+    split_secret(secret, share_count, threshold)
+        .map_err(|_| QvError::InvalidInput("invalid shamir parameters"))
 }
 
 /// Reconstructs a symmetric key from threshold shares.
@@ -206,12 +213,16 @@ pub fn encrypt_with_threshold(
     let kem = DevKem;
     let sig = DevSignature;
 
-    let (sig_pub, sig_priv) = sig.generate_keypair().map_err(|_| QvError::EncryptionFailed)?;
+    let (sig_pub, sig_priv) = sig
+        .generate_keypair()
+        .map_err(|_| QvError::EncryptionFailed)?;
 
     let mut kem_pubkeys: Vec<Vec<u8>> = Vec::with_capacity(share_count as usize);
     let mut kem_privkeys: Vec<Vec<u8>> = Vec::with_capacity(share_count as usize);
     for _ in 0..share_count {
-        let (pk, sk) = kem.generate_keypair().map_err(|_| QvError::EncryptionFailed)?;
+        let (pk, sk) = kem
+            .generate_keypair()
+            .map_err(|_| QvError::EncryptionFailed)?;
         kem_pubkeys.push(pk);
         kem_privkeys.push(sk);
     }
@@ -239,7 +250,8 @@ pub fn decrypt_with_threshold(
 ) -> QvResult<Vec<u8>> {
     let kem = DevKem;
     let sig = DevSignature;
-    let container = QuantumVaultContainer::from_bytes(container_json).map_err(|_| QvError::DecryptionFailed)?;
+    let container =
+        QuantumVaultContainer::from_bytes(container_json).map_err(|_| QvError::DecryptionFailed)?;
     // Derive share indices from the container's shares in order (positional match).
     let share_indices: Vec<u8> = container
         .shares
@@ -346,6 +358,9 @@ mod tests {
         let plaintext = b"determinism check";
         let (ct1, _, _) = encrypt_bytes(plaintext).unwrap();
         let (ct2, _, _) = encrypt_bytes(plaintext).unwrap();
-        assert_ne!(ct1, ct2, "two encryptions of the same plaintext must differ (random nonce)");
+        assert_ne!(
+            ct1, ct2,
+            "two encryptions of the same plaintext must differ (random nonce)"
+        );
     }
 }

@@ -116,7 +116,12 @@ fn malformed_containers_all_fail() {
         .join("corpus");
 
     let entries: Vec<_> = std::fs::read_dir(&corpus_dir)
-        .unwrap_or_else(|e| panic!("failed to open corpus directory {}: {e}", corpus_dir.display()))
+        .unwrap_or_else(|e| {
+            panic!(
+                "failed to open corpus directory {}: {e}",
+                corpus_dir.display()
+            )
+        })
         .filter_map(|r| r.ok())
         .collect();
 

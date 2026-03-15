@@ -79,19 +79,12 @@ extern "C" {
 
     /// `ct` >= SMAUG_T_CT_BYTES; `ss` >= SMAUG_T_SS_BYTES; `pk` = SMAUG_T_PK_BYTES.
     /// Returns 0 on success.
-    fn cryptolab_smaugt_mode3_enc(
-        ct: *mut u8,
-        ss: *mut u8,
-        pk: *const u8,
-    ) -> std::os::raw::c_int;
+    fn cryptolab_smaugt_mode3_enc(ct: *mut u8, ss: *mut u8, pk: *const u8) -> std::os::raw::c_int;
 
     /// `ss` >= SMAUG_T_SS_BYTES; `ct` = SMAUG_T_CT_BYTES; `sk` = SMAUG_T_SK_BYTES.
     /// Returns 0 on success.
-    fn cryptolab_smaugt_mode3_dec(
-        ss: *mut u8,
-        ct: *const u8,
-        sk: *const u8,
-    ) -> std::os::raw::c_int;
+    fn cryptolab_smaugt_mode3_dec(ss: *mut u8, ct: *const u8, sk: *const u8)
+        -> std::os::raw::c_int;
 
     // ── HAETAE (cryptolab_haetae_mode3_ prefix) ───────────────────────────
 
@@ -130,6 +123,18 @@ extern "C" {
 
 // ---------------------------------------------------------------------------
 // Safe Rust wrappers — SMAUG-T
+//
+// SECURITY NOTE (Finding M-001/FFI): These wrappers use `catch_unwind` to
+// convert Rust panics triggered by unexpected FFI return values into errors.
+// However, `catch_unwind` CANNOT intercept C-level crashes (segfault, abort,
+// illegal instruction, or memory corruption in the underlying C libraries).
+// For truly hostile inputs, the process may terminate without cleanup. A
+// production deployment should consider:
+//   1. Running the C binaries in isolated sub-processes, OR
+//   2. Compiling the C reference implementations to WASM and sandboxing via
+//      a runtime like Wasmtime.
+// For the current demonstration scope, C crashes are considered out-of-band
+// failures acceptable in a development/research context.
 // ---------------------------------------------------------------------------
 
 /// Generate a SMAUG-T Level-3 keypair. Returns `(public_key, secret_key)`.
@@ -141,7 +146,9 @@ pub fn smaug_t_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
     }))
     .map_err(|_| anyhow!("SMAUG-T keygen panicked at FFI boundary"))?;
     if rc != 0 {
-        return Err(anyhow!("cryptolab_smaugt_mode3_keypair failed with code {rc}"));
+        return Err(anyhow!(
+            "cryptolab_smaugt_mode3_keypair failed with code {rc}"
+        ));
     }
     Ok((pk, sk))
 }
@@ -206,7 +213,9 @@ pub fn haetae_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
     }))
     .map_err(|_| anyhow!("HAETAE keygen panicked at FFI boundary"))?;
     if rc != 0 {
-        return Err(anyhow!("cryptolab_haetae_mode3_keypair failed with code {rc}"));
+        return Err(anyhow!(
+            "cryptolab_haetae_mode3_keypair failed with code {rc}"
+        ));
     }
     Ok((pk, sk))
 }
@@ -235,7 +244,9 @@ pub fn haetae_sign(sk: &[u8], message: &[u8]) -> Result<Vec<u8>> {
     }))
     .map_err(|_| anyhow!("HAETAE sign panicked at FFI boundary"))?;
     if rc != 0 {
-        return Err(anyhow!("cryptolab_haetae_mode3_signature failed with code {rc}"));
+        return Err(anyhow!(
+            "cryptolab_haetae_mode3_signature failed with code {rc}"
+        ));
     }
     // Defensive: a buggy C implementation could write siglen > HAETAE_SIG_BYTES,
     // in which case the buffer was already overrun, but we prevent a confusing

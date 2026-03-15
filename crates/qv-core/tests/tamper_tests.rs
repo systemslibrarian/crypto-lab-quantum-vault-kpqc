@@ -13,7 +13,11 @@
 
 use qv_core::{
     container::QuantumVaultContainer,
-    crypto::{backend::dev::{DevKem, DevSignature}, kem::Kem, signature::Signature},
+    crypto::{
+        backend::dev::{DevKem, DevSignature},
+        kem::Kem,
+        signature::Signature,
+    },
     decrypt_file, encrypt_file, DecryptOptions, EncryptOptions,
 };
 
@@ -88,7 +92,10 @@ fn tamper_auth_tag_should_fail() {
 
     // The GCM auth tag is the last 16 bytes of the ciphertext blob.
     let len = container.ciphertext.len();
-    assert!(len >= 16, "ciphertext must contain at least the 16-byte tag");
+    assert!(
+        len >= 16,
+        "ciphertext must contain at least the 16-byte tag"
+    );
     container.ciphertext[len - 1] ^= 0x01;
 
     let kem = DevKem;
@@ -243,7 +250,10 @@ fn tamper_shamir_share_tag_should_fail() {
 
     // Flip the last byte of the first share (inside the per-share AES-GCM tag).
     let share_len = container.shares[0].encrypted_share.len();
-    assert!(share_len >= 16, "encrypted_share must be at least nonce(12) + tag(16)");
+    assert!(
+        share_len >= 16,
+        "encrypted_share must be at least nonce(12) + tag(16)"
+    );
     container.shares[0].encrypted_share[share_len - 1] ^= 0x01;
 
     let kem = DevKem;
@@ -295,5 +305,105 @@ fn tamper_threshold_should_fail() {
     assert!(
         decrypt_file(&container, &dec_opts, &kem, &sig).is_err(),
         "mutated threshold should cause decryption failure"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 8. Version rejection — downgrade and future-version attacks
+// ---------------------------------------------------------------------------
+
+/// Verify that a container with version 1 (downgrade) is rejected by from_bytes
+/// even before any cryptographic verification occurs.
+#[test]
+fn version_downgrade_v1_rejected() {
+    use qv_core::container::QuantumVaultContainer;
+
+    let (container, _dec_opts) = make_valid_container();
+    let mut bytes = container.to_bytes().unwrap();
+
+    // Patch the version field in the JSON from 2 to 1 (downgrade attack).
+    // The JSON contains `"version":2` — replace it with `"version":1`.
+    let json_str = String::from_utf8(bytes.clone()).unwrap();
+    let patched = json_str.replace("\"version\":2", "\"version\":1");
+    bytes = patched.into_bytes();
+
+    let result = QuantumVaultContainer::from_bytes(&bytes);
+    assert!(
+        result.is_err(),
+        "version 1 container must be rejected by v2 parser (downgrade attack)"
+    );
+}
+
+/// Verify that a container with a future version (e.g. 3) is rejected.
+#[test]
+fn version_future_v3_rejected() {
+    use qv_core::container::QuantumVaultContainer;
+
+    let (container, _dec_opts) = make_valid_container();
+    let mut bytes = container.to_bytes().unwrap();
+
+    // Patch the version field in the JSON from 2 to 3 (future version).
+    let json_str = String::from_utf8(bytes.clone()).unwrap();
+    let patched = json_str.replace("\"version\":2", "\"version\":3");
+    bytes = patched.into_bytes();
+
+    let result = QuantumVaultContainer::from_bytes(&bytes);
+    assert!(
+        result.is_err(),
+        "version 3 container must be rejected by v2 parser (future version)"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 9. Share injection / swap attack — cross-container share substitution
+// ---------------------------------------------------------------------------
+
+/// Verify that injecting valid shares from a different container fails.
+///
+/// This tests the defense that the HAETAE signature binds shares to the
+/// specific container contents. Even if shares are cryptographically valid,
+/// substituting them from another container must fail signature verification.
+#[test]
+fn share_injection_cross_container_fails() {
+    let kem = DevKem;
+    let sig = DevSignature;
+
+    // Create two separate containers with different payloads.
+    let (pk1, sk1) = kem.generate_keypair().unwrap();
+    let (pk2, sk2) = kem.generate_keypair().unwrap();
+    let (sig_pub, sig_priv) = sig.generate_keypair().unwrap();
+
+    let opts_a = EncryptOptions {
+        threshold: 2,
+        share_count: 2,
+        recipient_public_keys: vec![pk1.clone(), pk2.clone()],
+        signer_private_key: sig_priv.clone(),
+    };
+    let opts_b = EncryptOptions {
+        threshold: 2,
+        share_count: 2,
+        recipient_public_keys: vec![pk1, pk2],
+        signer_private_key: sig_priv,
+    };
+
+    let container_a = encrypt_file(b"payload A", &opts_a, &kem, &sig).unwrap();
+    let container_b = encrypt_file(b"payload B", &opts_b, &kem, &sig).unwrap();
+
+    // Create a Frankenstein container: container_a's shell with container_b's shares.
+    let mut franken = container_a.clone();
+    franken.shares = container_b.shares.clone();
+
+    // Attempt to decrypt with the same keys that would work for either original.
+    let share_indices: Vec<u8> = franken.shares.iter().map(|s| s.index).collect();
+    let dec_opts = DecryptOptions {
+        recipient_private_keys: vec![sk1, sk2],
+        share_indices,
+        signer_public_key: sig_pub,
+    };
+
+    let result = decrypt_file(&franken, &dec_opts, &kem, &sig);
+    assert!(
+        result.is_err(),
+        "injected shares from a different container must fail signature verification"
     );
 }

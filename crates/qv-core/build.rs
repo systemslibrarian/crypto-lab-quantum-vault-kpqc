@@ -63,7 +63,9 @@ fn compile_kpqc_native() {
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     // workspace root is two levels up from crates/qv-core
-    let workspace_root = manifest_dir.join("../..").canonicalize()
+    let workspace_root = manifest_dir
+        .join("../..")
+        .canonicalize()
         .expect("could not resolve workspace root from CARGO_MANIFEST_DIR");
 
     // ── SMAUG-T ──────────────────────────────────────────────────────────────
@@ -81,8 +83,7 @@ fn compile_kpqc_native() {
         eprintln!("╔══════════════════════════════════════════════════════════╗");
         eprintln!("║  SMAUG-T source not found — kpqc-native build failed    ║");
         eprintln!("╠══════════════════════════════════════════════════════════╣");
-        eprintln!("║  Expected:  {}  ║",
-            smaug_src.display());
+        eprintln!("║  Expected:  {}  ║", smaug_src.display());
         eprintln!("║  Override:  export SMAUG_T_SRC=/path/to/SMAUG-T         ║");
         eprintln!("║  Source:    https://kpqc.or.kr/competition.html                         ║");
         eprintln!("║  Extract the SMAUG-T package and place it at vendor/smaug-t/               ║");
@@ -108,8 +109,7 @@ fn compile_kpqc_native() {
         eprintln!("╔══════════════════════════════════════════════════════════╗");
         eprintln!("║  HAETAE source not found — kpqc-native build failed     ║");
         eprintln!("╠══════════════════════════════════════════════════════════╣");
-        eprintln!("║  Expected:  {}   ║",
-            haetae_src.display());
+        eprintln!("║  Expected:  {}   ║", haetae_src.display());
         eprintln!("║  Override:  export HAETAE_SRC=/path/to/HAETAE           ║");
         eprintln!("║  Source:    https://kpqc.or.kr/competition.html                        ║");
         eprintln!("║  Extract the HAETAE package and place it at vendor/haetae/               ║");
@@ -145,7 +145,8 @@ fn find_versioned_subdir(base: &std::path::Path) -> std::path::PathBuf {
         _ => panic!(
             "expected exactly one versioned sub-directory under {}, found {}; \
              set SMAUG_T_SRC / HAETAE_SRC to the exact versioned path",
-            base.display(), dirs.len()
+            base.display(),
+            dirs.len()
         ),
     }
 }

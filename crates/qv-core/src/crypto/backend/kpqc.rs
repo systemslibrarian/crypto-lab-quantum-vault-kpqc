@@ -113,10 +113,14 @@ mod wasm_backend {
             ))
         }
         fn encapsulate(&self, _pubkey: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
-            Err(anyhow::anyhow!("SMAUG-T WASM backend is not yet implemented."))
+            Err(anyhow::anyhow!(
+                "SMAUG-T WASM backend is not yet implemented."
+            ))
         }
         fn decapsulate(&self, _privkey: &[u8], _ct: &[u8]) -> Result<Vec<u8>> {
-            Err(anyhow::anyhow!("SMAUG-T WASM backend is not yet implemented."))
+            Err(anyhow::anyhow!(
+                "SMAUG-T WASM backend is not yet implemented."
+            ))
         }
         fn algorithm_id(&self) -> &'static str {
             "SMAUG-T-3"
@@ -134,10 +138,14 @@ mod wasm_backend {
             ))
         }
         fn sign(&self, _privkey: &[u8], _message: &[u8]) -> Result<Vec<u8>> {
-            Err(anyhow::anyhow!("HAETAE WASM backend is not yet implemented."))
+            Err(anyhow::anyhow!(
+                "HAETAE WASM backend is not yet implemented."
+            ))
         }
         fn verify(&self, _pubkey: &[u8], _message: &[u8], _sig: &[u8]) -> Result<bool> {
-            Err(anyhow::anyhow!("HAETAE WASM backend is not yet implemented."))
+            Err(anyhow::anyhow!(
+                "HAETAE WASM backend is not yet implemented."
+            ))
         }
         fn algorithm_id(&self) -> &'static str {
             "HAETAE-3"

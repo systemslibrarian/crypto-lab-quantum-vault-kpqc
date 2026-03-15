@@ -46,7 +46,9 @@ use aes_gcm::{
 #[wasm_bindgen]
 pub fn qv_kem_generate_keypair() -> Result<String, JsError> {
     let kem = DevKem;
-    let (pk, sk) = kem.generate_keypair().map_err(|e| JsError::new(&e.to_string()))?;
+    let (pk, sk) = kem
+        .generate_keypair()
+        .map_err(|e| JsError::new(&e.to_string()))?;
     Ok(serde_json::json!({ "pub": B64.encode(&pk), "priv": B64.encode(&sk) }).to_string())
 }
 
@@ -56,7 +58,9 @@ pub fn qv_kem_generate_keypair() -> Result<String, JsError> {
 #[wasm_bindgen]
 pub fn qv_sig_generate_keypair() -> Result<String, JsError> {
     let sig = DevSignature;
-    let (pk, sk) = sig.generate_keypair().map_err(|e| JsError::new(&e.to_string()))?;
+    let (pk, sk) = sig
+        .generate_keypair()
+        .map_err(|e| JsError::new(&e.to_string()))?;
     Ok(serde_json::json!({ "pub": B64.encode(&pk), "priv": B64.encode(&sk) }).to_string())
 }
 
@@ -88,7 +92,10 @@ pub fn qv_encrypt(
 
     let recipient_public_keys: Vec<Vec<u8>> = pubkey_b64s
         .iter()
-        .map(|s| B64.decode(s).map_err(|e| JsError::new(&format!("invalid base64 pubkey: {e}"))))
+        .map(|s| {
+            B64.decode(s)
+                .map_err(|e| JsError::new(&format!("invalid base64 pubkey: {e}")))
+        })
         .collect::<Result<_, _>>()?;
 
     let signer_private_key = B64
@@ -112,7 +119,9 @@ pub fn qv_encrypt(
     let container = encrypt_file(plaintext, &options, &kem, &sig)
         .map_err(|_| JsError::new("encryption failed"))?;
 
-    let json_bytes = container.to_bytes().map_err(|_| JsError::new("encryption failed"))?;
+    let json_bytes = container
+        .to_bytes()
+        .map_err(|_| JsError::new("encryption failed"))?;
     String::from_utf8(json_bytes).map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -183,9 +192,12 @@ pub fn qv_decrypt(
     // 2. Recover one Shamir share per (shareIndex, privKey) pair.
     //    Pairs are matched by share index so non-consecutive participant
     //    subsets work correctly.
+    //
+    // SECURITY INVARIANT: All decoded private keys and intermediate secrets
+    // must be zeroized before leaving this function — even on error paths.
     let mut shares: Vec<Share> = Vec::with_capacity(pairs.len());
     for pair in &pairs {
-        let privkey = B64
+        let mut privkey = B64
             .decode(&pair.priv_key)
             .map_err(|e| JsError::new(&format!("invalid privKey base64: {e}")))?;
 
@@ -193,17 +205,25 @@ pub fn qv_decrypt(
             .shares
             .iter()
             .find(|s| s.index == pair.share_index)
-            .ok_or_else(|| JsError::new("decryption failed"))?;
+            .ok_or_else(|| {
+                privkey.zeroize();
+                JsError::new("decryption failed")
+            })?;
 
-        let mut ss = kem
-            .decapsulate(&privkey, &enc_share.kem_ciphertext)
-            .map_err(|_| JsError::new("decryption failed"))?;
+        let decap_result = kem.decapsulate(&privkey, &enc_share.kem_ciphertext);
+        privkey.zeroize(); // Zeroize private key immediately after use
+        let mut ss = decap_result.map_err(|_| JsError::new("decryption failed"))?;
 
-        let share_data = aead_unprotect(&enc_share.encrypted_share, &ss)
-            .map_err(|_| JsError::new("decryption failed"))?;
+        let share_data = aead_unprotect(&enc_share.encrypted_share, &ss).map_err(|_| {
+            ss.zeroize();
+            JsError::new("decryption failed")
+        })?;
 
         ss.zeroize();
-        shares.push(Share { index: pair.share_index, data: share_data });
+        shares.push(Share {
+            index: pair.share_index,
+            data: share_data,
+        });
     }
 
     // 3. Reconstruct the file key from the recovered shares.
@@ -211,15 +231,28 @@ pub fn qv_decrypt(
         reconstruct_secret(&shares).map_err(|_| JsError::new("decryption failed"))?;
 
     // 4. AES-256-GCM decrypt with the same AAD used during encryption (M-001).
+    //
+    // SECURITY INVARIANT: file_key must be zeroized unconditionally, even on
+    // decryption failure, to prevent key material from lingering in WASM memory.
     let aad = aes_aad(&container);
     let aes_key = Key::<Aes256Gcm>::from_slice(&file_key);
     let cipher = Aes256Gcm::new(aes_key);
     let nonce = Nonce::from_slice(&container.nonce);
-    let plaintext = cipher
-        .decrypt(nonce, Payload { msg: container.ciphertext.as_slice(), aad: &aad })
-        .map_err(|_| JsError::new("decryption failed"))?;
+    let decrypt_result = cipher.decrypt(
+        nonce,
+        Payload {
+            msg: container.ciphertext.as_slice(),
+            aad: &aad,
+        },
+    );
+    file_key.zeroize(); // Zeroize before potential error return
+    let plaintext = decrypt_result.map_err(|_| JsError::new("decryption failed"))?;
 
-    file_key.zeroize();
+    // Zeroize share data now that we have the plaintext
+    for share in shares.iter_mut() {
+        share.data.zeroize();
+    }
+
     Ok(plaintext)
 }
 
@@ -250,11 +283,9 @@ mod tests {
 
         // Encrypt a fake 52-byte deck permutation.
         let permutation: Vec<u8> = (0u8..52).collect();
-        let kem_pubkeys_json =
-            serde_json::json!([kem_pub1, kem_pub2]).to_string();
+        let kem_pubkeys_json = serde_json::json!([kem_pub1, kem_pub2]).to_string();
 
-        let container_json =
-            qv_encrypt(&permutation, &kem_pubkeys_json, 2, sig_priv).unwrap();
+        let container_json = qv_encrypt(&permutation, &kem_pubkeys_json, 2, sig_priv).unwrap();
 
         // Parse container to get share indices.
         let c: serde_json::Value = serde_json::from_str(&container_json).unwrap();
@@ -288,9 +319,13 @@ mod tests {
         let kem_pubkeys_json = serde_json::to_string(&pubs).unwrap();
 
         let plaintext = b"threshold test payload";
-        let container_json =
-            qv_encrypt(plaintext, &kem_pubkeys_json, 2, sig_kp["priv"].as_str().unwrap())
-                .unwrap();
+        let container_json = qv_encrypt(
+            plaintext,
+            &kem_pubkeys_json,
+            2,
+            sig_kp["priv"].as_str().unwrap(),
+        )
+        .unwrap();
 
         let c: serde_json::Value = serde_json::from_str(&container_json).unwrap();
         let idx0 = c["shares"][0]["index"].as_u64().unwrap() as u8;
@@ -303,12 +338,8 @@ mod tests {
         ])
         .to_string();
 
-        let recovered = qv_decrypt(
-            &container_json,
-            &selected,
-            sig_kp["pub"].as_str().unwrap(),
-        )
-        .unwrap();
+        let recovered =
+            qv_decrypt(&container_json, &selected, sig_kp["pub"].as_str().unwrap()).unwrap();
         assert_eq!(recovered.as_slice(), plaintext.as_slice());
     }
 
@@ -324,11 +355,14 @@ mod tests {
         let wrong_sig_kp: serde_json::Value =
             serde_json::from_str(&qv_sig_generate_keypair().unwrap()).unwrap();
 
-        let kem_pubkeys_json =
-            serde_json::json!([kem_kp["pub"].as_str().unwrap()]).to_string();
-        let container_json =
-            qv_encrypt(b"data", &kem_pubkeys_json, 1, sig_kp["priv"].as_str().unwrap())
-                .unwrap();
+        let kem_pubkeys_json = serde_json::json!([kem_kp["pub"].as_str().unwrap()]).to_string();
+        let container_json = qv_encrypt(
+            b"data",
+            &kem_pubkeys_json,
+            1,
+            sig_kp["priv"].as_str().unwrap(),
+        )
+        .unwrap();
 
         let c: serde_json::Value = serde_json::from_str(&container_json).unwrap();
         let idx = c["shares"][0]["index"].as_u64().unwrap() as u8;

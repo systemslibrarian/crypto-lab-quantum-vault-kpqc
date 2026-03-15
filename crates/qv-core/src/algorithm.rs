@@ -464,13 +464,22 @@ mod tests {
     #[test]
     fn supported_ids_are_valid() {
         for &id in KemAlgorithm::supported_ids() {
-            assert!(KemAlgorithm::from_id(id).is_some(), "KEM ID '{id}' should be valid");
+            assert!(
+                KemAlgorithm::from_id(id).is_some(),
+                "KEM ID '{id}' should be valid"
+            );
         }
         for &id in SignatureAlgorithm::supported_ids() {
-            assert!(SignatureAlgorithm::from_id(id).is_some(), "Sig ID '{id}' should be valid");
+            assert!(
+                SignatureAlgorithm::from_id(id).is_some(),
+                "Sig ID '{id}' should be valid"
+            );
         }
         for &id in AeadAlgorithm::supported_ids() {
-            assert!(AeadAlgorithm::from_id(id).is_some(), "AEAD ID '{id}' should be valid");
+            assert!(
+                AeadAlgorithm::from_id(id).is_some(),
+                "AEAD ID '{id}' should be valid"
+            );
         }
     }
 }

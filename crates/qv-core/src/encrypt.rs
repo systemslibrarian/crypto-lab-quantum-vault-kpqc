@@ -3,9 +3,9 @@
 
 use crate::{
     constants::{
-        CONTAINER_ID_BYTES, CONTAINER_VERSION, HKDF_LABEL_CONTAINER_NONCE,
-        HKDF_LABEL_SHARE_KEY, HKDF_LABEL_SHARE_NONCE, HKDF_SALT, MAGIC,
-        MAX_CIPHERTEXT_BYTES, MAX_ENCRYPTED_SHARE_BYTES, MAX_SHARE_COUNT,
+        CONTAINER_ID_BYTES, CONTAINER_VERSION, HKDF_LABEL_CONTAINER_NONCE, HKDF_LABEL_SHARE_KEY,
+        HKDF_LABEL_SHARE_NONCE, HKDF_SALT, MAGIC, MAX_CIPHERTEXT_BYTES, MAX_ENCRYPTED_SHARE_BYTES,
+        MAX_SHARE_COUNT,
     },
     container::{CipherSuite, EncryptedKeyShare, QuantumVaultContainer},
     crypto::{kem::Kem, signature::Signature},
@@ -90,7 +90,9 @@ pub fn encrypt_file(
         return Err(QvError::InvalidInput("share_count exceeds parser limit"));
     }
     if options.recipient_public_keys.len() != options.share_count as usize {
-        return Err(QvError::InvalidInput("recipient key count must match share_count"));
+        return Err(QvError::InvalidInput(
+            "recipient key count must match share_count",
+        ));
     }
     if plaintext.len() + 16 > MAX_CIPHERTEXT_BYTES {
         return Err(QvError::InvalidInput("plaintext too large"));
@@ -124,7 +126,13 @@ pub fn encrypt_file(
     let cipher = Aes256Gcm::new(aes_key);
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ciphertext = cipher
-        .encrypt(nonce, Payload { msg: plaintext, aad: &aad })
+        .encrypt(
+            nonce,
+            Payload {
+                msg: plaintext,
+                aad: &aad,
+            },
+        )
         .map_err(|_| QvError::EncryptionFailed)?;
 
     // 4. Shamir split.
@@ -135,7 +143,9 @@ pub fn encrypt_file(
     // 5. Protect each share with the recipient's KEM public key.
     let mut encrypted_shares: Vec<EncryptedKeyShare> = Vec::with_capacity(raw_shares.len());
     for (share, pubkey) in raw_shares.iter().zip(options.recipient_public_keys.iter()) {
-        let (kem_ct, mut ss) = kem.encapsulate(pubkey).map_err(|_| QvError::EncryptionFailed)?;
+        let (kem_ct, mut ss) = kem
+            .encapsulate(pubkey)
+            .map_err(|_| QvError::EncryptionFailed)?;
         let protected = aead_protect(&share.data, &ss)?;
         ss.zeroize();
         if protected.len() > MAX_ENCRYPTED_SHARE_BYTES {
@@ -179,6 +189,14 @@ pub fn encrypt_file(
 /// Binds the ciphertext to its security-relevant context: algorithm choice,
 /// threshold, and container version.  Both encrypt and decrypt must supply
 /// the same bytes for the GCM authentication tag to verify.
+///
+/// SECURITY NOTE (Finding M-001/AAD): The AAD intentionally excludes the
+/// `shares` array because share-to-recipient binding is enforced at a higher
+/// layer via the HAETAE signature (see `container_signing_bytes`), which
+/// covers ALL fields including shares. This signature is verified FIRST in
+/// `decrypt_file`, making share substitution impossible without also forging
+/// the signature. Including shares in AAD would provide defense-in-depth but
+/// is not required for security given the mandatory signature check.
 ///
 /// Key ordering is stable: `serde_json` serialises object fields via an internal
 /// `BTreeMap`, which sorts keys alphabetically, making the output deterministic
@@ -241,15 +259,20 @@ pub(crate) fn container_signing_bytes(c: &QuantumVaultContainer) -> QvResult<Vec
 ///
 /// Output layout: `nonce (12 B) || AES-GCM ciphertext+tag (data.len() + 16 B)`.
 /// The derived nonce is prepended so callers store only a single opaque blob.
+///
+/// SECURITY INVARIANT: Derived key material is zeroized immediately after use
+/// to minimize the window during which secrets exist on the stack.
 pub(crate) fn aead_protect(data: &[u8], ikm: &[u8]) -> QvResult<Vec<u8>> {
-    let key = derive_share_key(ikm)?;
+    let mut key = derive_share_key(ikm)?;
     let nonce_bytes = derive_share_nonce(ikm)?;
     let aes_key = Key::<Aes256Gcm>::from_slice(&key);
     let cipher = Aes256Gcm::new(aes_key);
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ct = cipher
         .encrypt(nonce, data)
-        .map_err(|_| QvError::EncryptionFailed)?;
+        .map_err(|_| QvError::EncryptionFailed);
+    key.zeroize(); // Zeroize derived key immediately after cipher initialization
+    let ct = ct?;
     let mut result = Vec::with_capacity(12 + ct.len());
     result.extend_from_slice(&nonce_bytes);
     result.extend_from_slice(&ct);
@@ -259,6 +282,9 @@ pub(crate) fn aead_protect(data: &[u8], ikm: &[u8]) -> QvResult<Vec<u8>> {
 /// Authenticate and decrypt data produced by [`aead_protect`].
 /// Returns an error immediately if the authentication tag does not verify,
 /// pinpointing corruption to this specific share without consulting the outer AES-GCM tag.
+///
+/// SECURITY INVARIANT: Derived key material is zeroized immediately after use
+/// to minimize the window during which secrets exist on the stack.
 pub(crate) fn aead_unprotect(data: &[u8], ikm: &[u8]) -> QvResult<Vec<u8>> {
     if data.len() < 12 {
         return Err(QvError::DecryptionFailed);
@@ -268,12 +294,12 @@ pub(crate) fn aead_unprotect(data: &[u8], ikm: &[u8]) -> QvResult<Vec<u8>> {
         return Err(QvError::DecryptionFailed);
     }
     let nonce = Nonce::from_slice(&derived_nonce);
-    let key = derive_share_key(ikm)?;
+    let mut key = derive_share_key(ikm)?;
     let aes_key = Key::<Aes256Gcm>::from_slice(&key);
     let cipher = Aes256Gcm::new(aes_key);
-    cipher
-        .decrypt(nonce, &data[12..])
-        .map_err(|_| QvError::DecryptionFailed)
+    let result = cipher.decrypt(nonce, &data[12..]);
+    key.zeroize(); // Zeroize derived key immediately after cipher initialization
+    result.map_err(|_| QvError::DecryptionFailed)
 }
 
 // ---------------------------------------------------------------------------

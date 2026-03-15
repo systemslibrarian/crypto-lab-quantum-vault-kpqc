@@ -26,9 +26,8 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
 };
 use qv_core::{
-    decrypt_bytes, decrypt_with_threshold, encrypt_bytes, encrypt_with_threshold,
-    container::QuantumVaultContainer,
-    KeyShare, reconstruct_secret,
+    container::QuantumVaultContainer, decrypt_bytes, decrypt_with_threshold, encrypt_bytes,
+    encrypt_with_threshold, reconstruct_secret, KeyShare,
 };
 
 // ── AES-256-GCM NIST Test Vectors ────────────────────────────────────────────
@@ -47,8 +46,8 @@ fn aes256_gcm_nist_empty_message() {
 
     // For an empty message, the output is purely the 16-byte auth tag.
     let expected_tag: [u8; 16] = [
-        0x53, 0x0f, 0x8a, 0xfb, 0xc7, 0x45, 0x36, 0xb9,
-        0xa9, 0x63, 0xb4, 0xf1, 0xc4, 0xcb, 0x73, 0x8b,
+        0x53, 0x0f, 0x8a, 0xfb, 0xc7, 0x45, 0x36, 0xb9, 0xa9, 0x63, 0xb4, 0xf1, 0xc4, 0xcb, 0x73,
+        0x8b,
     ];
 
     let ct = cipher
@@ -56,7 +55,8 @@ fn aes256_gcm_nist_empty_message() {
         .expect("AES-256-GCM encryption failed");
 
     assert_eq!(
-        ct.as_slice(), &expected_tag,
+        ct.as_slice(),
+        &expected_tag,
         "NIST AES-256-GCM vector (empty PT) tag mismatch — \
          expected: {}, got: {}",
         hex_str(&expected_tag),
@@ -78,7 +78,13 @@ fn aes256_gcm_round_trip() {
     let cipher = Aes256Gcm::new(key);
 
     let ct = cipher
-        .encrypt(nonce, Payload { msg: plaintext, aad })
+        .encrypt(
+            nonce,
+            Payload {
+                msg: plaintext,
+                aad,
+            },
+        )
         .unwrap();
     let recovered = cipher
         .decrypt(nonce, Payload { msg: &ct, aad })
@@ -95,10 +101,25 @@ fn aes256_gcm_aad_mismatch_fails() {
     let cipher = Aes256Gcm::new(key);
 
     let ct = cipher
-        .encrypt(nonce, Payload { msg: b"secret", aad: b"correct-aad" })
+        .encrypt(
+            nonce,
+            Payload {
+                msg: b"secret",
+                aad: b"correct-aad",
+            },
+        )
         .unwrap();
-    let result = cipher.decrypt(nonce, Payload { msg: &ct, aad: b"tampered-aad" });
-    assert!(result.is_err(), "modified AAD must cause authentication failure");
+    let result = cipher.decrypt(
+        nonce,
+        Payload {
+            msg: &ct,
+            aad: b"tampered-aad",
+        },
+    );
+    assert!(
+        result.is_err(),
+        "modified AAD must cause authentication failure"
+    );
 }
 
 // ── Shamir GF(2⁸) Deterministic Reconstruction Vector ───────────────────────
@@ -116,13 +137,20 @@ fn aes256_gcm_aad_mismatch_fails() {
 fn shamir_deterministic_reconstruction_sss01() {
     // Pre-computed shares from polynomial f(x) = 0x42 + 0x53·x
     let shares = vec![
-        KeyShare { index: 1, data: vec![0x11] },
-        KeyShare { index: 2, data: vec![0xE4] },
+        KeyShare {
+            index: 1,
+            data: vec![0x11],
+        },
+        KeyShare {
+            index: 2,
+            data: vec![0xE4],
+        },
     ];
 
     let secret = reconstruct_secret(&shares).expect("reconstruction failed");
     assert_eq!(
-        secret, vec![0x42u8],
+        secret,
+        vec![0x42u8],
         "SSS-01: reconstruction from known shares failed; \
          got: {}, expected: 0x42",
         hex_str(&secret),
@@ -138,13 +166,20 @@ fn shamir_deterministic_reconstruction_sss01() {
 #[test]
 fn shamir_deterministic_multi_byte_sss01_ext() {
     let shares = vec![
-        KeyShare { index: 1, data: vec![0x11, 0x53, 0xAC] },
-        KeyShare { index: 2, data: vec![0xE4, 0xA6, 0x59] },
+        KeyShare {
+            index: 1,
+            data: vec![0x11, 0x53, 0xAC],
+        },
+        KeyShare {
+            index: 2,
+            data: vec![0xE4, 0xA6, 0x59],
+        },
     ];
 
     let secret = reconstruct_secret(&shares).expect("multi-byte reconstruction failed");
     assert_eq!(
-        secret, vec![0x42u8, 0x00, 0xFF],
+        secret,
+        vec![0x42u8, 0x00, 0xFF],
         "SSS-01 extended: multi-byte reconstruction mismatch; got: {}",
         hex_str(&secret),
     );
@@ -153,12 +188,18 @@ fn shamir_deterministic_multi_byte_sss01_ext() {
 /// Supplying only one share of a 2-share scheme must not produce the correct secret.
 #[test]
 fn shamir_single_share_of_two_is_not_secret() {
-    let shares = vec![KeyShare { index: 1, data: vec![0x11] }];
+    let shares = vec![KeyShare {
+        index: 1,
+        data: vec![0x11],
+    }];
     let recovered = reconstruct_secret(&shares).unwrap();
     // With only 1 share of a 2-of-2, the result is the share value itself
     // (Lagrange at (1, 0x11) with a single point), not 0x42.
-    assert_ne!(recovered, vec![0x42u8],
-        "single share must not reconstruct the 2-of-2 secret");
+    assert_ne!(
+        recovered,
+        vec![0x42u8],
+        "single share must not reconstruct the 2-of-2 secret"
+    );
 }
 
 // ── Container Format Vectors ─────────────────────────────────────────────────
@@ -167,8 +208,7 @@ fn shamir_single_share_of_two_is_not_secret() {
 /// and preserve all structural fields.
 #[test]
 fn container_serialise_deserialise_identity() {
-    let (ct_bytes, _keys, _sig_pub) =
-        encrypt_bytes(b"container format vector").unwrap();
+    let (ct_bytes, _keys, _sig_pub) = encrypt_bytes(b"container format vector").unwrap();
 
     let c = QuantumVaultContainer::from_bytes(&ct_bytes).unwrap();
 
@@ -203,7 +243,10 @@ fn pipeline_nonce_freshness() {
     let plain = b"nonce freshness test vector";
     let (ct1, _, _) = encrypt_bytes(plain).unwrap();
     let (ct2, _, _) = encrypt_bytes(plain).unwrap();
-    assert_ne!(ct1, ct2, "identical plaintext must produce different containers");
+    assert_ne!(
+        ct1, ct2,
+        "identical plaintext must produce different containers"
+    );
 }
 
 /// Round-trip for the minimum threshold (2-of-2).
@@ -277,7 +320,9 @@ fn generate_test_vectors() {
     let key = Key::<Aes256Gcm>::from_slice(&[0u8; 32]);
     let nonce = Nonce::from_slice(&[0u8; 12]);
     let cipher = Aes256Gcm::new(key);
-    let tag = cipher.encrypt(nonce, Payload { msg: &[], aad: &[] }).unwrap();
+    let tag = cipher
+        .encrypt(nonce, Payload { msg: &[], aad: &[] })
+        .unwrap();
     println!("=== AES-01 ===");
     println!("Key:   {}", hex_str(&[0u8; 32]));
     println!("Nonce: {}", hex_str(&[0u8; 12]));
@@ -286,8 +331,14 @@ fn generate_test_vectors() {
     // Shamir SSS-01
     println!("\n=== SSS-01 ===");
     let shares = vec![
-        KeyShare { index: 1, data: vec![0x11] },
-        KeyShare { index: 2, data: vec![0xE4] },
+        KeyShare {
+            index: 1,
+            data: vec![0x11],
+        },
+        KeyShare {
+            index: 2,
+            data: vec![0xE4],
+        },
     ];
     let secret = reconstruct_secret(&shares).unwrap();
     println!("Share 1 (x=1): {}", hex_str(&[0x11]));
@@ -312,5 +363,9 @@ fn generate_test_vectors() {
 // ── Helper ────────────────────────────────────────────────────────────────────
 
 fn hex_str(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("")
+    bytes
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<Vec<_>>()
+        .join("")
 }

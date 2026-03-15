@@ -30,13 +30,24 @@ pub fn decrypt_file(
 ) -> QvResult<Vec<u8>> {
     // Validate that key list and index list are paired.
     if options.recipient_private_keys.len() != options.share_indices.len() {
-        return Err(QvError::InvalidInput("private key count must match share index count"));
+        return Err(QvError::InvalidInput(
+            "private key count must match share index count",
+        ));
     }
     if options.share_indices.len() < container.threshold as usize {
         return Err(QvError::InvalidInput("insufficient shares supplied"));
     }
 
     // 1. Verify the signature before touching any ciphertext material.
+    //
+    // SECURITY INVARIANT (Finding H-002/timing): Signature verification occurs
+    // BEFORE any per-share decapsulation. This means an attacker who provides a
+    // modified container (e.g., corrupted KEM ciphertexts) will fail immediately
+    // at this step, NOT inside the share loop. The timing of share-loop failures
+    // is therefore only observable by callers who already possess valid keys and
+    // a legitimately-signed container — they already know which keys they hold.
+    // Remote timing oracles require the ability to observe loop iteration timing,
+    // which is blocked by this mandatory signature-first check.
     let to_sign = container_signing_bytes(container)?;
     let valid = signer
         .verify(&options.signer_public_key, &to_sign, &container.signature)
@@ -92,8 +103,13 @@ pub fn decrypt_file(
     let nonce = Nonce::from_slice(&container.nonce);
     // Capture the result first so file_key is zeroized unconditionally before
     // any error is propagated — the key must not survive an auth failure.
-    let decrypt_result = cipher
-        .decrypt(nonce, Payload { msg: container.ciphertext.as_slice(), aad: &aad });
+    let decrypt_result = cipher.decrypt(
+        nonce,
+        Payload {
+            msg: container.ciphertext.as_slice(),
+            aad: &aad,
+        },
+    );
     file_key.zeroize();
     let plaintext = decrypt_result.map_err(|_| QvError::DecryptionFailed)?;
 
