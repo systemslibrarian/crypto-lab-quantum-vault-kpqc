@@ -1,0 +1,31 @@
+Build and test	Fuzz container parser (short smoke run)	﻿2026-03-15T04:45:32.1840696Z ##[group]Run rustup install nightly --no-self-update
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1841115Z [36;1mrustup install nightly --no-self-update[0m
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1841516Z [36;1mcargo +nightly install cargo-fuzz --locked 2>/dev/null || true[0m
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1841917Z [36;1mcargo +nightly fuzz run fuzz_container_parse \[0m
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1842274Z [36;1m  --manifest-path crates/qv-core/fuzz/Cargo.toml \[0m
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1842603Z [36;1m  -- -max_total_time=30 -max_len=4096[0m
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1890034Z shell: /usr/bin/bash -e {0}
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1890260Z env:
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1890434Z   CARGO_TERM_COLOR: always
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1890666Z   CARGO_HOME: /home/runner/.cargo
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1890894Z   CARGO_INCREMENTAL: 0
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.1891087Z ##[endgroup]
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.2011540Z info: syncing channel updates for 'nightly-x86_64-unknown-linux-gnu'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.2594800Z info: latest update on 2026-03-15, rust version 1.96.0-nightly (03749d625 2026-03-14)
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.2596246Z info: downloading component 'cargo'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.2990124Z info: downloading component 'rust-std'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.3830318Z info: downloading component 'rustc'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:32.5608226Z info: installing component 'cargo'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:33.2801357Z info: installing component 'rust-std'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:35.1703303Z info: installing component 'rustc'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:39.7916295Z 
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:39.8009716Z   nightly-x86_64-unknown-linux-gnu installed - rustc 1.96.0-nightly (03749d625 2026-03-14)
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:39.8010161Z 
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:56.7978206Z error: Found argument '--manifest-path' which wasn't expected, or isn't valid in this context
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:56.7978910Z 
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:56.7979211Z   If you tried to supply '--manifest-path' as a value rather than a flag, use '-- --manifest-path'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:56.7979583Z 
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:56.7979728Z Usage: cargo-fuzz run <TARGET> [CORPUS]... [-- <ARGS>...]
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:56.7979989Z 
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:56.7980081Z For more information try '--help'
+Build and test	Fuzz container parser (short smoke run)	2026-03-15T04:45:56.7995385Z ##[error]Process completed with exit code 2.
