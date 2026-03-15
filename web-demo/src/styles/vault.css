@@ -1109,3 +1109,29 @@ main.page-wrapper {
   color: #888;
   font-size: 0.9rem;
 }
+
+/* ---------- Demo Instructions ---------- */
+.demo-instructions {
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-left: 4px solid #003478; /* Use the existing blue theme color */
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.instruction-list {
+  padding-left: 20px;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #2c3e50;
+}
+
+.instruction-list li {
+  margin-bottom: 6px;
+}
+
+.instruction-list li:last-child {
+  margin-bottom: 0;
+}
