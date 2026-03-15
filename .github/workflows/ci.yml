@@ -36,7 +36,7 @@ jobs:
         run: cargo build --workspace
 
       - name: Run tests (default features)
-        run: cargo test --workspace --all-features
+        run: cargo test --workspace
 
       - name: Run tamper, corpus, nonce, zeroize, and differential tests
         run: cargo test --workspace -p qv-core --test tamper_tests --test corpus_tests --test nonce_tests --test zeroize_tests --test differential_tests
