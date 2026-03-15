@@ -236,6 +236,22 @@ cargo bench          # criterion benchmarks
 
 ---
 
+## Attribution
+
+This project uses reference implementations from the **Korea Post-Quantum Cryptography (KpqC)** competition:
+
+- **SMAUG-T** — Lattice-based Key Encapsulation Mechanism (KEM)  
+  Authors: Park, Kim, et al. (Cryptolab, Inc. & Korea University)  
+  Repository: https://github.com/hmchoe0528/SMAUG-T_public
+
+- **HAETAE** — Lattice-based Digital Signature Scheme  
+  Authors: Cryptolab Inc., KAIST, et al.  
+  Specification: KpqC Round 4 submission
+
+Both algorithms are candidates in the KpqC standardization process for post-quantum cryptography in South Korea. This project uses them for educational and interoperability research purposes.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

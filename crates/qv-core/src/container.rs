@@ -5,29 +5,18 @@
 //! string and version field allow future format migrations without breaking
 //! older parsers.
 
-use crate::{error::{QvError, QvResult}, CONTAINER_VERSION};
+use crate::algorithm::{is_supported_kem, is_supported_signature};
+use crate::constants::CONTAINER_VERSION;
+use crate::error::{QvError, QvResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-/// Magic string embedded at the start of every container to identify the format.
-pub const MAGIC: &str = "QVKP";
-
-pub const MAX_CONTAINER_BYTES: usize = 8 * 1024 * 1024;
-pub const MAX_SHARE_COUNT: u8 = 16;
-pub const MAX_CIPHERTEXT_BYTES: usize = 4 * 1024 * 1024;
-pub const MAX_SIGNATURE_BYTES: usize = 4096;
-pub const MAX_KEM_CIPHERTEXT_BYTES: usize = 2048;
-pub const MAX_ENCRYPTED_SHARE_BYTES: usize = 128;
-pub const MAX_ALGORITHM_ID_BYTES: usize = 32;
-pub const CONTAINER_ID_BYTES: usize = 16;
-
-fn is_supported_kem_algorithm(value: &str) -> bool {
-    matches!(value, "dev-kem" | "SMAUG-T-3")
-}
-
-fn is_supported_sig_algorithm(value: &str) -> bool {
-    matches!(value, "dev-sig" | "HAETAE-3")
-}
+// Re-export constants for backward compatibility.
+pub use crate::constants::{
+    CONTAINER_ID_BYTES, MAGIC, MAX_ALGORITHM_ID_BYTES, MAX_CIPHERTEXT_BYTES,
+    MAX_CONTAINER_BYTES, MAX_ENCRYPTED_SHARE_BYTES, MAX_KEM_CIPHERTEXT_BYTES,
+    MAX_SHARE_COUNT, MAX_SIGNATURE_BYTES,
+};
 
 /// Symmetric cipher used to encrypt the payload.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,10 +108,10 @@ impl QuantumVaultContainer {
         if c.kem_algorithm.len() > MAX_ALGORITHM_ID_BYTES || c.sig_algorithm.len() > MAX_ALGORITHM_ID_BYTES {
             return Err(QvError::InvalidContainer("algorithm identifier too long"));
         }
-        if !is_supported_kem_algorithm(&c.kem_algorithm) {
+        if !is_supported_kem(&c.kem_algorithm) {
             return Err(QvError::UnsupportedAlgorithm("kem"));
         }
-        if !is_supported_sig_algorithm(&c.sig_algorithm) {
+        if !is_supported_signature(&c.sig_algorithm) {
             return Err(QvError::UnsupportedAlgorithm("signature"));
         }
         if c.threshold < 2 {

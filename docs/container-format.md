@@ -1,7 +1,7 @@
 # Quantum Vault Container Format
 
-Version: **1**  
-Magic: `QVLT1`
+Version: **2**  
+Magic: `QVKP`
 
 ---
 
@@ -18,13 +18,15 @@ tampering is detected before any decryption is attempted.
 
 ```json
 {
-  "magic":         "QVLT1",
-  "version":       1,
+  "magic":         "QVKP",
+  "version":       2,
   "cipher":        "Aes256Gcm",
   "kem_algorithm": "SMAUG-T-3",
   "sig_algorithm": "HAETAE-3",
   "threshold":     2,
   "share_count":   3,
+  "created_at":    1717200000,
+  "container_id":  [/* 16 random bytes */],
   "nonce":         [/* 12 bytes, JSON array of u8 */],
   "ciphertext":    [/* N + 16 bytes (payload + GCM auth tag) */],
   "shares":        [ /* array of EncryptedKeyShare */ ],
@@ -36,17 +38,32 @@ tampering is detected before any decryption is attempted.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `magic` | string | Must equal `"QVLT1"` |
-| `version` | u8 | Format version; currently `1` |
-| `cipher` | enum | `"Aes256Gcm"` only in v1 |
-| `kem_algorithm` | string | Algorithm used for key encapsulation, e.g. `"DevKem"`, `"SMAUG-T-3"` |
-| `sig_algorithm` | string | Algorithm used for the container signature, e.g. `"DevSignature"`, `"HAETAE-3"` |
-| `threshold` | u8 | Minimum shares needed to decrypt |
-| `share_count` | u8 | Total shares created |
-| `nonce` | `[u8]` | 12-byte AES-GCM nonce |
+| `magic` | string | Must equal `"QVKP"` |
+| `version` | u8 | Format version; currently `2` |
+| `cipher` | enum | `"Aes256Gcm"` only in v2 |
+| `kem_algorithm` | string | Algorithm used for key encapsulation: `"dev-kem"` (test), `"SMAUG-T-3"` (production) |
+| `sig_algorithm` | string | Algorithm used for the container signature: `"dev-sig"` (test), `"HAETAE-3"` (production) |
+| `threshold` | u8 | Minimum shares needed to decrypt (≥2) |
+| `share_count` | u8 | Total shares created (≤16) |
+| `created_at` | u64 | Unix timestamp (seconds) when container was created; used for replay detection |
+| `container_id` | `[u8; 16]` | Random 128-bit identifier; binds all derived keys to this container |
+| `nonce` | `[u8; 12]` | 12-byte AES-GCM nonce |
 | `ciphertext` | `[u8]` | AES-256-GCM output including 16-byte auth tag |
 | `shares` | array | One `EncryptedKeyShare` per recipient |
 | `signature` | `[u8]` | Signature over all fields above |
+
+### Limits
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `MAX_CONTAINER_BYTES` | 8 MiB | Maximum total serialized size |
+| `MAX_SHARE_COUNT` | 16 | Maximum number of shares |
+| `MAX_CIPHERTEXT_BYTES` | 4 MiB | Maximum payload size |
+| `MAX_SIGNATURE_BYTES` | 4096 | Maximum signature length |
+| `MAX_KEM_CIPHERTEXT_BYTES` | 2048 | Maximum KEM ciphertext per share |
+| `MAX_ENCRYPTED_SHARE_BYTES` | 128 | Maximum encrypted share data |
+| `MAX_ALGORITHM_ID_BYTES` | 32 | Maximum algorithm identifier length |
+| `CONTAINER_ID_BYTES` | 16 | Fixed container ID length |
 
 ---
 
@@ -77,15 +94,26 @@ The signature covers the canonical JSON serialization of the following fields
 in this exact key order:
 
 ```
-magic, version, cipher, kem_algorithm, sig_algorithm, threshold, share_count, nonce, ciphertext, shares
+magic, version, cipher, kem_algorithm, sig_algorithm, threshold, share_count, created_at, container_id, nonce, ciphertext, shares
 ```
 
 The `signature` field itself is excluded.  The signing implementation is in
 `qv-core::encrypt::container_signing_bytes`.
 
-In version 1 the signature is produced by whatever backend is active.  The
-dev backend uses `SHA-256(SHA-256(privkey) || canonical_json)` so that
-verification only requires the public key.  Production containers will use HAETAE.
+In version 2 the signature is produced by the active backend:
+- **dev-sig** (test): `SHA-256(SHA-256(privkey) || canonical_json)`
+- **HAETAE-3** (production): HAETAE signature over canonical JSON
+
+---
+
+## Replay and Swap Resistance
+
+Version 2 containers include two fields for replay/swap resistance:
+
+- **`created_at`**: Unix timestamp (seconds) recording when the container was created. Applications may reject containers outside an acceptable time window.
+- **`container_id`**: Random 128-bit identifier unique to each container. This value is included in HKDF domain separation for share keys, binding decryption to the specific container.
+
+These fields are covered by both the container signature and the AEAD AAD, preventing substitution attacks.
 
 ---
 
@@ -155,9 +183,13 @@ It is **recomputed** at decryption time (not stored) from the container fields:
   "kem_algorithm": "<value>",
   "sig_algorithm": "<value>",
   "threshold":     <uint8>,
-  "version":       <uint8>
+  "version":       <uint8>,
+  "container_id":  [/* 16 bytes */]
 }
 ```
+
+Including `container_id` in the AAD prevents an attacker from substituting one
+container's ciphertext into another container's header.
 
 Keys appear in **alphabetical order** in the serialised form.  Any mismatch in these
 fields causes AES-GCM authentication to fail.

@@ -2,14 +2,16 @@
 //! Encryption pipeline: plaintext → AES-256-GCM → Shamir split → KEM protect → container.
 
 use crate::{
-    container::{
-        CipherSuite, EncryptedKeyShare, QuantumVaultContainer, CONTAINER_ID_BYTES,
-        MAGIC, MAX_CIPHERTEXT_BYTES, MAX_ENCRYPTED_SHARE_BYTES, MAX_SHARE_COUNT,
+    constants::{
+        CONTAINER_ID_BYTES, CONTAINER_VERSION, HKDF_LABEL_CONTAINER_NONCE,
+        HKDF_LABEL_SHARE_KEY, HKDF_LABEL_SHARE_NONCE, HKDF_SALT, MAGIC,
+        MAX_CIPHERTEXT_BYTES, MAX_ENCRYPTED_SHARE_BYTES, MAX_SHARE_COUNT,
     },
+    container::{CipherSuite, EncryptedKeyShare, QuantumVaultContainer},
     crypto::{kem::Kem, signature::Signature},
     error::{QvError, QvResult},
     shamir::split_secret,
-    EncryptOptions, CONTAINER_VERSION,
+    EncryptOptions,
 };
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
@@ -45,7 +47,7 @@ struct AadContext<'a> {
 }
 
 fn derive_labeled_bytes<const N: usize>(ikm: &[u8], label: &[u8]) -> QvResult<[u8; N]> {
-    let hk = Hkdf::<Sha256>::new(Some(b"qvault-v2"), ikm);
+    let hk = Hkdf::<Sha256>::new(Some(HKDF_SALT), ikm);
     let mut out = [0u8; N];
     hk.expand(label, &mut out)
         .map_err(|_| QvError::EncryptionFailed)?;
@@ -59,15 +61,15 @@ fn derive_container_id() -> [u8; CONTAINER_ID_BYTES] {
 }
 
 fn derive_container_nonce(container_id: &[u8]) -> QvResult<[u8; 12]> {
-    derive_labeled_bytes(container_id, b"qvault-container-nonce")
+    derive_labeled_bytes(container_id, HKDF_LABEL_CONTAINER_NONCE)
 }
 
 fn derive_share_key(shared_secret: &[u8]) -> QvResult<[u8; 32]> {
-    derive_labeled_bytes(shared_secret, b"qvault-share-key")
+    derive_labeled_bytes(shared_secret, HKDF_LABEL_SHARE_KEY)
 }
 
 fn derive_share_nonce(shared_secret: &[u8]) -> QvResult<[u8; 12]> {
-    derive_labeled_bytes(shared_secret, b"qvault-share-nonce")
+    derive_labeled_bytes(shared_secret, HKDF_LABEL_SHARE_NONCE)
 }
 
 /// Encrypts `plaintext` and returns a signed [`QuantumVaultContainer`].

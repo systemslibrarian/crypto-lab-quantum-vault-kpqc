@@ -15,6 +15,8 @@
 //! assert_eq!(plain, b"hello world");
 //! ```
 
+pub mod algorithm;
+pub mod constants;
 pub mod container;
 pub mod crypto;
 pub mod decrypt;
@@ -32,6 +34,7 @@ pub mod shamir;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
+pub use constants::CONTAINER_VERSION;
 pub use container::{EncryptedKeyShare, QuantumVaultContainer};
 pub use error::{QvError, QvResult};
 pub use encrypt::generate_nonce;
@@ -63,9 +66,6 @@ compile_error!(
      Compile with --features kpqc-native for a production build, or add \
      feature `allow_dev_backend_in_release` to acknowledge the insecurity."
 );
-
-/// Container format version used by the current implementation.
-pub const CONTAINER_VERSION: u8 = 2;
 
 /// Input options controlling key splitting and metadata during encryption.
 ///
