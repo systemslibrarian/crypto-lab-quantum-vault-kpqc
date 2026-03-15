@@ -2,7 +2,7 @@
 // These are regenerated fresh each time (new random keys/nonces/salts),
 // so the stored ciphertext is always different — but the passwords always work.
 //
-// Only 3 boxes are created per language (EN → 03/06/09, KO → 03/06/09).
+// Only 3 boxes are created per language (EN → 03/06/09, KO → 01/04/07).
 // When the user switches language, the old demo boxes are swapped out for new ones.
 
 import { sealMessage } from '../crypto/pipeline';
@@ -35,17 +35,17 @@ const EN_BOXES: DemoBox[] = [
 
 const KO_BOXES: DemoBox[] = [
   {
-    number: '03',
+    number: '01',
     secret: '보물 지도는 오래된 참나무 아래에 있다',
     passwords: ['무궁화', '태극기', '한라산'],
   },
   {
-    number: '06',
+    number: '04',
     secret: '발사 코드: 가나다-7749-라마바',
     passwords: ['거북선', '첨성대', '석굴암'],
   },
   {
-    number: '09',
+    number: '07',
     secret: '회의가 금요일 정오로 변경되었습니다',
     passwords: ['봄바람', '여름비', '가을달'],
   },

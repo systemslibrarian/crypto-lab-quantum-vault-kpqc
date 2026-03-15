@@ -314,22 +314,19 @@ async function init(): Promise<void> {
   setupLangToggle(async () => {
     // Swap demo boxes: remove old-language demos, generate new-language demos
     state = removeDemoBoxes(state);
-    state = await generateDemoBoxes(state, getLang());
     saveVaultState(state);
 
-    // Close any open panel so it re-renders in the new language
+    // Close any open panel and re-render immediately so stale boxes disappear
+    // before the async crypto for the new language finishes.
     if (selectedBox) {
-      const currentBox = selectedBox;
       selectedBox = null;
       closePanel(panelEl);
-      renderWall();
-      // Re-open the same box if it still exists in the new language
-      if (state.boxes[currentBox]) {
-        setTimeout(() => handleBoxClick(currentBox), 50);
-      }
-    } else {
-      renderWall();
     }
+    renderWall();
+
+    state = await generateDemoBoxes(state, getLang());
+    saveVaultState(state);
+    renderWall();
   });
 
   // Initial render
@@ -339,27 +336,34 @@ async function init(): Promise<void> {
 }
 
 // ---- Language toggle ----
+
+/** Apply the given language to all DOM elements (buttons, translated text, hint table rows). */
+function applyLangToDOM(lang: 'en' | 'ko'): void {
+  document.documentElement.lang = lang;
+  document.querySelectorAll<HTMLButtonElement>('.lang-btn').forEach(b => {
+    const isActive = b.dataset.lang === lang;
+    b.classList.toggle('active', isActive);
+    b.setAttribute('aria-current', isActive ? 'true' : 'false');
+    b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+  document.querySelectorAll<HTMLElement>('[data-en]').forEach(el => {
+    const translated = el.getAttribute(`data-${lang}`);
+    if (translated !== null) el.textContent = translated;
+  });
+  document.querySelectorAll<HTMLElement>('[data-lang-table]').forEach(table => {
+    table.style.display = table.dataset.langTable === lang ? '' : 'none';
+  });
+}
+
 function setupLangToggle(onLangChange?: () => void | Promise<void>): void {
+  // Apply the detected/stored language on first load so the DOM matches getLang()
+  applyLangToDOM(getLang());
+
   document.querySelectorAll<HTMLButtonElement>('.lang-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const lang = (btn.dataset.lang ?? 'en') as 'en' | 'ko';
       setLang(lang);
-      // Update html[lang] for screen readers and OS language detection
-      document.documentElement.lang = lang === 'ko' ? 'ko' : 'en';
-      document.querySelectorAll<HTMLButtonElement>('.lang-btn').forEach(b => {
-        const isActive = b.dataset.lang === lang;
-        b.classList.toggle('active', isActive);
-        b.setAttribute('aria-current', isActive ? 'true' : 'false');
-        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-      });
-      document.querySelectorAll<HTMLElement>('[data-en]').forEach(el => {
-        const translated = el.getAttribute(`data-${lang}`);
-        if (translated !== null) el.textContent = translated;
-      });
-      // Toggle language-specific password tables
-      document.querySelectorAll<HTMLElement>('[data-lang-table]').forEach(table => {
-        table.style.display = table.dataset.langTable === lang ? '' : 'none';
-      });
+      applyLangToDOM(lang);
       onLangChange?.();
     });
   });
