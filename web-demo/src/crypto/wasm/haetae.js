@@ -904,3 +904,5 @@ if (typeof exports === 'object' && typeof module === 'object') {
 } else if (typeof define === 'function' && define['amd'])
   define([], () => createHaetaeModule);
 
+
+export default createHaetaeModule;

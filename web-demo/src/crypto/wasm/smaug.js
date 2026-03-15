@@ -906,3 +906,5 @@ if (typeof exports === 'object' && typeof module === 'object') {
 } else if (typeof define === 'function' && define['amd'])
   define([], () => createSmaugModule);
 
+
+export default createSmaugModule;
