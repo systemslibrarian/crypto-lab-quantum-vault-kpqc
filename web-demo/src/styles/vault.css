@@ -637,11 +637,12 @@ body {
 
 .btn-vault-action {
   background: none;
-  color: #8a8078;
+  color: #3a3530;
+  font-weight: 600;
   border: 1px solid #c8c4bc;
   border-radius: 5px;
   padding: 6px 14px;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   cursor: pointer;
   transition: color 150ms, border-color 150ms;
   min-height: 44px;
@@ -665,11 +666,12 @@ body {
 
 .btn-reset {
   background: none;
-  color: #8a8078;
+  color: #3a3530;
+  font-weight: 600;
   border: 1px solid #c8c4bc;
   border-radius: 5px;
   padding: 6px 14px;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   cursor: pointer;
   transition: color 150ms, border-color 150ms;
   min-height: 44px;
