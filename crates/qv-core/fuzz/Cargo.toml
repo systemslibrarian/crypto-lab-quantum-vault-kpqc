@@ -4,13 +4,16 @@ version = "0.0.0"
 publish = false
 edition = "2021"
 
+[workspace]
+
 [package.metadata]
 cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
-qv_core = { path = "..", features = ["dev-backend"] }
+qv_core = { package = "qv-core", path = "..", features = ["dev-backend", "wasm"] }
+serde_json = "1.0"
 
 # Prevent LTO stripping of fuzz entry points.
 [profile.release]
@@ -43,5 +46,23 @@ doc = false
 [[bin]]
 name = "fuzz_aead_protect"
 path = "fuzz_targets/fuzz_aead_protect.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_kem_handshake"
+path = "fuzz_targets/fuzz_kem_handshake.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_signature_verify"
+path = "fuzz_targets/fuzz_signature_verify.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_wasm_api"
+path = "fuzz_targets/fuzz_wasm_api.rs"
 test = false
 doc = false

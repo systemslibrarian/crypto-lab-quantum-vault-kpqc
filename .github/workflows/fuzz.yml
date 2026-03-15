@@ -46,6 +46,9 @@ jobs:
           cargo fuzz build fuzz_shamir_roundtrip
           cargo fuzz build fuzz_decrypt_pipeline
           cargo fuzz build fuzz_aead_protect
+          cargo fuzz build fuzz_kem_handshake
+          cargo fuzz build fuzz_signature_verify
+          cargo fuzz build fuzz_wasm_api
 
   # Short smoke-run (30 s each) to catch obvious panics quickly.
   # Runs only on push to main so PRs don't need nightly fuzzing time.
@@ -93,3 +96,15 @@ jobs:
       - name: Smoke fuzz — aead_protect (30 s)
         working-directory: crates/qv-core
         run: cargo fuzz run fuzz_aead_protect -- -max_total_time=30
+
+      - name: Smoke fuzz — kem_handshake (30 s)
+        working-directory: crates/qv-core
+        run: cargo fuzz run fuzz_kem_handshake -- -max_total_time=30
+
+      - name: Smoke fuzz — signature_verify (30 s)
+        working-directory: crates/qv-core
+        run: cargo fuzz run fuzz_signature_verify -- -max_total_time=30
+
+      - name: Smoke fuzz — wasm_api (30 s)
+        working-directory: crates/qv-core
+        run: cargo fuzz run fuzz_wasm_api -- -max_total_time=30

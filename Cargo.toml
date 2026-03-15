@@ -3,6 +3,9 @@ members = [
     "crates/qv-core",
     "crates/qv-cli",
 ]
+exclude = [
+    "crates/qv-core/fuzz",
+]
 resolver = "2"
 
 [workspace.package]

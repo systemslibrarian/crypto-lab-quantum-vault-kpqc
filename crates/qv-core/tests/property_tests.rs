@@ -8,6 +8,7 @@
 use proptest::prelude::*;
 use qv_core::{
     container::QuantumVaultContainer,
+    crypto::{backend::dev::{DevKem, DevSignature}, kem::Kem, signature::Signature},
     decrypt_bytes, encrypt_bytes,
     reconstruct_secret, split_secret, KeyShare,
 };
@@ -132,6 +133,37 @@ proptest! {
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
+
+    /// Property: Dev KEM roundtrip preserves the shared secret.
+    #[test]
+    fn kem_roundtrip_preserves_shared_secret(_marker in any::<u8>()) {
+        let kem = DevKem;
+        let (pk, sk) = kem.generate_keypair().map_err(to_test_err)?;
+        let (ct, ss_enc) = kem.encapsulate(&pk).map_err(to_test_err)?;
+        let ss_dec = kem.decapsulate(&sk, &ct).map_err(to_test_err)?;
+        prop_assert_eq!(ss_dec, ss_enc);
+    }
+
+    /// Property: Dev signature roundtrip verifies and message tampering fails.
+    #[test]
+    fn signature_roundtrip_and_tamper_invariants(
+        message in prop::collection::vec(any::<u8>(), 0..=512),
+    ) {
+        let sig = DevSignature;
+        let (pk, sk) = sig.generate_keypair().map_err(to_test_err)?;
+        let signature = sig.sign(&sk, &message).map_err(to_test_err)?;
+        let valid = sig.verify(&pk, &message, &signature).map_err(to_test_err)?;
+        prop_assert!(valid);
+
+        let mut tampered = message.clone();
+        if tampered.is_empty() {
+            tampered.push(0x01);
+        } else {
+            tampered[0] ^= 0x01;
+        }
+        let valid_tampered = sig.verify(&pk, &tampered, &signature).map_err(to_test_err)?;
+        prop_assert!(!valid_tampered);
+    }
 
     /// Property: encrypt → decrypt roundtrip preserves plaintext.
     #[test]

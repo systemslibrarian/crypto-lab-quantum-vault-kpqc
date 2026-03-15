@@ -66,6 +66,30 @@ jobs:
             --manifest-path crates/qv-core/fuzz/Cargo.toml \
             -- -max_total_time=30 -max_len=4096
 
+      - name: Fuzz KEM handshake (short smoke run)
+        run: |
+          rustup install nightly --no-self-update
+          cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
+          cargo +nightly fuzz run fuzz_kem_handshake \
+            --manifest-path crates/qv-core/fuzz/Cargo.toml \
+            -- -max_total_time=30 -max_len=4096
+
+      - name: Fuzz signature verify (short smoke run)
+        run: |
+          rustup install nightly --no-self-update
+          cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
+          cargo +nightly fuzz run fuzz_signature_verify \
+            --manifest-path crates/qv-core/fuzz/Cargo.toml \
+            -- -max_total_time=30 -max_len=4096
+
+      - name: Fuzz WASM API boundary (short smoke run)
+        run: |
+          rustup install nightly --no-self-update
+          cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
+          cargo +nightly fuzz run fuzz_wasm_api \
+            --manifest-path crates/qv-core/fuzz/Cargo.toml \
+            -- -max_total_time=30 -max_len=4096
+
       - name: Security audit
         run: |
           cargo install cargo-audit --locked
