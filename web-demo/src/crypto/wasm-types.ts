@@ -81,6 +81,8 @@ export interface HaetaeModule extends EmscriptenModuleBase {
 export interface EmscriptenModuleOptions {
   /** Function to resolve paths to .wasm files at runtime. */
   locateFile?: (path: string) => string;
+  /** Optional pre-fetched wasm binary bytes. */
+  wasmBinary?: Uint8Array | ArrayBuffer;
 }
 
 /**

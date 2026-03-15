@@ -22,28 +22,59 @@ import { revealMessage, showGibberish } from './ui/reveal';
 import { sleep } from './crypto/utils';
 import { setLang, t } from './i18n';
 
+const initDiagnostics: string[] = [];
+
+function recordInitStep(step: string): void {
+  initDiagnostics.push(`[${new Date().toISOString()}] ${step}`);
+  // Keep the diagnostics short enough to show on-screen without flooding.
+  if (initDiagnostics.length > 40) initDiagnostics.shift();
+}
+
+function formatInitError(err: unknown): string {
+  if (err instanceof Error) {
+    if (err.stack) return err.stack;
+    return `${err.name}: ${err.message}`;
+  }
+  return String(err);
+}
+
 async function init(): Promise<void> {
+  recordInitStep('init:start');
   // Language toggle is wired up after renderWall is defined (so it can trigger re-render)
 
   // Load both KpqC WASM modules (SMAUG-T + HAETAE) before any vault operations
   const loaderEl = document.getElementById('wasm-loader');
   if (loaderEl) loaderEl.style.display = 'block';
+  recordInitStep('crypto:init:start');
   await initCrypto();
+  recordInitStep('crypto:init:done');
   if (loaderEl) loaderEl.style.display = 'none';
 
   let state: VaultState;
 
+  recordInitStep('state:load:start');
   const existing = loadVaultState();
   if (existing) {
+    recordInitStep('state:load:existing');
     state = existing;
-    // Fix: Ensure demo boxes exist if they were missing or failed to initialize
-    state = await generateDemoBoxes(state);
-    saveVaultState(state);
   } else {
-    // First visit: generate real demo boxes and show hint
-    state = await generateDemoBoxes(emptyVaultState());
-    saveVaultState(state);
-    showHintBanner();
+    recordInitStep('state:load:none');
+    // First visit: generate real demo boxes and show hint.
+    // If generation fails (e.g. stale cache/corrupt runtime), recover to empty state.
+    try {
+      recordInitStep('demo:generate:start');
+      state = await generateDemoBoxes(emptyVaultState());
+      saveVaultState(state);
+      showHintBanner();
+      recordInitStep('demo:generate:done');
+    } catch (err) {
+      console.error('Demo box generation failed, recovering with empty vault:', err);
+      recordInitStep(`demo:generate:failed:${String(err)}`);
+      clearVaultState();
+      state = emptyVaultState();
+      saveVaultState(state);
+      recordInitStep('demo:recovery:empty-state');
+    }
   }
 
   let selectedBox: string | null = null;
@@ -145,20 +176,6 @@ async function init(): Promise<void> {
       infoEl.className = 'result-info';
       infoEl.textContent = `${result.validShareCount} ${t('thresholdMet')}`;
       resultEl.appendChild(infoEl);
-
-      const clearBtn = document.createElement('button');
-      clearBtn.className = 'btn-outline btn-delete';
-      clearBtn.textContent = '✕ ' + t('clearBtn');
-      clearBtn.style.marginTop = '16px';
-      clearBtn.onclick = () => {
-        if (confirm(t('confirmClear'))) {
-          delete state.boxes[boxNumber];
-          saveVaultState(state);
-          closePanel(panelEl);
-          renderWall();
-        }
-      };
-      resultEl.appendChild(clearBtn);
     } else {
       updateRetrieveTitle(panelEl, `Box ${boxNumber} — ${t('accessDenied')}`);
 
@@ -225,7 +242,9 @@ async function init(): Promise<void> {
   setupLangToggle(() => renderWall());
 
   // Initial render
+  recordInitStep('ui:render:start');
   renderWall();
+  recordInitStep('init:done');
 }
 
 // ---- Language toggle ----
@@ -263,6 +282,7 @@ function showHintBanner(): void {
 }
 
 init().catch(err => {
+  recordInitStep(`init:failed:${String(err)}`);
   console.error('Vault initialization failed:', err);
   const div = document.createElement('div');
   div.style.cssText = 'padding:2rem;color:#c00;font-family:monospace;';
@@ -270,5 +290,29 @@ init().catch(err => {
   const note = document.createElement('p');
   note.textContent = 'Check that your browser supports Web Crypto API (requires HTTPS or localhost).';
   div.appendChild(note);
+
+  const details = document.createElement('details');
+  details.open = true;
+  details.style.marginTop = '1rem';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Startup diagnostics';
+  details.appendChild(summary);
+
+  const pre = document.createElement('pre');
+  pre.style.whiteSpace = 'pre-wrap';
+  pre.style.wordBreak = 'break-word';
+  pre.textContent = [
+    `URL: ${window.location.href}`,
+    `User-Agent: ${navigator.userAgent}`,
+    '',
+    'Steps:',
+    ...initDiagnostics,
+    '',
+    'Error:',
+    formatInitError(err),
+  ].join('\n');
+  details.appendChild(pre);
+  div.appendChild(details);
+
   document.body.replaceChildren(div);
 });

@@ -8,12 +8,24 @@ let haetaeModule: HaetaeModule | null = null;
 
 export async function initHaetae(): Promise<void> {
   const createModule = (await import('./wasm/haetae.js')).default as EmscriptenModuleFactory<HaetaeModule>;
+  const base = import.meta.env.BASE_URL ?? '/';
+  const wasmUrl = base.replace(/\/$/, '') + '/haetae.wasm';
+  const wasmResp = await fetch(wasmUrl, { cache: 'no-store' });
+  if (!wasmResp.ok) {
+    throw new Error(`Failed to fetch haetae.wasm (${wasmResp.status})`);
+  }
+  const wasmBinary = new Uint8Array(await wasmResp.arrayBuffer());
+
   haetaeModule = await createModule({
+    wasmBinary,
     locateFile: (path: string) => {
-      const base = import.meta.env.BASE_URL ?? '/';
       return base.replace(/\/$/, '') + '/' + path;
     },
   });
+
+  if (typeof haetaeModule._malloc !== 'function' || typeof haetaeModule._free !== 'function') {
+    throw new Error('HAETAE module is missing malloc/free exports');
+  }
 }
 
 /** Get the initialized module or throw. Returns narrowed type for TypeScript. */

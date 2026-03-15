@@ -10,13 +10,25 @@ export async function initSmaug(): Promise<void> {
   // Dynamic import of the Emscripten-generated JS loader.
   // Vite copies the .wasm file to public/ and the loader fetches it from there.
   const createModule = (await import('./wasm/smaug.js')).default as EmscriptenModuleFactory<SmaugModule>;
+  const base = import.meta.env.BASE_URL ?? '/';
+  const wasmUrl = base.replace(/\/$/, '') + '/smaug.wasm';
+  const wasmResp = await fetch(wasmUrl, { cache: 'no-store' });
+  if (!wasmResp.ok) {
+    throw new Error(`Failed to fetch smaug.wasm (${wasmResp.status})`);
+  }
+  const wasmBinary = new Uint8Array(await wasmResp.arrayBuffer());
+
   smaugModule = await createModule({
+    wasmBinary,
     // Tell Emscripten where the .wasm file lives at runtime.
     locateFile: (path: string) => {
-      const base = import.meta.env.BASE_URL ?? '/';
       return base.replace(/\/$/, '') + '/' + path;
     },
   });
+
+  if (typeof smaugModule._malloc !== 'function' || typeof smaugModule._free !== 'function') {
+    throw new Error('SMAUG-T module is missing malloc/free exports');
+  }
 }
 
 /** Get the initialized module or throw. Returns narrowed type for TypeScript. */
