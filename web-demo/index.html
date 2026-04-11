@@ -3,10 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy"
-          content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; object-src 'none'; base-uri 'none';" />
+          content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; object-src 'none'; base-uri 'none';" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Browser-based demonstration of Korean post-quantum cryptographic algorithms (SMAUG-T KEM + HAETAE signature) compiled to WebAssembly — AES-256-GCM, Shamir SSS, real KpqC WASM" />
     <title>Quantum Vault KPQC</title>
+    <script>
+      (function () {
+        const saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved ?? 'dark');
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
   </head>
@@ -16,6 +22,7 @@
 
       <!-- Header -->
       <header class="site-header">
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode">🌙</button>
         <div class="lang-toggle" id="lang-toggle" role="group" aria-label="Language selection">
           <button class="lang-btn active" data-lang="en" aria-current="true" aria-pressed="true">EN</button>
           <span class="lang-sep" aria-hidden="true">|</span>
@@ -197,16 +204,11 @@
         </p>
       </section>
 
-      <!-- Footer -->
-      <footer class="site-footer">
-        <span data-en="© 2026 Paul Clark" data-ko="© 2026 Paul Clark">© 2026 Paul Clark</span> &middot;
-        <span data-en="MIT License" data-ko="MIT 라이선스">MIT License</span> &middot;
-        <a href="https://github.com/systemslibrarian/crypto-lab-quantum-vault-kpqc" style="color:inherit;">
-          github.com/systemslibrarian/crypto-lab-quantum-vault-kpqc
-        </a>
-      </footer>
-
     </main>
+
+    <footer style="text-align:center; padding: 1.5rem; font-size: 0.85rem; opacity: 0.7; margin-top: 2rem;">
+      Whether you eat or drink or whatever you do, do it all for the glory of God. — 1 Corinthians 10:31
+    </footer>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

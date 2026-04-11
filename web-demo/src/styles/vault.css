@@ -16,6 +16,14 @@ html {
   color: #2a2520;
 }
 
+html[data-theme='dark'] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+html[data-theme='light'] {
+  filter: none;
+}
+
 body {
   min-height: 100vh;
   display: flex;
@@ -32,8 +40,41 @@ body {
 
 /* ---------- Header ---------- */
 .site-header {
+  position: relative;
   padding: 32px 0 20px;
   text-align: center;
+}
+
+.theme-toggle {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.theme-toggle:hover {
+  filter: contrast(1.1) brightness(1.08);
+}
+
+.theme-toggle:active {
+  transform: scale(0.96);
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
 }
 
 .site-title {

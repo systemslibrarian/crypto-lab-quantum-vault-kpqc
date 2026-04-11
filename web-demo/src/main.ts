@@ -369,6 +369,36 @@ function setupLangToggle(onLangChange?: () => void | Promise<void>): void {
   });
 }
 
+function setupThemeToggle(): void {
+  const htmlEl = document.documentElement;
+  const themeToggleBtn = document.getElementById('theme-toggle') as HTMLButtonElement | null;
+  if (!themeToggleBtn) return;
+
+  const getTheme = (): 'dark' | 'light' => {
+    return htmlEl.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  };
+
+  const applyToggleState = (theme: 'dark' | 'light'): void => {
+    const isDark = theme === 'dark';
+    themeToggleBtn.textContent = isDark ? '🌙' : '☀️';
+    themeToggleBtn.setAttribute(
+      'aria-label',
+      isDark ? 'Switch to light mode' : 'Switch to dark mode',
+    );
+  };
+
+  const initialTheme = getTheme();
+  htmlEl.setAttribute('data-theme', initialTheme);
+  applyToggleState(initialTheme);
+
+  themeToggleBtn.addEventListener('click', () => {
+    const nextTheme = getTheme() === 'dark' ? 'light' : 'dark';
+    htmlEl.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('theme', nextTheme);
+    applyToggleState(nextTheme);
+  });
+}
+
 // ---- Dismissible hint banner ----
 function showHintBanner(): void {
   const banner = document.getElementById('hint-banner');
@@ -379,6 +409,8 @@ function showHintBanner(): void {
     if (b) b.classList.remove('visible');
   });
 }
+
+setupThemeToggle();
 
 init().catch(err => {
   recordInitStep(`init:failed:${String(err)}`);
