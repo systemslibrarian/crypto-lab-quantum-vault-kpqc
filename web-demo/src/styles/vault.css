@@ -38,58 +38,6 @@ body {
   padding: 0 16px 48px;
 }
 
-/* ---------- Header ---------- */
-.site-header {
-  position: relative;
-  padding: 32px 0 20px;
-  text-align: center;
-}
-
-.theme-toggle {
-  position: absolute;
-  top: 8px;
-  right: 0;
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 50%;
-  border: 1px solid currentColor;
-  background: transparent;
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: transform 120ms ease, filter 120ms ease;
-}
-
-.theme-toggle:hover {
-  filter: contrast(1.1) brightness(1.08);
-}
-
-.theme-toggle:active {
-  transform: scale(0.96);
-}
-
-.theme-toggle:focus-visible {
-  outline: 3px solid currentColor;
-  outline-offset: 2px;
-}
-
-.site-title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #1a1715;
-}
-
-.site-subtitle {
-  font-size: 0.9rem;
-  color: #5c5650;
-  margin-top: 4px;
-}
-
 /* ---------- Hint Banner ---------- */
 .hint-banner {
   display: none;
@@ -736,72 +684,6 @@ body {
 }
 
 /* ==========================================================
-   KR Redesign — Language Toggle
-   ========================================================== */
-.lang-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.lang-btn {
-  background: none;
-  border: 1px solid #c8c4bc;
-  border-radius: 4px;
-  padding: 3px 9px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: #3a3530;
-  transition: background 120ms, color 120ms, border-color 120ms;
-  min-height: 36px;
-  touch-action: manipulation;
-}
-
-.lang-btn.active {
-  background: #003478;
-  color: #fff;
-  border-color: #003478;
-}
-
-.lang-btn:not(.active):hover {
-  background: #e8eef8;
-  border-color: #003478;
-  color: #003478;
-}
-
-.lang-sep {
-  color: #bbb;
-  font-size: 0.78rem;
-  user-select: none;
-}
-
-/* ==========================================================
-   KR Redesign — Header extras
-   ========================================================== */
-.site-title-kpqc {
-  color: #003478;
-  letter-spacing: 0.08em;
-}
-
-.site-algorithms {
-  font-size: 0.88rem;
-  color: #3a3530;
-  margin-top: 6px;
-  font-weight: 500;
-}
-
-.site-greeting {
-  font-size: 0.82rem;
-  color: #6a6460;
-  margin-top: 6px;
-  font-style: italic;
-  letter-spacing: 0.01em;
-}
-
-/* ==========================================================
    KR Redesign — Hint banner password table
    ========================================================== */
 .hint-content {
@@ -1058,10 +940,6 @@ main.page-wrapper {
   outline: 3px solid #C60C30;
   outline-offset: 2px;
 }
-.lang-btn:focus-visible {
-  outline: 3px solid #003478;
-  outline-offset: 2px;
-}
 
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
@@ -1135,9 +1013,6 @@ main.page-wrapper {
     width: 100%;
     text-align: center;
   }
-  .site-title {
-    font-size: 1.35rem;
-  }
   .hint-banner {
     flex-direction: column;
     align-items: flex-start;
@@ -1152,9 +1027,6 @@ main.page-wrapper {
 
 /* ---- Very small screens ≤ 360px ---- */
 @media (max-width: 360px) {
-  .site-title {
-    font-size: 1.15rem;
-  }
   .vault-section {
     padding: 8px;
   }
@@ -1215,3 +1087,75 @@ main.page-wrapper {
 .instruction-list li:last-child {
   margin-bottom: 0;
 }
+
+/* ── Standardized Crypto Lab header ───────────────────── */
+.cl-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  background: #0e1f1e;
+  position: relative;
+  overflow: hidden;
+}
+
+.cl-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(77, 207, 176, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(77, 207, 176, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+.cl-badge {
+  position: relative;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  background: #162b2a;
+  border: 1px solid #2a4a44;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4dcfb0;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.cl-header-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cl-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e8f5f2;
+  letter-spacing: 1.5px;
+  line-height: 1.2;
+}
+
+.cl-sub {
+  font-size: 11px;
+  color: #4dcfb0;
+  letter-spacing: 1px;
+  font-family: monospace;
+  opacity: 0.8;
+  text-decoration: none;
+}
+
+.cl-sub:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+/* ────────────────────────────────────────────────────── */
