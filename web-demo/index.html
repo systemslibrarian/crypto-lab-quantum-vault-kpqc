@@ -193,6 +193,126 @@
         </p>
       </section>
 
+      <!-- Decision Engine: Fast Crypto Rules -->
+      <section class="kpqc-panel decision-engine" aria-labelledby="decision-title">
+        <h2 class="kpqc-panel-title" id="decision-title">
+          <span data-en="⚡ Quick Decision Rules" data-ko="⚡ 빠른 결정 규칙">⚡ Quick Decision Rules</span>
+        </h2>
+        <div class="decision-grid">
+          <div class="decision-card">
+            <span class="decision-if"
+                  data-en="Encrypt data at rest →"
+                  data-ko="저장 데이터 암호화 →">Encrypt data at rest →</span>
+            <strong class="decision-use">AES-256-GCM</strong>
+            <span class="decision-not"
+                  data-en="Not AES-CBC, not ECB"
+                  data-ko="AES-CBC, ECB 사용 금지">Not AES-CBC, not ECB</span>
+          </div>
+          <div class="decision-card">
+            <span class="decision-if"
+                  data-en="Split a key among parties →"
+                  data-ko="키를 참여자들이 분할 →">Split a key among parties →</span>
+            <strong class="decision-use">Shamir SSS / GF(2⁸)</strong>
+            <span class="decision-not"
+                  data-en="Not XOR splitting"
+                  data-ko="XOR 분할 사용 금지">Not XOR splitting</span>
+          </div>
+          <div class="decision-card">
+            <span class="decision-if"
+                  data-en="Quantum-safe key exchange →"
+                  data-ko="양자 안전 키 교환 →">Quantum-safe key exchange →</span>
+            <strong class="decision-use">SMAUG-T KEM / ML-KEM</strong>
+            <span class="decision-not"
+                  data-en="Not raw RSA, not static DH"
+                  data-ko="RSA 직접 암호화, 정적 DH 금지">Not raw RSA, not static DH</span>
+          </div>
+          <div class="decision-card">
+            <span class="decision-if"
+                  data-en="Sign &amp; verify data →"
+                  data-ko="데이터 서명 및 검증 →">Sign &amp; verify data →</span>
+            <strong class="decision-use">HAETAE / ML-DSA</strong>
+            <span class="decision-not"
+                  data-en="Not RSA-PKCS1v1.5"
+                  data-ko="RSA-PKCS1v1.5 사용 금지">Not RSA-PKCS1v1.5</span>
+          </div>
+        </div>
+        <p class="decision-default"
+           data-en="When unsure → AES-256-GCM + Argon2id + ML-KEM. These are safe defaults."
+           data-ko="잘 모르겠으면 → AES-256-GCM + Argon2id + ML-KEM. 안전한 기본값입니다.">
+          When unsure → AES-256-GCM + Argon2id + ML-KEM. These are safe defaults.
+        </p>
+      </section>
+
+      <!-- What Breaks: Failure Scenarios -->
+      <section class="kpqc-panel failure-panel" aria-labelledby="failure-title">
+        <h2 class="kpqc-panel-title" id="failure-title">
+          <span data-en="💥 What Breaks If You Choose Wrong" data-ko="💥 잘못 선택하면 무엇이 깨지나요">💥 What Breaks If You Choose Wrong</span>
+        </h2>
+        <div class="failure-grid">
+          <div class="failure-card">
+            <h3 class="failure-name"
+                data-en="Nonce reuse (AES-GCM)"
+                data-ko="논스 재사용 (AES-GCM)">Nonce reuse (AES-GCM)</h3>
+            <p class="failure-result"
+               data-en="Attacker recovers XOR of plaintexts + the authentication key. Total break."
+               data-ko="공격자가 평문의 XOR과 인증 키를 복구합니다. 완전한 보안 붕괴.">
+              Attacker recovers XOR of plaintexts + the authentication key. Total break.
+            </p>
+          </div>
+          <div class="failure-card">
+            <h3 class="failure-name"
+                data-en="Too few Shamir shares"
+                data-ko="샤미르 공유 부족">Too few Shamir shares</h3>
+            <p class="failure-result"
+               data-en="Reconstruction produces random garbage. No partial leak — information-theoretically secure."
+               data-ko="복원 시 임의의 쓰레기가 나옵니다. 부분 정보 유출 없음 — 정보 이론적으로 안전.">
+              Reconstruction produces random garbage. No partial leak — information-theoretically secure.
+            </p>
+          </div>
+          <div class="failure-card">
+            <h3 class="failure-name"
+                data-en="Skip signature verification"
+                data-ko="서명 검증 생략">Skip signature verification</h3>
+            <p class="failure-result"
+               data-en="Attacker substitutes containers or shares. Chosen-ciphertext attacks become possible."
+               data-ko="공격자가 컨테이너 또는 공유를 대체합니다. 선택 암호문 공격이 가능해집니다.">
+              Attacker substitutes containers or shares. Chosen-ciphertext attacks become possible.
+            </p>
+          </div>
+          <div class="failure-card">
+            <h3 class="failure-name"
+                data-en="Classical-only key exchange"
+                data-ko="기존 방식만 사용한 키 교환">Classical-only key exchange</h3>
+            <p class="failure-result"
+               data-en="Harvest now, decrypt later. Quantum computer breaks RSA/ECDH retroactively."
+               data-ko="지금 수집, 나중에 복호화. 양자 컴퓨터가 RSA/ECDH를 소급 파괴합니다.">
+              Harvest now, decrypt later. Quantum computer breaks RSA/ECDH retroactively.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Disclaimers -->
+      <section class="kpqc-panel disclaimers" aria-labelledby="disclaimers-title">
+        <h2 class="kpqc-panel-title" id="disclaimers-title">
+          <span data-en="⚠️ Disclaimers" data-ko="⚠️ 면책 조항">⚠️ Disclaimers</span>
+        </h2>
+        <ul class="disclaimer-list">
+          <li data-en="Educational only — do not use for production data protection."
+              data-ko="교육 목적 전용 — 프로덕션 데이터 보호에 사용하지 마세요.">
+            Educational only — do not use for production data protection.
+          </li>
+          <li data-en="Not audited — C reference implementations have not undergone formal security audit."
+              data-ko="감사되지 않음 — C 참조 구현은 공식 보안 감사를 거치지 않았습니다.">
+            Not audited — C reference implementations have not undergone formal security audit.
+          </li>
+          <li data-en="Browser WASM timing is not constant-time. Side-channel resistance is not guaranteed."
+              data-ko="브라우저 WASM 타이밍은 상수 시간이 아닙니다. 부채널 저항은 보장되지 않습니다.">
+            Browser WASM timing is not constant-time. Side-channel resistance is not guaranteed.
+          </li>
+        </ul>
+      </section>
+
     </main>
 
     <footer style="text-align:center; padding: 1.5rem; font-size: 0.85rem; opacity: 0.7; margin-top: 2rem;">
