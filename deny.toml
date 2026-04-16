@@ -1,0 +1,24 @@
+# cargo-deny configuration
+# https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# RUSTSEC-2026-0097: rand unsoundness with custom logger + thread_rng().
+# This codebase uses only OsRng (never thread_rng / rand::rng), has no
+# custom logger, and does not enable the `log` feature — none of the
+# triggering conditions apply.  Allow until we upgrade to rand ≥ 0.9.3.
+ignore = ["RUSTSEC-2026-0097"]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+]
+
+[bans]
+
+[sources]
