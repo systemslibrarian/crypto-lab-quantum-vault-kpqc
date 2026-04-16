@@ -32,6 +32,14 @@
             systemslibrarian.dev
           </a>
         </div>
+        <div class="cl-header-controls">
+          <div class="lang-toggle" id="lang-toggle" role="group" aria-label="Language selection">
+            <button class="cl-header-btn lang-btn active" data-lang="en" aria-current="true" aria-pressed="true">EN</button>
+            <button class="cl-header-btn lang-btn" data-lang="ko" aria-current="false" aria-pressed="false">한국어</button>
+          </div>
+          <a class="cl-header-btn" href="https://github.com/systemslibrarian/crypto-lab-quantum-vault-kpqc" target="_blank" rel="noopener">GITHUB</a>
+          <button class="cl-header-btn cl-header-btn--icon theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode">🌙</button>
+        </div>
       </header>
 
 
@@ -138,10 +146,9 @@
                 data-ko="볼트 내보내기">
           Export vault
         </button>
-        <label class="btn-vault-action btn-import-label" id="btn-import-vault-label"
-               data-en="Import vault"
-               data-ko="볼트 가져오기">
-          Import vault
+        <label class="btn-vault-action btn-import-label" id="btn-import-vault-label">
+          <span data-en="Import vault"
+                data-ko="볼트 가져오기">Import vault</span>
           <input type="file" id="input-import-vault" accept=".quantum-vault" hidden />
         </label>
         <button class="btn-vault-action btn-danger" id="btn-clear-vault"

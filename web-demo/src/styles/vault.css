@@ -1158,6 +1158,62 @@ main.page-wrapper {
   opacity: 1;
   text-decoration: underline;
 }
+
+.cl-header-controls {
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cl-header-btn {
+  background: #162b2a;
+  border: 1px solid #2a4a44;
+  border-radius: 6px;
+  color: #4dcfb0;
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 7px 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cl-header-btn:hover {
+  border-color: #4dcfb0;
+  color: #e8f5f2;
+}
+
+.cl-header-btn--icon {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lang-btn {
+  opacity: 0.6;
+}
+
+.lang-btn.active {
+  opacity: 1;
+  border-color: #4dcfb0;
+}
 /* ────────────────────────────────────────────────────── */
 
 /* ── Decision Engine & Failure Panels ──────────────── */
