@@ -16,12 +16,13 @@ html {
   color: #2a2520;
 }
 
+/* Dark theme = a hand-built dark Korean palette (see the override block at the
+   end of this file), NOT a global invert() — inverting turned the warm hanji
+   beige into cold blue-grey and flipped the Taegukgi navy to orange. Here we
+   only set the page-level surface + ink; components are re-coloured below. */
 html[data-theme='dark'] {
-  filter: invert(1) hue-rotate(180deg);
-}
-
-html[data-theme='light'] {
-  filter: none;
+  background: #15130e; /* warm ink (먹) near-black, the dark counterpart to hanji */
+  color: #ece7da;      /* hanji-tinted off-white */
 }
 
 body {
@@ -1094,7 +1095,9 @@ main.page-wrapper {
   align-items: center;
   gap: 14px;
   padding: 12px 20px;
-  background: #0e1f1e;
+  /* Taegukgi (태극기) navy — the blue of the Korean flag, already used as the
+     app's primary accent — so the header reads as part of the Korean palette. */
+  background: #003478;
   position: relative;
   overflow: hidden;
 }
@@ -1104,8 +1107,8 @@ main.page-wrapper {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(77, 207, 176, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(77, 207, 176, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
   background-size: 24px 24px;
   pointer-events: none;
 }
@@ -1113,18 +1116,18 @@ main.page-wrapper {
 .cl-badge {
   position: relative;
   z-index: 1;
-  width: 36px;
-  height: 36px;
-  background: #162b2a;
-  border: 1px solid #2a4a44;
-  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 1.5px solid #f0ede6;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: monospace;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: #4dcfb0;
+  color: #f0ede6;
   letter-spacing: 0.5px;
   flex-shrink: 0;
 }
@@ -1147,7 +1150,7 @@ main.page-wrapper {
 
 .cl-sub {
   font-size: 11px;
-  color: #4dcfb0;
+  color: #b9cdec;
   letter-spacing: 1px;
   font-family: monospace;
   opacity: 0.8;
@@ -1169,10 +1172,10 @@ main.page-wrapper {
 }
 
 .cl-header-btn {
-  background: #162b2a;
-  border: 1px solid #2a4a44;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(240, 237, 230, 0.4);
   border-radius: 6px;
-  color: #4dcfb0;
+  color: #f0ede6;
   font-family: monospace;
   font-size: 12px;
   font-weight: 700;
@@ -1188,8 +1191,9 @@ main.page-wrapper {
 }
 
 .cl-header-btn:hover {
-  border-color: #4dcfb0;
-  color: #e8f5f2;
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
 }
 
 .cl-header-btn--icon {
@@ -1211,8 +1215,12 @@ main.page-wrapper {
 }
 
 .lang-btn.active {
+  /* Flag red (적색) — pairing the Taegukgi's red against the navy header
+     mirrors the blue+red of the taegeuk (태극) at the centre of the flag. */
   opacity: 1;
-  border-color: #4dcfb0;
+  background: #cd2e3a;
+  border-color: #cd2e3a;
+  color: #ffffff;
 }
 /* ────────────────────────────────────────────────────── */
 
@@ -1308,3 +1316,147 @@ main.page-wrapper {
   left: 0;
 }
 /* ────────────────────────────────────────────────────── */
+
+/* =========================================================
+   Dark theme — hand-built Korean palette
+   ---------------------------------------------------------
+   Replaces the old global invert() so the cultural intent
+   survives in dark mode. Roles:
+     surfaces   warm ink/meok    #1b1813 → #2a261d
+     borders                     #38332a / #4a4438
+     ink        hanji-white      #ece7da, muted #c4bcab/#b3ab9b, faint #9a9080
+     navy       Taegukgi blue,   lightened to #7faaee (text) / #1f5fc0 (fills)
+     red        flag red,        lightened to #ef6b62 (text) / #d8453f (fills)
+     gold       obangsaek 황,    #dca846
+     green      success,         #5cbf8f / #1d9e75
+   ========================================================= */
+
+/* Hint banner */
+html[data-theme='dark'] .hint-banner { background: #1c2230; border-color: #33425f; color: #bcd0ef; }
+html[data-theme='dark'] .btn-dismiss { color: #8fb0e0; }
+html[data-theme='dark'] .btn-dismiss:hover { background: #2a3550; }
+
+/* Vault wall + deposit boxes */
+html[data-theme='dark'] .vault-section { background: #2a2620; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.4); }
+html[data-theme='dark'] .deposit-box { background: #37322a; border-color: #544d40; }
+html[data-theme='dark'] .deposit-box:hover { border-color: #7a715d; }
+html[data-theme='dark'] .deposit-box:focus-visible { outline-color: #7faaee; }
+html[data-theme='dark'] .deposit-box.occupied { background: #2f2716; border-color: #9a7322; }
+html[data-theme='dark'] .deposit-box.occupied:hover { border-color: #c79a3c; }
+html[data-theme='dark'] .deposit-box.selected { border-color: #7faaee !important; box-shadow: 0 0 0 2px rgba(127,170,238,0.3); }
+html[data-theme='dark'] .box-number { color: #cfc7b6; text-shadow: none; }
+html[data-theme='dark'] .occupied .box-number { color: #e6b450; }
+html[data-theme='dark'] .box-status { color: #a39a8a; }
+html[data-theme='dark'] .occupied .box-status { color: #dca846; }
+html[data-theme='dark'] .deposit-box .keyhole,
+html[data-theme='dark'] .keyhole::before,
+html[data-theme='dark'] .keyhole::after { color: #9a9080; }
+html[data-theme='dark'] .deposit-box.occupied .keyhole,
+html[data-theme='dark'] .deposit-box.occupied .keyhole::before { color: #dca846; border-color: #dca846; }
+
+/* Slide-down panel */
+html[data-theme='dark'] .panel-inner { background: #211e17; border-color: #38332a; }
+html[data-theme='dark'] .panel-title { color: #ece7da; }
+html[data-theme='dark'] .btn-cancel-x { color: #9a9080; }
+html[data-theme='dark'] .btn-cancel-x:hover { background: #2e2a22; color: #ece7da; }
+
+/* Forms */
+html[data-theme='dark'] .form-group label { color: #b3ab9b; }
+html[data-theme='dark'] .form-group input,
+html[data-theme='dark'] .form-group textarea { background: #2a261d; border-color: #4a4438; color: #ece7da; }
+html[data-theme='dark'] .form-group input:focus,
+html[data-theme='dark'] .form-group textarea:focus { border-color: #7faaee; box-shadow: 0 0 0 3px rgba(127,170,238,0.22); }
+html[data-theme='dark'] .field-error { color: #ef6b62; }
+html[data-theme='dark'] .show-password-toggle { color: #b3ab9b; }
+html[data-theme='dark'] .show-password-toggle input[type="checkbox"] { accent-color: #7faaee; }
+html[data-theme='dark'] .panel-note { color: #b3ab9b; }
+
+/* Buttons */
+html[data-theme='dark'] .btn-primary { background: #1f5fc0; }
+html[data-theme='dark'] .btn-primary:hover { background: #2f72d8; }
+html[data-theme='dark'] .btn-primary:disabled { background: #33405c; color: #9aa6bd; }
+html[data-theme='dark'] .btn-outline { color: #7faaee; border-color: #4f74b8; }
+html[data-theme='dark'] .btn-outline:hover { background: #1e2840; }
+html[data-theme='dark'] .btn-outline.btn-delete { color: #ef6b62; border-color: #a8453d; }
+html[data-theme='dark'] .btn-outline.btn-delete:hover { background: #2e1a18; }
+
+/* Export / import */
+html[data-theme='dark'] .import-section { border-top-color: #38332a; }
+html[data-theme='dark'] .import-divider { color: #9a9080; }
+html[data-theme='dark'] .btn-import:hover { background: #1e2840; }
+html[data-theme='dark'] .import-status.success { color: #5cbf8f; }
+html[data-theme='dark'] .import-status.error { color: #ef6b62; }
+
+/* Pipeline */
+html[data-theme='dark'] .pipeline-step.pending { background: #2a261d; color: #8a8276; }
+html[data-theme='dark'] .pipeline-step.active { background: #1f5fc0; }
+html[data-theme='dark'] .pipeline-step.done { background: #1d9e75; }
+html[data-theme='dark'] .pipeline-step.failed { background: #d8453f; }
+html[data-theme='dark'] .pipeline-arrow { color: #6a6258; }
+
+/* Result boxes */
+html[data-theme='dark'] .result-success { background: #16291a; color: #a9e0a0; border-color: #3c6b2f; }
+html[data-theme='dark'] .result-failure { background: #2a1614; color: #f0a8a0; border-color: #7a3a34; }
+html[data-theme='dark'] .result-info { color: #9bd07a; }
+
+/* Info bar + algorithm badges */
+html[data-theme='dark'] .info-bar { background: #211e17; border-color: #38332a; }
+html[data-theme='dark'] .algo-badge { background: #2a261d; border-color: #4a4438; color: #cfc7b6; }
+html[data-theme='dark'] .algo-badge .algo-dot { background: #8a8276; }
+html[data-theme='dark'] .algo-badge.algo-kem .algo-dot { background: #4f8ae0; }
+html[data-theme='dark'] .algo-badge.algo-sig .algo-dot { background: #e85a62; }
+html[data-theme='dark'] .algo-badge.algo-sym .algo-dot { background: #5cbf8f; }
+
+/* Vault management buttons */
+html[data-theme='dark'] .btn-vault-action,
+html[data-theme='dark'] .btn-reset { color: #cfc7b6; border-color: #4a4438; }
+html[data-theme='dark'] .btn-vault-action:hover { color: #7faaee; border-color: #4f74b8; }
+html[data-theme='dark'] .btn-vault-action.btn-danger:hover,
+html[data-theme='dark'] .btn-reset:hover { color: #ef6b62; border-color: #a8453d; }
+
+/* Footer */
+html[data-theme='dark'] .site-footer { color: #8a8276; border-top-color: #38332a; }
+
+/* Hint password table */
+html[data-theme='dark'] .hint-box-num { color: #7faaee; }
+html[data-theme='dark'] .hint-passwords code { background: #1e2840; color: #9cc0f5; }
+
+/* KpqC info panels */
+html[data-theme='dark'] .kpqc-panel { background: #211e17; border-color: #38332a; }
+html[data-theme='dark'] .kpqc-panel-title { color: #ece7da; border-bottom-color: #4f8ae0; }
+html[data-theme='dark'] .kpqc-panel p { color: #c4bcab; }
+html[data-theme='dark'] .kpqc-panel-subhead { color: #ece7da; }
+html[data-theme='dark'] .kpqc-algo-list li { color: #c4bcab; border-left-color: #4a4438; }
+html[data-theme='dark'] .algo-kem-tag { color: #7faaee; }
+html[data-theme='dark'] .algo-sig-tag { color: #ef6b62; }
+html[data-theme='dark'] .kpqc-panel-attribution { color: #9a9080 !important; }
+
+/* Architecture pipeline diagram */
+html[data-theme='dark'] .pipeline-diagram { background: #1b1813; border-color: #38332a; }
+html[data-theme='dark'] .pd-step { background: #2a261d; border-color: #4a4438; color: #ece7da; }
+html[data-theme='dark'] .pd-step-kpqc { border-color: #4f8ae0; color: #7faaee; }
+html[data-theme='dark'] .pd-arrow { color: #6a6258; }
+
+/* Demo credentials table */
+html[data-theme='dark'] .demo-credentials { border-top-color: #38332a; }
+html[data-theme='dark'] .demo-cred-title { color: #ece7da; }
+html[data-theme='dark'] .cred-table th { color: #9a9080; border-bottom-color: #38332a; }
+html[data-theme='dark'] .cred-table td { border-bottom-color: #2a261d; }
+html[data-theme='dark'] .cred-box { color: #7faaee; }
+html[data-theme='dark'] .cred-table code { background: #1e2840; color: #9cc0f5; }
+
+/* Demo instructions + misc */
+html[data-theme='dark'] .demo-instructions { background: #211e17; border-color: #38332a; border-left-color: #4f8ae0; }
+html[data-theme='dark'] .instruction-list { color: #c4bcab; }
+html[data-theme='dark'] #wasm-loader { color: #9a9080; }
+
+/* Decision-engine & failure cards (cold light surfaces → warm dark) */
+html[data-theme='dark'] .decision-card { background: #211e17; border-color: #38332a; border-left-color: #4f8ae0; }
+html[data-theme='dark'] .decision-if { color: #b3ab9b; }
+html[data-theme='dark'] .decision-use { color: #7faaee; }
+html[data-theme='dark'] .decision-not { color: #ef6b62; }
+html[data-theme='dark'] .decision-default { background: #16291a; color: #a9e0a0; border-color: #3c6b2f; }
+html[data-theme='dark'] .failure-card { background: #241715; border-color: #5a302c; border-left-color: #d8453f; }
+html[data-theme='dark'] .failure-name { color: #f0a8a0; }
+html[data-theme='dark'] .failure-result { color: #d8b6b0; }
+html[data-theme='dark'] .disclaimer-list li { color: #d6b34d; }
