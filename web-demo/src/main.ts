@@ -40,7 +40,8 @@ function formatInitError(err: unknown): string {
 
 async function init(): Promise<void> {
   recordInitStep('init:start');
-  // Language toggle is wired up after renderWall is defined (so it can trigger re-render)
+  // Language toggle listeners are wired at module load; the crypto-dependent
+  // demo-box swap (onLangSwitch) is installed below once renderWall is in scope.
 
   // Load both KpqC WASM modules (SMAUG-T + HAETAE) before any vault operations
   const loaderEl = document.getElementById('wasm-loader');
@@ -310,8 +311,11 @@ async function init(): Promise<void> {
     renderWall();
   });
 
-  // Wire language toggle now that renderWall is in scope
-  setupLangToggle(async () => {
+  // The language toggle's listeners + UI text were already wired at module load,
+  // so early clicks switch the interface instantly. Here we install only the
+  // crypto-dependent half: regenerating the demo boxes in the chosen language
+  // (this needs the WASM runtime, which is now ready).
+  onLangSwitch = async () => {
     // Swap demo boxes: remove old-language demos, generate new-language demos
     state = removeDemoBoxes(state);
     saveVaultState(state);
@@ -327,7 +331,7 @@ async function init(): Promise<void> {
     state = await generateDemoBoxes(state, getLang());
     saveVaultState(state);
     renderWall();
-  });
+  };
 
   // Initial render
   recordInitStep('ui:render:start');
@@ -410,7 +414,14 @@ function showHintBanner(): void {
   });
 }
 
+// Wire both toggles at module load — NOT inside the async init() — so the very
+// first click responds instantly even while the KpqC WASM is still loading.
+// Theme + language UI text switch immediately; the crypto-dependent demo-box
+// swap is installed by init() once the runtime is ready (see onLangSwitch).
+let onLangSwitch: (() => void | Promise<void>) | null = null;
+
 setupThemeToggle();
+setupLangToggle(() => onLangSwitch?.());
 
 init().catch(err => {
   recordInitStep(`init:failed:${String(err)}`);
