@@ -74,6 +74,14 @@ $RECYCLE.BIN/
 *~
 
 # ------------------------------
+# Playwright e2e artifacts
+# ------------------------------
+web-demo/test-results/
+web-demo/playwright-report/
+web-demo/blob-report/
+web-demo/.playwright/
+
+# ------------------------------
 # Logs / temp files
 # ------------------------------
 *.log

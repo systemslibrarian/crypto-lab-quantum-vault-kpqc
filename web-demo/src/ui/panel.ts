@@ -1,6 +1,7 @@
 // Deposit and retrieval panel forms with inline validation
 
 import { t } from '../i18n';
+import { qs } from './dom';
 import { importQvault, QvaultImportError } from '../vault/file';
 import type { SealedBox } from '../crypto/pipeline';
 
@@ -92,17 +93,17 @@ export function showDepositPanel(
   openPanel(panel);
 
   // Password visibility toggle
-  const pwToggle = panel.querySelector<HTMLInputElement>('#show-pw-toggle')!;
+  const pwToggle = qs<HTMLInputElement>(panel, '#show-pw-toggle');
   pwToggle.addEventListener('change', () => {
     const type = pwToggle.checked ? 'text' : 'password';
     (['pw-alice', 'pw-bob', 'pw-carol']).forEach(id => {
-      panel.querySelector<HTMLInputElement>(`#${id}`)!.type = type;
+      qs<HTMLInputElement>(panel, `#${id}`).type = type;
     });
   });
 
   // Import file handling
-  const fileInput = panel.querySelector<HTMLInputElement>('#import-file')!;
-  const importStatus = panel.querySelector<HTMLElement>('#import-status')!;
+  const fileInput = qs<HTMLInputElement>(panel, '#import-file');
+  const importStatus = qs<HTMLElement>(panel, '#import-status');
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
@@ -154,14 +155,14 @@ export function showDepositPanel(
     first?.focus();
   }, 50);
 
-  panel.querySelector('.btn-cancel-x')!.addEventListener('click', onCancel);
-  panel.querySelector('#btn-cancel-deposit')!.addEventListener('click', onCancel);
+  qs(panel, '.btn-cancel-x').addEventListener('click', onCancel);
+  qs(panel, '#btn-cancel-deposit').addEventListener('click', onCancel);
 
-  panel.querySelector('#btn-seal')!.addEventListener('click', async () => {
-    const messageEl = panel.querySelector<HTMLTextAreaElement>('#deposit-message')!;
-    const aliceEl = panel.querySelector<HTMLInputElement>('#pw-alice')!;
-    const bobEl = panel.querySelector<HTMLInputElement>('#pw-bob')!;
-    const carolEl = panel.querySelector<HTMLInputElement>('#pw-carol')!;
+  qs(panel, '#btn-seal').addEventListener('click', async () => {
+    const messageEl = qs<HTMLTextAreaElement>(panel, '#deposit-message');
+    const aliceEl = qs<HTMLInputElement>(panel, '#pw-alice');
+    const bobEl = qs<HTMLInputElement>(panel, '#pw-bob');
+    const carolEl = qs<HTMLInputElement>(panel, '#pw-carol');
 
     const message = messageEl.value.trim();
     const alice = aliceEl.value.trim();
@@ -212,10 +213,10 @@ export function showDepositPanel(
 
     if (!valid) return;
 
-    const btn = panel.querySelector<HTMLButtonElement>('#btn-seal')!;
+    const btn = qs<HTMLButtonElement>(panel, '#btn-seal');
     btn.disabled = true;
     btn.textContent = t('sealing');
-    (panel.querySelector<HTMLButtonElement>('#btn-cancel-deposit')!).disabled = true;
+    qs<HTMLButtonElement>(panel, '#btn-cancel-deposit').disabled = true;
 
     await onSubmit({ message, passwords: [alice, bob, carol] });
   });
@@ -278,11 +279,11 @@ export function showRetrievePanel(
   openPanel(panel);
 
   // Retrieve password visibility toggle
-  const rpwToggle = panel.querySelector<HTMLInputElement>('#show-rpw-toggle')!;
+  const rpwToggle = qs<HTMLInputElement>(panel, '#show-rpw-toggle');
   rpwToggle.addEventListener('change', () => {
     const type = rpwToggle.checked ? 'text' : 'password';
     (['rpw-alice', 'rpw-bob', 'rpw-carol']).forEach(id => {
-      panel.querySelector<HTMLInputElement>(`#${id}`)!.type = type;
+      qs<HTMLInputElement>(panel, `#${id}`).type = type;
     });
   });
 
@@ -292,19 +293,19 @@ export function showRetrievePanel(
     first?.focus();
   }, 50);
 
-  panel.querySelector('.btn-cancel-x')!.addEventListener('click', onCancel);
-  panel.querySelector('#btn-cancel-retrieve')!.addEventListener('click', onCancel);
-  panel.querySelector('#btn-export')!.addEventListener('click', onExport);
+  qs(panel, '.btn-cancel-x').addEventListener('click', onCancel);
+  qs(panel, '#btn-cancel-retrieve').addEventListener('click', onCancel);
+  qs(panel, '#btn-export').addEventListener('click', onExport);
 
-  panel.querySelector('#btn-open')!.addEventListener('click', async () => {
-    const aliceVal = panel.querySelector<HTMLInputElement>('#rpw-alice')!.value.trim();
-    const bobVal = panel.querySelector<HTMLInputElement>('#rpw-bob')!.value.trim();
-    const carolVal = panel.querySelector<HTMLInputElement>('#rpw-carol')!.value.trim();
+  qs(panel, '#btn-open').addEventListener('click', async () => {
+    const aliceVal = qs<HTMLInputElement>(panel, '#rpw-alice').value.trim();
+    const bobVal = qs<HTMLInputElement>(panel, '#rpw-bob').value.trim();
+    const carolVal = qs<HTMLInputElement>(panel, '#rpw-carol').value.trim();
 
-    const btn = panel.querySelector<HTMLButtonElement>('#btn-open')!;
+    const btn = qs<HTMLButtonElement>(panel, '#btn-open');
     btn.disabled = true;
     btn.textContent = t('opening');
-    const cancelBtn = panel.querySelector<HTMLButtonElement>('#btn-cancel-retrieve')!;
+    const cancelBtn = qs<HTMLButtonElement>(panel, '#btn-cancel-retrieve');
     cancelBtn.disabled = true;
 
     await onSubmit({

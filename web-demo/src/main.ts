@@ -19,6 +19,7 @@ import {
 } from './ui/panel';
 import { animateSealPipeline, animateOpenPipeline } from './ui/pipeline-ui';
 import { revealMessage, showGibberish } from './ui/reveal';
+import { qs, byId } from './ui/dom';
 import { sleep } from './crypto/utils';
 import { setLang, getLang, t } from './i18n';
 
@@ -84,8 +85,8 @@ async function init(): Promise<void> {
 
   let selectedBox: string | null = null;
 
-  const wallEl = document.getElementById('vault-wall')!;
-  const panelEl = document.getElementById('panel')!;
+  const wallEl = byId('vault-wall');
+  const panelEl = byId('panel');
 
   // ---- Render vault wall ----
   function renderWall(): void {
@@ -135,7 +136,7 @@ async function init(): Promise<void> {
     message: string,
     passwords: [string, string, string],
   ): Promise<void> {
-    const pipelineArea = panelEl.querySelector<HTMLElement>('#pipeline-area')!;
+    const pipelineArea = qs<HTMLElement>(panelEl, '#pipeline-area');
 
     // Run crypto and animation concurrently — animation is purely cosmetic (2 s)
     // and crypto typically completes in ~4–6 s (3 × PBKDF2 600k iterations).
@@ -165,8 +166,8 @@ async function init(): Promise<void> {
     boxNumber: string,
     passwords: [string | null, string | null, string | null],
   ): Promise<void> {
-    const pipelineArea = panelEl.querySelector<HTMLElement>('#pipeline-area')!;
-    const resultEl = panelEl.querySelector<HTMLElement>('#retrieve-result')!;
+    const pipelineArea = qs<HTMLElement>(panelEl, '#pipeline-area');
+    const resultEl = qs<HTMLElement>(panelEl, '#retrieve-result');
 
     const sealedBox = deserializeSealedBox(state.boxes[boxNumber]);
 

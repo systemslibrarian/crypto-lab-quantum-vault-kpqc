@@ -2,6 +2,7 @@
   "name": "quantum-vault-web-demo",
   "version": "5.1.0",
   "private": true,
+  "type": "module",
   "description": "Quantum Vault — threshold cryptography demo: AES-256-GCM + Shamir SSS + SMAUG-T Level 1 KEM + HAETAE Mode 2 signature (real KpqC WASM)",
   "scripts": {
     "dev": "vite",
@@ -10,6 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium",
     "lint": "eslint src/"
   },
   "devDependencies": {

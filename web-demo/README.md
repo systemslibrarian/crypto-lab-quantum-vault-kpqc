@@ -36,14 +36,27 @@ The passwords are also shown in the **"How This Demo Works"** panel on the demo 
 ## Running Tests
 
 ```bash
-npm run test          # run all tests once (Vitest)
+npm run test          # run all unit tests once (Vitest)
 npm run test:watch    # watch mode
+
+npm run test:e2e:install   # one-time: download the Playwright Chromium build
+npm run test:e2e           # run the browser end-to-end suite (Playwright)
 ```
 
-Test coverage:
+Unit coverage (Vitest):
 - `src/crypto/__tests__/utils.test.ts` — base64 codec, byte helpers, text encode/decode
 - `src/crypto/__tests__/shamir.test.ts` — GF(2⁸) Shamir split/reconstruct, threshold behaviour
 - `src/crypto/__tests__/pipeline.test.ts` — full seal/open pipeline with mocked WASM modules
+- `src/vault/__tests__/file.test.ts` — `.qvault` serialise / validate / tamper-reject
+
+End-to-end coverage (Playwright, `e2e/vault.spec.ts`) drives a real browser against
+the dev server and exercises the genuine KpqC WASM pipeline — no mocks:
+- demo boxes seal on load and render (9 boxes, 3 pre-sealed)
+- two correct passwords reconstruct and reveal the secret (any 2-of-3 pair)
+- one correct / two wrong passwords stay below threshold → **ACCESS DENIED**, secret never shown
+- seal a fresh secret into an empty box, then reopen it (full round-trip)
+
+Both suites run in CI (`.github/workflows/ci.yml`).
 
 ---
 
