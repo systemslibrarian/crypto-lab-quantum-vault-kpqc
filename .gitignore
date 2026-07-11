@@ -80,6 +80,7 @@ web-demo/test-results/
 web-demo/playwright-report/
 web-demo/blob-report/
 web-demo/.playwright/
+web-demo/.pw-browsers/
 
 # ------------------------------
 # Logs / temp files
