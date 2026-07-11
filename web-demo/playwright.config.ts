@@ -19,7 +19,7 @@ export default defineConfig({
   retries: CI ? 2 : 0,
   reporter: CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: 'http://localhost:5174',
+    baseURL: 'http://localhost:4213/crypto-lab-quantum-vault-kpqc/',
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
@@ -29,8 +29,8 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'npm run dev -- --port 5174',
-    port: 5174,
+    command: 'npm run dev -- --port 4213 --strictPort',
+    port: 4213,
     reuseExistingServer: !CI,
     timeout: 60_000,
   },

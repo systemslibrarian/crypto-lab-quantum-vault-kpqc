@@ -122,7 +122,7 @@
       <!-- Vault wall: 9 safety deposit boxes (3×3) -->
       <section class="vault-section" aria-labelledby="vault-wall-label">
         <h2 id="vault-wall-label" class="sr-only">Vault — Safety Deposit Boxes</h2>
-        <div class="vault-wall" id="vault-wall" role="list" aria-label="Safety deposit boxes"></div>
+        <div class="vault-wall" id="vault-wall" role="group" aria-label="Safety deposit boxes"></div>
       </section>
 
       <!-- Panel: slides open below the vault wall on box click -->
@@ -130,16 +130,16 @@
 
       <!-- Algorithm legend -->
       <div class="info-bar" role="list" aria-label="Cryptographic algorithms used">
-        <span class="algo-badge algo-sym">
+        <span class="algo-badge algo-sym" role="listitem">
           <span class="algo-dot"></span>AES-256-GCM
         </span>
-        <span class="algo-badge algo-sym">
+        <span class="algo-badge algo-sym" role="listitem">
           <span class="algo-dot"></span>Shamir SSS / GF(2⁸)
         </span>
-        <span class="algo-badge algo-kem">
+        <span class="algo-badge algo-kem" role="listitem">
           <span class="algo-dot"></span>SMAUG-T (스마우그-T) — <span data-en="KEM" data-ko="키 캡슐화">KEM</span>
         </span>
-        <span class="algo-badge algo-sig">
+        <span class="algo-badge algo-sig" role="listitem">
           <span class="algo-dot"></span>HAETAE (해태) — <span data-en="signature" data-ko="서명">signature</span>
         </span>
       </div>
@@ -327,7 +327,7 @@
 
     </main>
 
-    <footer style="text-align:center; padding: 1.5rem; font-size: 0.85rem; opacity: 0.7; margin-top: 2rem;">
+    <footer class="related-footer" style="text-align:center; padding: 1.5rem; font-size: 0.85rem; margin-top: 2rem;">
       <p style="margin:0 0 0.5rem;">Related demos:
         <a href="https://systemslibrarian.github.io/crypto-lab-shamir-gate/">crypto-lab-shamir-gate</a>,
         <a href="https://systemslibrarian.github.io/crypto-lab-silent-tally/">crypto-lab-silent-tally</a>,

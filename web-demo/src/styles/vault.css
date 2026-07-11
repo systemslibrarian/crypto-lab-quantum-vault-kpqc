@@ -684,6 +684,20 @@ body {
   width: 100%;
 }
 
+/* Related-demos footer. Muted tone comes from the colour's own lightness, not
+   `opacity` (opacity would drag the links below the AA contrast threshold). */
+.related-footer {
+  color: #5c5650;
+}
+
+.related-footer a {
+  color: #0860c4;
+}
+
+.related-footer a:hover {
+  text-decoration: underline;
+}
+
 /* ==========================================================
    KR Redesign — Hint banner password table
    ========================================================== */
@@ -1416,6 +1430,8 @@ html[data-theme='dark'] .btn-reset:hover { color: #ef6b62; border-color: #a8453d
 
 /* Footer */
 html[data-theme='dark'] .site-footer { color: #8a8276; border-top-color: #38332a; }
+html[data-theme='dark'] .related-footer { color: #b3ab9b; }
+html[data-theme='dark'] .related-footer a { color: #7faaee; }
 
 /* Hint password table */
 html[data-theme='dark'] .hint-box-num { color: #7faaee; }
