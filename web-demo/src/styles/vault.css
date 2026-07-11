@@ -890,26 +890,8 @@ body {
    Accessibility & Mobile Hardening
    ========================================================== */
 
-/* Skip-navigation link — appears only on keyboard focus */
-.skip-link {
-  position: absolute;
-  top: -100%;
-  left: 6px;
-  z-index: 9999;
-  background: #003478;
-  color: #fff;
-  padding: 10px 18px;
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-decoration: none;
-  border-radius: 0 0 6px 6px;
-  white-space: nowrap;
-}
-.skip-link:focus {
-  top: 0;
-  outline: 3px solid #fff;
-  outline-offset: 3px;
-}
+/* Skip-navigation link now ships with the shared .cl-topbar header
+   (.cl-skip-link, inline in index.html). */
 
 /* Screen-reader-only utility */
 .sr-only {
@@ -1103,139 +1085,11 @@ main.page-wrapper {
   margin-bottom: 0;
 }
 
-/* ── Standardized Crypto Lab header ───────────────────── */
-.cl-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 20px;
-  /* Taegukgi (태극기) navy — the blue of the Korean flag, already used as the
-     app's primary accent — so the header reads as part of the Korean palette. */
-  background: #003478;
-  position: relative;
-  overflow: hidden;
-}
-
-.cl-header::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-  background-size: 24px 24px;
-  pointer-events: none;
-}
-
-.cl-badge {
-  position: relative;
-  z-index: 1;
-  width: 40px;
-  height: 40px;
-  background: transparent;
-  border: 1.5px solid #f0ede6;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: monospace;
-  font-size: 14px;
-  font-weight: 700;
-  color: #f0ede6;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-}
-
-.cl-header-text {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cl-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #e8f5f2;
-  letter-spacing: 1.5px;
-  line-height: 1.2;
-}
-
-.cl-sub {
-  font-size: 11px;
-  color: #b9cdec;
-  letter-spacing: 1px;
-  font-family: monospace;
-  opacity: 0.8;
-  text-decoration: none;
-}
-
-.cl-sub:hover {
-  opacity: 1;
-  text-decoration: underline;
-}
-
-.cl-header-controls {
-  position: relative;
-  z-index: 1;
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cl-header-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(240, 237, 230, 0.4);
-  border-radius: 6px;
-  color: #f0ede6;
-  font-family: monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  padding: 7px 14px;
-  cursor: pointer;
-  text-decoration: none;
-  transition: border-color 0.15s, color 0.15s;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cl-header-btn:hover {
-  border-color: #ffffff;
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
-}
-
-.cl-header-btn--icon {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  font-size: 16px;
-  font-family: inherit;
-}
-
-.lang-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.lang-btn {
-  opacity: 0.6;
-}
-
-.lang-btn.active {
-  /* Flag red (적색) — pairing the Taegukgi's red against the navy header
-     mirrors the blue+red of the taegeuk (태극) at the centre of the flag. */
-  opacity: 1;
-  background: #cd2e3a;
-  border-color: #cd2e3a;
-  color: #ffffff;
-}
+/* ── Standardized Crypto Lab header ───────────────────────
+   The shared .cl-topbar header (markup + self-contained styles + the bilingual
+   toggle skin) now lives inline in index.html so it is identical across labs and
+   always renders on the always-dark bar. The former in-page .cl-header styles
+   were removed to avoid bleeding onto the shared bar. */
 /* ────────────────────────────────────────────────────── */
 
 /* ── Decision Engine & Failure Panels ──────────────── */

@@ -376,7 +376,9 @@ function setupLangToggle(onLangChange?: () => void | Promise<void>): void {
 
 function setupThemeToggle(): void {
   const htmlEl = document.documentElement;
-  const themeToggleBtn = document.getElementById('theme-toggle') as HTMLButtonElement | null;
+  // The shared crypto-lab topbar owns the theme control (#cl-theme-toggle),
+  // which flips html[data-theme]; we wire persistence + glyph here.
+  const themeToggleBtn = document.getElementById('cl-theme-toggle') as HTMLButtonElement | null;
   if (!themeToggleBtn) return;
 
   const getTheme = (): 'dark' | 'light' => {
@@ -385,7 +387,8 @@ function setupThemeToggle(): void {
 
   const applyToggleState = (theme: 'dark' | 'light'): void => {
     const isDark = theme === 'dark';
-    themeToggleBtn.textContent = isDark ? '🌙' : '☀️';
+    // On the always-dark bar: sun means "switch to light", moon means "to dark".
+    themeToggleBtn.textContent = isDark ? '☀' : '☾';
     themeToggleBtn.setAttribute(
       'aria-label',
       isDark ? 'Switch to light mode' : 'Switch to dark mode',

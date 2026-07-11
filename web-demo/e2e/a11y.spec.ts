@@ -48,7 +48,7 @@ test('no WCAG A/AA violations in light theme (default)', async ({ page }) => {
 
 test('no WCAG A/AA violations in dark theme', async ({ page }) => {
   await gotoLoadedVault(page);
-  await page.locator('#theme-toggle').click();
+  await page.locator('#cl-theme-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await openAllDetails(page);
   await scan(page);
