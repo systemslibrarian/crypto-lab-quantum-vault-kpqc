@@ -29,7 +29,7 @@ Three boxes are pre-sealed on first visit. Any two of the three passwords unlock
 | 06 | `fortress` | `bastion` | `citadel` |
 | 09 | `monday` | `tuesday` | `wednesday` |
 
-The passwords are also shown in the **"How This Demo Works"** panel on the demo page itself.
+The passwords are also shown in the hint banner and the **"How this box works"** walkthrough panel on the demo page itself.
 
 ---
 

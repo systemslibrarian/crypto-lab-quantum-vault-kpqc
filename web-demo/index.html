@@ -205,8 +205,134 @@
         <div class="vault-wall" id="vault-wall" role="group" aria-label="Safety deposit boxes"></div>
       </section>
 
+      <!-- One-line call-to-action: lead with the simplest successful interaction -->
+      <p class="try-cta" id="try-cta"
+         data-en="👉 Try it: click box 03 and enter any 2 of ruby / emerald / diamond to open it."
+         data-ko="👉 해보세요: 03번 상자를 클릭하고 ruby / emerald / diamond 중 아무 2개를 입력해 여세요.">
+        👉 Try it: click box 03 and enter any 2 of ruby / emerald / diamond to open it.
+      </p>
+
       <!-- Panel: slides open below the vault wall on box click -->
       <div class="panel-area" id="panel" role="region" aria-label="Box panel"></div>
+
+      <!-- HOW THIS BOX WORKS — persistent, plain-language envelope walkthrough.
+           Each numbered sentence corresponds to one pipeline step; when you seal
+           or open a box, the matching pipeline pill lights up with the same
+           narration, so these four labels stop being opaque buzzwords. -->
+      <section class="kpqc-panel how-it-works" aria-labelledby="how-title">
+        <h2 class="kpqc-panel-title" id="how-title">
+          <span data-en="How this box works" data-ko="이 상자의 작동 방식">How this box works</span>
+        </h2>
+        <p class="how-intro"
+           data-en="Four cryptographic primitives compose into one seal. This is the envelope story, in order:"
+           data-ko="네 가지 암호 기본 요소가 하나의 봉인으로 조합됩니다. 순서대로 보는 봉투 이야기입니다:">
+          Four cryptographic primitives compose into one seal. This is the envelope story, in order:
+        </p>
+        <ol class="pipeline-diagram" role="list">
+          <li class="pd-step pd-step-1">
+            <span class="pd-num">1</span>
+            <span class="pd-text"
+                  data-en="Your secret is locked with one random AES-256 key."
+                  data-ko="비밀이 하나의 무작위 AES-256 키로 잠깁니다.">
+              Your secret is locked with one random AES-256 key.
+            </span>
+          </li>
+          <li class="pd-arrow" aria-hidden="true">↓</li>
+          <li class="pd-step pd-step-2">
+            <span class="pd-num">2</span>
+            <span class="pd-text"
+                  data-en="That key is split into 3 pieces — any 2 rebuild it exactly, 1 alone reveals nothing."
+                  data-ko="그 키가 3조각으로 나뉩니다 — 아무 2개면 정확히 복원되고, 1개만으론 아무것도 드러나지 않습니다.">
+              That key is split into 3 pieces — any 2 rebuild it exactly, 1 alone reveals nothing.
+            </span>
+          </li>
+          <li class="pd-arrow" aria-hidden="true">↓</li>
+          <li class="pd-step pd-step-3 pd-step-kpqc">
+            <span class="pd-num">3</span>
+            <span class="pd-text"
+                  data-en="Each piece is sealed to one keyholder with a quantum-safe lock (SMAUG-T)."
+                  data-ko="각 조각이 양자내성 잠금(SMAUG-T)으로 한 명의 키홀더에게 봉인됩니다.">
+              Each piece is sealed to one keyholder with a quantum-safe lock (SMAUG-T).
+            </span>
+          </li>
+          <li class="pd-arrow" aria-hidden="true">↓</li>
+          <li class="pd-step pd-step-4 pd-step-kpqc">
+            <span class="pd-num">4</span>
+            <span class="pd-text"
+                  data-en="The whole box is signed (HAETAE) so any tampering is detected before it opens."
+                  data-ko="상자 전체가 서명(HAETAE)되어 열기 전에 변조가 감지됩니다.">
+              The whole box is signed (HAETAE) so any tampering is detected before it opens.
+            </span>
+          </li>
+        </ol>
+
+        <!-- Inline click-to-expand glossary: newcomer definition + one-line analogy -->
+        <div class="glossary">
+          <p class="glossary-lead"
+             data-en="New to these terms? Expand any for a plain-language definition:"
+             data-ko="용어가 낯설다면? 아무거나 펼쳐 쉬운 설명을 보세요:">
+            New to these terms? Expand any for a plain-language definition:
+          </p>
+          <details class="gloss-item">
+            <summary><span data-en="What is a KEM?" data-ko="KEM이란?">What is a KEM?</span></summary>
+            <p data-en="KEM = Key Encapsulation Mechanism: a way for two parties to agree on a shared secret key using public-key crypto. Analogy: a self-locking mailbox — anyone can drop in a secret using your public slot, but only your private key opens it. SMAUG-T is a KEM a quantum computer can't crack later."
+               data-ko="KEM(키 캡슐화 메커니즘)은 공개키 암호로 공유 비밀 키에 합의하는 방법입니다. 비유: 자물쇠가 달린 우편함 — 누구나 공개 투입구로 비밀을 넣을 수 있지만 개인 키로만 엽니다. SMAUG-T는 나중에 양자 컴퓨터도 못 깨는 KEM입니다.">
+              KEM = Key Encapsulation Mechanism: a way for two parties to agree on a shared secret key using public-key crypto. Analogy: a self-locking mailbox — anyone can drop in a secret using your public slot, but only your private key opens it. SMAUG-T is a KEM a quantum computer can't crack later.
+            </p>
+          </details>
+          <details class="gloss-item">
+            <summary><span data-en="Shamir sharing &amp; GF(2⁸)?" data-ko="샤미르 공유와 GF(2⁸)?">Shamir sharing &amp; GF(2⁸)?</span></summary>
+            <p data-en="Shamir Secret Sharing splits a secret into n pieces so any t of them rebuild it and fewer reveal nothing. It works by fitting a random polynomial through the secret over GF(2⁸) — the finite field of one byte (values 0–255 with wrap-around arithmetic). Analogy: 2 points fix a straight line, so any 2 shares fix the same line and recover the secret; 1 point leaves infinitely many lines."
+               data-ko="샤미르 비밀 공유는 비밀을 n조각으로 나눠 t개면 복원되고 그보다 적으면 아무것도 드러나지 않게 합니다. GF(2⁸)(한 바이트의 유한체, 0–255) 위에서 무작위 다항식을 비밀에 맞춰 동작합니다. 비유: 두 점이 하나의 직선을 정하듯, 2개 조각이 같은 직선을 정해 비밀을 되찾습니다.">
+              Shamir Secret Sharing splits a secret into n pieces so any t of them rebuild it and fewer reveal nothing. It works by fitting a random polynomial through the secret over GF(2⁸) — the finite field of one byte (values 0–255 with wrap-around arithmetic). Analogy: 2 points fix a straight line, so any 2 shares fix the same line and recover the secret; 1 point leaves infinitely many lines.
+            </p>
+          </details>
+          <details class="gloss-item">
+            <summary><span data-en="What does “lattice-based” mean?" data-ko="“격자 기반”이란?">What does “lattice-based” mean?</span></summary>
+            <p data-en="Lattice-based crypto builds its security on the hardness of finding short vectors in a high-dimensional grid of points (a lattice) — a problem no known quantum algorithm solves efficiently. Analogy: finding the nearest lamppost in a vast, tilted 3-D city grid is easy in 2-D but brutal in hundreds of dimensions. That hardness is what makes SMAUG-T and HAETAE post-quantum."
+               data-ko="격자 기반 암호는 고차원 점 격자에서 짧은 벡터를 찾는 어려움에 안전성을 둡니다 — 알려진 양자 알고리즘으로도 효율적으로 풀 수 없습니다. 이 어려움이 SMAUG-T와 HAETAE를 양자내성으로 만듭니다.">
+              Lattice-based crypto builds its security on the hardness of finding short vectors in a high-dimensional grid of points (a lattice) — a problem no known quantum algorithm solves efficiently. Analogy: finding the nearest lamppost in a vast, tilted 3-D city grid is easy in 2-D but brutal in hundreds of dimensions. That hardness is what makes SMAUG-T and HAETAE post-quantum.
+            </p>
+          </details>
+          <details class="gloss-item">
+            <summary><span data-en="Signature vs. verify?" data-ko="서명과 검증?">Signature vs. verify?</span></summary>
+            <p data-en="Signing uses a private key to stamp data with proof it wasn't altered; verifying uses the matching public key to check that stamp. Analogy: a wax seal on an envelope — only the owner's ring makes it (sign), but anyone can confirm it's unbroken (verify). Here HAETAE signs the sealed box; on open we verify first, so a tampered container is rejected before any password is tried."
+               data-ko="서명은 개인 키로 데이터에 변조되지 않았다는 증표를 찍고, 검증은 짝이 되는 공개 키로 그 증표를 확인합니다. 비유: 봉투의 밀랍 봉인 — 주인의 반지로만 찍지만(서명) 누구나 온전한지 확인(검증)할 수 있습니다. 여기서 HAETAE가 상자에 서명하고, 열 때 먼저 검증하므로 변조된 컨테이너는 비밀번호를 시도하기 전에 거부됩니다.">
+              Signing uses a private key to stamp data with proof it wasn't altered; verifying uses the matching public key to check that stamp. Analogy: a wax seal on an envelope — only the owner's ring makes it (sign), but anyone can confirm it's unbroken (verify). Here HAETAE signs the sealed box; on open we verify first, so a tampered container is rejected before any password is tried.
+            </p>
+          </details>
+        </div>
+
+        <!-- Classical vs. post-quantum: make the quantum threat concrete, next to
+             the SMAUG-T step it motivates (not buried in a footer). -->
+        <div class="pq-compare" id="pq-compare">
+          <p class="pq-lead"
+             data-en="Why quantum-safe? Step 3 uses SMAUG-T instead of classical RSA/ECDH. Toggle to see why:"
+             data-ko="왜 양자내성인가? 3단계는 기존 RSA/ECDH 대신 SMAUG-T를 씁니다. 전환해 이유를 보세요:">
+            Why quantum-safe? Step 3 uses SMAUG-T instead of classical RSA/ECDH. Toggle to see why:
+          </p>
+          <div class="pq-toggle" role="group" aria-label="Classical versus post-quantum comparison">
+            <button class="pq-btn" id="pq-btn-classical" type="button" aria-pressed="false"
+                    data-en="What if we'd used RSA here?" data-ko="여기서 RSA를 썼다면?">
+              What if we'd used RSA here?
+            </button>
+            <button class="pq-btn pq-btn-active" id="pq-btn-post" type="button" aria-pressed="true"
+                    data-en="What SMAUG-T gives us" data-ko="SMAUG-T가 주는 것">
+              What SMAUG-T gives us
+            </button>
+          </div>
+          <p class="pq-body pq-body-classical" id="pq-body-classical" hidden
+             data-en="A quantum computer running Shor's algorithm factors RSA and breaks ECDH. An attacker who copies this sealed box today — “harvest now, decrypt later” — retroactively unwraps every share once such a machine exists. The box you sealed years ago pops open."
+             data-ko="쇼어 알고리즘을 실행하는 양자 컴퓨터는 RSA를 인수분해하고 ECDH를 깨뜨립니다. 오늘 이 봉인 상자를 복사한 공격자는 “지금 수집, 나중에 복호화” 방식으로, 그런 기계가 등장하면 모든 조각을 소급해 풀어냅니다. 수년 전 봉인한 상자가 열립니다.">
+            A quantum computer running Shor's algorithm factors RSA and breaks ECDH. An attacker who copies this sealed box today — “harvest now, decrypt later” — retroactively unwraps every share once such a machine exists. The box you sealed years ago pops open.
+          </p>
+          <p class="pq-body pq-body-post" id="pq-body-post"
+             data-en="SMAUG-T's security rests on the Module-LWE lattice problem, for which no efficient quantum algorithm is known. The same harvested box stays sealed even against a future quantum attacker — that is exactly what the post-quantum KEM buys you here."
+             data-ko="SMAUG-T의 안전성은 효율적인 양자 알고리즘이 알려지지 않은 Module-LWE 격자 문제에 기반합니다. 수집된 상자는 미래의 양자 공격자에게도 봉인된 채로 남습니다 — 바로 이것이 양자내성 KEM이 주는 이점입니다.">
+            SMAUG-T's security rests on the Module-LWE lattice problem, for which no efficient quantum algorithm is known. The same harvested box stays sealed even against a future quantum attacker — that is exactly what the post-quantum KEM buys you here.
+          </p>
+        </div>
+      </section>
 
       <!-- Algorithm legend -->
       <div class="info-bar" role="list" aria-label="Cryptographic algorithms used">

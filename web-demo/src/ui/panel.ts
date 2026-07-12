@@ -228,6 +228,7 @@ export function showRetrievePanel(
   onSubmit: (data: RetrieveFormData) => Promise<void>,
   onExport: () => void,
   onCancel: () => void,
+  onTamper?: () => Promise<void>,
 ): void {
   panel.innerHTML = `
     <div class="panel-inner">
@@ -239,6 +240,7 @@ export function showRetrievePanel(
         <button class="btn-outline btn-export" id="btn-export" type="button">
           <span class="export-icon">↓</span> ${t('exportBtn')}
         </button>
+        ${onTamper ? `<button class="btn-outline btn-tamper" id="btn-tamper" type="button" title="${t('tamperNote')}">⚠ ${t('tamperBtn')}</button>` : ''}
       </div>
       <p class="panel-note">${t('thresholdOpen')}</p>
       <div class="password-row">
@@ -296,6 +298,15 @@ export function showRetrievePanel(
   qs(panel, '.btn-cancel-x').addEventListener('click', onCancel);
   qs(panel, '#btn-cancel-retrieve').addEventListener('click', onCancel);
   qs(panel, '#btn-export').addEventListener('click', onExport);
+
+  if (onTamper) {
+    const tamperBtn = panel.querySelector<HTMLButtonElement>('#btn-tamper');
+    tamperBtn?.addEventListener('click', async () => {
+      tamperBtn.disabled = true;
+      await onTamper();
+      tamperBtn.disabled = false;
+    });
+  }
 
   qs(panel, '#btn-open').addEventListener('click', async () => {
     const aliceVal = qs<HTMLInputElement>(panel, '#rpw-alice').value.trim();

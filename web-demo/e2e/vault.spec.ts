@@ -168,4 +168,50 @@ test.describe('Quantum Vault — seal/open pipeline', () => {
       timeout: 30_000,
     });
   });
+
+  test('a successful open shows the Shamir key-strip re-forming (real bytes)', async ({
+    page,
+  }) => {
+    await gotoLoadedVault(page);
+    await attemptOpen(page, '06', [DEMO['06'].passwords[0], DEMO['06'].passwords[1]]);
+
+    // The key-strip visualization renders from the REAL reconstructed key.
+    await expect(page.locator('.keystrip .ks-verdict.ks-ok')).toBeVisible({
+      timeout: 30_000,
+    });
+    // Per-step narration is present (labels gain meaning, not just buzzwords).
+    await expect(page.locator('#pipeline-narration')).not.toBeEmpty();
+    await expect(page.locator('#retrieve-result')).toContainText(DEMO['06'].secret);
+  });
+
+  test('tamper demo trips HAETAE integrity check (red), never the secret', async ({
+    page,
+  }) => {
+    await gotoLoadedVault(page);
+    await page.locator('[data-box="03"]').click();
+    await expect(page.locator('#retrieve-title')).toBeVisible();
+
+    await page.click('#btn-tamper');
+
+    // HAETAE-verify pill turns red and the pipeline stops there — a DIFFERENT
+    // failure mode than "too few shares" (which is amber on the SMAUG-T pill).
+    await expect(page.locator('#ps-haetae.failed')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('#retrieve-result')).toContainText('signature invalid');
+    // Tampering must never leak the real plaintext.
+    await expect(page.locator('#retrieve-result')).not.toContainText(
+      DEMO['03'].secret,
+    );
+  });
+
+  test('below-threshold open turns the SMAUG-T pill amber (share unavailable)', async ({
+    page,
+  }) => {
+    await gotoLoadedVault(page);
+    await attemptOpen(page, '09', [DEMO['09'].passwords[0]]);
+
+    // One valid share: SMAUG-T unlock goes amber (confidentiality shortfall),
+    // distinct from the red HAETAE integrity failure.
+    await expect(page.locator('#ps-smaug.warn')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('#retrieve-result')).toContainText('ACCESS DENIED');
+  });
 });

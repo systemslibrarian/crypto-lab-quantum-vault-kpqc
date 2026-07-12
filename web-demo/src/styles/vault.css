@@ -525,6 +525,22 @@ body {
   color: #fff;
 }
 
+/* Amber warn state: confidentiality shortfall (a share unavailable / below
+   threshold) — distinct from the red integrity failure of a tampered box. */
+.pipeline-step.warn {
+  background: #9a5b00;
+  color: #fff;
+}
+
+.step-sub {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  opacity: 0.95;
+  margin-top: 2px;
+  line-height: 1.15;
+}
+
 .pipeline-arrow {
   color: #aaa9a4;
   font-size: 0.85rem;
@@ -532,9 +548,35 @@ body {
   flex-shrink: 0;
 }
 
+/* Per-step plain-language narration line, revealed as each pill animates. */
+.pipeline-narration {
+  margin: 10px 0 0;
+  min-height: 2.4em;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: #2a2520;
+  font-weight: 500;
+}
+.pipeline-narration.narr-fail {
+  color: #a31420;
+  font-weight: 700;
+}
+
+.pipeline-viz { margin-top: 4px; }
+
+/* Tamper demo button — warns the learner it triggers an integrity failure. */
+.btn-tamper {
+  border-color: #C60C30 !important;
+  color: #a31420 !important;
+}
+.btn-tamper:hover:not(:disabled) {
+  background: #fbecec !important;
+}
+
 @media (max-width: 500px) {
   .pipeline-step { min-width: 60px; font-size: 0.65rem; }
   .pipeline-arrow { font-size: 0.7rem; }
+  .step-sub { font-size: 0.56rem; }
 }
 
 /* ---------- Result Boxes ---------- */
@@ -807,41 +849,233 @@ body {
    KR Redesign — Architecture pipeline diagram (how-it-works)
    ========================================================== */
 .pipeline-diagram {
+  list-style: none;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0;
-  margin: 8px 0 4px;
-  padding: 8px 12px;
+  margin: 10px 0 6px;
+  padding: 12px 14px;
   background: #f0ede6;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid #d4d0c8;
-  font-size: 0.78rem;
+  font-size: 0.86rem;
 }
 
 .pd-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   background: #fff;
   border: 1px solid #c8c4bc;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-weight: 600;
+  border-radius: 6px;
+  padding: 8px 12px;
   color: #2a2520;
   font-family: 'Noto Sans', 'Pretendard', system-ui, sans-serif;
-  white-space: nowrap;
+  line-height: 1.45;
 }
+
+.pd-num {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #003478;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.pd-text { flex: 1; }
 
 .pd-step-kpqc {
   border-color: #003478;
-  color: #003478;
+}
+.pd-step-kpqc .pd-num {
+  background: #C60C30;
 }
 
-.pd-arrow {
-  color: #aaa;
-  font-size: 0.85rem;
-  padding: 0 6px;
+.pipeline-diagram .pd-arrow {
+  color: #8a857c;
+  font-size: 1rem;
+  text-align: center;
+  padding: 3px 0;
   user-select: none;
+  line-height: 1;
 }
+
+/* One-line try-it call-to-action */
+.try-cta {
+  margin: 10px 0 4px;
+  padding: 9px 14px;
+  background: #eef4fb;
+  border: 1px solid #b9d0ea;
+  border-left: 4px solid #003478;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a3a5c;
+}
+
+.how-intro {
+  font-weight: 600;
+  color: #1a1715;
+}
+
+/* Glossary — inline click-to-expand definitions */
+.glossary {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #d4d0c8;
+}
+.glossary-lead {
+  font-weight: 600;
+  color: #1a1715;
+  margin-bottom: 8px !important;
+}
+.gloss-item {
+  border: 1px solid #d4d0c8;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: #fff;
+}
+.gloss-item > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: #003478;
+  list-style-position: inside;
+}
+.gloss-item[open] > summary {
+  border-bottom: 1px solid #ece8e1;
+}
+.gloss-item > p {
+  padding: 8px 12px 10px;
+  margin: 0 !important;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: #3a3530;
+}
+
+/* Classical vs post-quantum comparison */
+.pq-compare {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #d4d0c8;
+}
+.pq-lead {
+  font-weight: 600;
+  color: #1a1715;
+  margin-bottom: 8px !important;
+}
+.pq-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.pq-btn {
+  padding: 7px 12px;
+  border: 1px solid #b9b4aa;
+  border-radius: 6px;
+  background: #fff;
+  color: #3a3530;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pq-btn-active {
+  background: #003478;
+  border-color: #003478;
+  color: #fff;
+}
+.pq-body {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  border-left: 4px solid;
+}
+.pq-body-classical {
+  background: #fbecec;
+  border-color: #C60C30;
+  color: #6e1b22;
+}
+.pq-body-post {
+  background: #eaf5ef;
+  border-color: #1D9E75;
+  color: #14603f;
+}
+
+/* ---------- Shamir key-strip visualization ---------- */
+.keystrip {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f7f5f0;
+  border: 1px solid #d4d0c8;
+  border-radius: 8px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+.keystrip.ks-in { opacity: 1; transform: none; }
+.ks-caption {
+  font-size: 0.82rem;
+  color: #3a3530;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+.ks-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.ks-label {
+  flex: 0 0 auto;
+  width: 5.5em;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #2a2520;
+  text-align: right;
+}
+.ks-strip {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 3px;
+  border-radius: 4px;
+  background: #e6e2da;
+  overflow: hidden;
+}
+.ks-cell {
+  flex: 1 1 0;
+  height: 18px;
+  min-width: 6px;
+  border-radius: 2px;
+}
+.ks-row.ks-key .ks-label { color: #003478; }
+.ks-row.ks-recon-ok .ks-label { color: #14603f; }
+.ks-row.ks-recon-bad .ks-label { color: #C60C30; }
+.ks-split-arrow {
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6a6460;
+  padding: 4px 0;
+}
+.ks-verdict {
+  margin: 8px 0 0 !important;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.ks-verdict.ks-ok { color: #14603f; }
+.ks-verdict.ks-bad { color: #C60C30; }
 
 /* ==========================================================
    KR Redesign — Demo credentials table
@@ -1260,7 +1494,10 @@ html[data-theme='dark'] .pipeline-step.pending { background: #2a261d; color: #8a
 html[data-theme='dark'] .pipeline-step.active { background: #1f5fc0; }
 html[data-theme='dark'] .pipeline-step.done { background: #1d9e75; }
 html[data-theme='dark'] .pipeline-step.failed { background: #d8453f; }
+html[data-theme='dark'] .pipeline-step.warn { background: #9a5b00; }
 html[data-theme='dark'] .pipeline-arrow { color: #6a6258; }
+html[data-theme='dark'] .pipeline-narration { color: #d8d0bf; }
+html[data-theme='dark'] .pipeline-narration.narr-fail { color: #f0a8a0; }
 
 /* Result boxes */
 html[data-theme='dark'] .result-success { background: #16291a; color: #a9e0a0; border-color: #3c6b2f; }
@@ -1304,8 +1541,46 @@ html[data-theme='dark'] .kpqc-panel-attribution { color: #9a9080 !important; }
 /* Architecture pipeline diagram */
 html[data-theme='dark'] .pipeline-diagram { background: #1b1813; border-color: #38332a; }
 html[data-theme='dark'] .pd-step { background: #2a261d; border-color: #4a4438; color: #ece7da; }
-html[data-theme='dark'] .pd-step-kpqc { border-color: #4f8ae0; color: #7faaee; }
-html[data-theme='dark'] .pd-arrow { color: #6a6258; }
+html[data-theme='dark'] .pd-step-kpqc { border-color: #4f8ae0; }
+html[data-theme='dark'] .pd-num { background: #4f8ae0; color: #0d1420; }
+html[data-theme='dark'] .pd-step-kpqc .pd-num { background: #e85a62; color: #1a0d0e; }
+html[data-theme='dark'] .pipeline-diagram .pd-arrow { color: #9a9080; }
+
+/* Try-it CTA */
+html[data-theme='dark'] .try-cta { background: #16202e; border-color: #33507a; border-left-color: #4f8ae0; color: #b7d2f2; }
+html[data-theme='dark'] .how-intro { color: #ece7da; }
+
+/* Glossary */
+html[data-theme='dark'] .glossary { border-top-color: #38332a; }
+html[data-theme='dark'] .glossary-lead { color: #ece7da; }
+html[data-theme='dark'] .gloss-item { background: #211e17; border-color: #4a4438; }
+html[data-theme='dark'] .gloss-item > summary { color: #7faaee; }
+html[data-theme='dark'] .gloss-item[open] > summary { border-bottom-color: #38332a; }
+html[data-theme='dark'] .gloss-item > p { color: #c4bcab; }
+
+/* Classical vs post-quantum */
+html[data-theme='dark'] .pq-compare { border-top-color: #38332a; }
+html[data-theme='dark'] .pq-lead { color: #ece7da; }
+html[data-theme='dark'] .pq-btn { background: #2a261d; border-color: #4a4438; color: #cfc7b6; }
+html[data-theme='dark'] .pq-btn-active { background: #4f8ae0; border-color: #4f8ae0; color: #0d1420; }
+html[data-theme='dark'] .pq-body-classical { background: #2a1614; border-color: #d8453f; color: #f0b4ac; }
+html[data-theme='dark'] .pq-body-post { background: #12261b; border-color: #1d9e75; color: #98dcb4; }
+
+/* Shamir key-strip */
+html[data-theme='dark'] .keystrip { background: #211e17; border-color: #38332a; }
+html[data-theme='dark'] .ks-caption { color: #c4bcab; }
+html[data-theme='dark'] .ks-label { color: #d8d0bf; }
+html[data-theme='dark'] .ks-row.ks-key .ks-label { color: #7faaee; }
+html[data-theme='dark'] .ks-row.ks-recon-ok .ks-label { color: #98dcb4; }
+html[data-theme='dark'] .ks-row.ks-recon-bad .ks-label { color: #f0a8a0; }
+html[data-theme='dark'] .ks-strip { background: #15130f; }
+html[data-theme='dark'] .ks-split-arrow { color: #9a9080; }
+html[data-theme='dark'] .ks-verdict.ks-ok { color: #98dcb4; }
+html[data-theme='dark'] .ks-verdict.ks-bad { color: #f0a8a0; }
+
+/* Tamper button */
+html[data-theme='dark'] .btn-tamper { border-color: #a8453d !important; color: #ef6b62 !important; }
+html[data-theme='dark'] .btn-tamper:hover:not(:disabled) { background: #2a1614 !important; }
 
 /* Demo credentials table */
 html[data-theme='dark'] .demo-credentials { border-top-color: #38332a; }

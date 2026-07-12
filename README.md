@@ -1,7 +1,17 @@
 # crypto-lab-quantum-vault-kpqc
 
 ## What It Is
-Quantum Vault is a browser demo that combines AES-256-GCM, Shamir SSS / GF(2⁸), SMAUG-T (스마우그-T) KEM, and HAETAE (해태) signature in one sealing/opening pipeline. It is built to show how a secret can be encrypted once, split into threshold shares, and opened only when enough valid shares are recovered. SMAUG-T handles post-quantum key encapsulation for per-share wrapping, and HAETAE verifies container integrity before decryption. The security model is hybrid: symmetric encryption plus post-quantum asymmetric primitives with threshold reconstruction.
+Quantum Vault is a browser demo that combines AES-256-GCM, Shamir SSS / GF(2⁸), SMAUG-T (스마우그-T) KEM, and HAETAE (해태) signature in one sealing/opening pipeline. It is built to show how a secret can be encrypted once, split into threshold shares, and opened only when enough valid shares are recovered. SMAUG-T handles post-quantum key encapsulation for per-share wrapping, and HAETAE verifies container integrity before decryption. The security model is hybrid: symmetric encryption plus post-quantum asymmetric primitives with threshold reconstruction. A plain-language **"How this box works"** walkthrough tells the four-primitive envelope story in order, per-step narration lights up as each pipeline stage runs, and a Shamir key-strip visualization shows the real 32-byte AES key splitting into 3 shares and re-forming from any 2 (or landing on unrelated bytes from just 1). Inline glossary tooltips introduce KEM, Shamir/GF(2⁸), "lattice-based", and sign-vs-verify for newcomers; a classical-vs-post-quantum toggle and a one-click tamper demo make the "harvest now, decrypt later" motivation and the confidentiality-vs-integrity failure distinction concrete.
+
+## Exhibits
+1. **Vault wall** — 9 safety-deposit boxes; three pre-sealed on first visit with real KpqC crypto, openable with any 2 of 3 passwords.
+2. **How this box works** — persistent, ordered envelope walkthrough (AES lock → Shamir split → SMAUG-T per-share seal → HAETAE signature) whose sentences light up in sync with the live pipeline.
+3. **Seal / open pipeline** — animated step pills with per-step plain-language narration, driven by the real crypto outcome, not a fixed script.
+4. **Shamir key-strip** — the genuine AES key breaking into 3 colored share strips on seal, and Lagrange reconstruction re-forming the identical key from 2 shares (or a mismatched strip from 1) on open.
+5. **Glossary tooltips** — click-to-expand newcomer definitions with one-line analogies for KEM, Shamir sharing / GF(2⁸), lattice-based hardness, and signature vs. verify.
+6. **Classical vs. post-quantum** — a toggle tied to the SMAUG-T step showing what a future quantum attacker does to RSA/ECDH ("harvest now, decrypt later") versus why the lattice KEM resists it.
+7. **Two failure modes, distinctly** — a wrong password turns just that keyholder's SMAUG-T pill amber ("share unavailable — N of 2 needed"); a tamper demo button flips a ciphertext byte and turns the HAETAE-verify pill red, stopping before any share is tried.
+8. **Vault management** — export/import individual `.qvault` containers and full vault state, reset to demo, and an EN/한국어 language toggle.
 
 ## When to Use It
 - Browser-based crypto education and demos: It shows each stage (AES, Shamir, KEM, signature) in a visible, testable workflow.

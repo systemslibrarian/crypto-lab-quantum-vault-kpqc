@@ -6,7 +6,7 @@ import { initCrypto } from './crypto/init';
 import { loadVaultState, saveVaultState, clearVaultState, emptyVaultState, serializeSealedBox, deserializeSealedBox } from './vault/state';
 import type { VaultState } from './vault/state';
 import { generateDemoBoxes, removeDemoBoxes, clearDemoTracker } from './vault/demo';
-import { sealMessage, openBox } from './crypto/pipeline';
+import { sealMessageWithVisual, openBox } from './crypto/pipeline';
 import type { SealedBox } from './crypto/pipeline';
 import { exportQvault, vaultBoxToSealedBox, exportFullVault, importFullVault, QvaultImportError } from './vault/file';
 import { renderVaultWall } from './ui/wall';
@@ -113,6 +113,7 @@ async function init(): Promise<void> {
         data => handleRetrieve(boxNumber, data.passwords),
         () => handleExport(boxNumber),
         () => { selectedBox = null; closePanel(panelEl); renderWall(); },
+        () => handleTamper(boxNumber),
       );
     } else {
       showDepositPanel(
@@ -138,12 +139,13 @@ async function init(): Promise<void> {
   ): Promise<void> {
     const pipelineArea = qs<HTMLElement>(panelEl, '#pipeline-area');
 
-    // Run crypto and animation concurrently — animation is purely cosmetic (2 s)
-    // and crypto typically completes in ~4–6 s (3 × PBKDF2 600k iterations).
-    const [sealedBox] = await Promise.all([
-      sealMessage(message, passwords),
-      animateSealPipeline(pipelineArea),
-    ]);
+    // Run crypto first so the split animation can show the REAL key + shares.
+    // (Crypto typically completes in ~4–6 s: 3 × PBKDF2 600k iterations.)
+    const { box: sealedBox, visual } = await sealMessageWithVisual(message, passwords);
+    await animateSealPipeline(pipelineArea, visual);
+    // Zeroize the visualization copies of the key + shares once rendered.
+    visual.key.fill(0);
+    for (const s of visual.shares) s.fill(0);
 
     state.boxes[boxNumber] = serializeSealedBox(sealedBox);
     saveVaultState(state);
@@ -157,6 +159,7 @@ async function init(): Promise<void> {
       data => handleRetrieve(boxNumber, data.passwords),
       () => handleExport(boxNumber),
       () => { selectedBox = null; closePanel(panelEl); renderWall(); },
+      () => handleTamper(boxNumber),
     );
     showDepositSuccess(panelEl, boxNumber);
   }
@@ -174,8 +177,9 @@ async function init(): Promise<void> {
     // Run crypto first (determines pipeline animation outcome)
     const result = await openBox(sealedBox, passwords);
 
-    // Animate pipeline based on known result
-    await animateOpenPipeline(pipelineArea, !result.success);
+    // Animate pipeline from the REAL open result — distinct failure modes and
+    // the genuine reconstructed key-strip are driven by result.visual.
+    await animateOpenPipeline(pipelineArea, result.visual);
 
     if (result.success) {
       updateRetrieveTitle(panelEl, `Box ${boxNumber} — ${t('decrypted')}`);
@@ -210,6 +214,30 @@ async function init(): Promise<void> {
       );
     }
   }
+  // ---- Tamper demo: flip one ciphertext byte and watch HAETAE catch it ----
+  // Integrity failure is a DIFFERENT failure mode from "not enough shares": the
+  // signature no longer matches the container, so the open stops at HAETAE-verify
+  // (red) before any password is even tried. The stored box is never mutated —
+  // we open a throwaway tampered copy so the real box stays intact.
+  async function handleTamper(boxNumber: string): Promise<void> {
+    const pipelineArea = qs<HTMLElement>(panelEl, '#pipeline-area');
+    const resultEl = qs<HTMLElement>(panelEl, '#retrieve-result');
+
+    const original = deserializeSealedBox(state.boxes[boxNumber]);
+    const tampered: SealedBox = { ...original, ciphertext: original.ciphertext.slice() };
+    tampered.ciphertext[0] ^= 0xff; // flip one byte — genuine, not simulated
+
+    const result = await openBox(tampered, [null, null, null]);
+    await animateOpenPipeline(pipelineArea, result.visual);
+
+    updateRetrieveTitle(panelEl, `Box ${boxNumber} — ${t('accessDenied')}`);
+    const msgEl = document.createElement('div');
+    msgEl.className = 'result-box result-failure';
+    msgEl.setAttribute('role', 'alert');
+    msgEl.textContent = t('pillSigInvalid');
+    resultEl.replaceChildren(msgEl);
+  }
+
   // ---- Export a sealed container ----
   function handleExport(boxNumber: string): void {
     const vaultBox = state.boxes[boxNumber];
@@ -236,6 +264,7 @@ async function init(): Promise<void> {
         data => handleRetrieve(boxNumber, data.passwords),
         () => handleExport(boxNumber),
         () => { selectedBox = null; closePanel(panelEl); renderWall(); },
+        () => handleTamper(boxNumber),
       );
       panelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 100);
@@ -407,6 +436,30 @@ function setupThemeToggle(): void {
   });
 }
 
+// ---- Classical vs. post-quantum comparison toggle ----
+// Purely presentational: reveals one of two static explanations so the "quantum"
+// motivation lives next to the SMAUG-T step, not in a footer.
+function setupPqToggle(): void {
+  const btnClassical = document.getElementById('pq-btn-classical');
+  const btnPost = document.getElementById('pq-btn-post');
+  const bodyClassical = document.getElementById('pq-body-classical');
+  const bodyPost = document.getElementById('pq-body-post');
+  if (!btnClassical || !btnPost || !bodyClassical || !bodyPost) return;
+
+  const show = (which: 'classical' | 'post'): void => {
+    const isClassical = which === 'classical';
+    bodyClassical.hidden = !isClassical;
+    bodyPost.hidden = isClassical;
+    btnClassical.setAttribute('aria-pressed', String(isClassical));
+    btnPost.setAttribute('aria-pressed', String(!isClassical));
+    btnClassical.classList.toggle('pq-btn-active', isClassical);
+    btnPost.classList.toggle('pq-btn-active', !isClassical);
+  };
+
+  btnClassical.addEventListener('click', () => show('classical'));
+  btnPost.addEventListener('click', () => show('post'));
+}
+
 // ---- Dismissible hint banner ----
 function showHintBanner(): void {
   const banner = document.getElementById('hint-banner');
@@ -426,6 +479,7 @@ let onLangSwitch: (() => void | Promise<void>) | null = null;
 
 setupThemeToggle();
 setupLangToggle(() => onLangSwitch?.());
+setupPqToggle();
 
 init().catch(err => {
   recordInitStep(`init:failed:${String(err)}`);
