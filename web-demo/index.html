@@ -127,7 +127,24 @@
 <!-- END crypto-lab shared header -->
     <main class="page-wrapper" id="main-content">
 
-
+      <!-- Fleet-standard hero: title block left, "why it matters" box right.
+           Bilingual (data-en/data-ko) like the rest of the page; the brand name
+           "Quantum Vault" is a proper noun and stays constant across locales. -->
+      <header class="cl-hero">
+        <div class="cl-hero-main">
+          <h1 class="cl-hero-title">Quantum Vault</h1>
+          <p class="cl-hero-sub"
+             data-en="Threshold envelope encryption · SMAUG-T + HAETAE"
+             data-ko="임계값 봉투 암호화 · SMAUG-T + HAETAE">Threshold envelope encryption · SMAUG-T + HAETAE</p>
+        </div>
+        <aside class="cl-hero-why" aria-label="Why it matters">
+          <span class="cl-hero-why-label"
+                data-en="WHY IT MATTERS" data-ko="왜 중요한가">WHY IT MATTERS</span>
+          <p class="cl-hero-why-text"
+             data-en="One secret is split across three keyholders, so any two can open the box but no single person can alone. Post-quantum algorithms (SMAUG-T, HAETAE) wrap and sign the vault, keeping it safe even from future quantum computers."
+             data-ko="하나의 비밀이 세 명의 키홀더에게 나뉘어, 아무 두 명이면 상자를 열 수 있지만 한 사람만으로는 열 수 없습니다. 양자내성 알고리즘(SMAUG-T, HAETAE)이 볼트를 감싸고 서명하여 미래의 양자 컴퓨터로부터도 안전하게 지킵니다.">One secret is split across three keyholders, so any two can open the box but no single person can alone. Post-quantum algorithms (SMAUG-T, HAETAE) wrap and sign the vault, keeping it safe even from future quantum computers.</p>
+        </aside>
+      </header>
 
       <!-- Hint banner: shown on first load, dismissed after first visit -->
       <div class="hint-banner" id="hint-banner" role="status">

@@ -1605,3 +1605,42 @@ html[data-theme='dark'] .failure-card { background: #241715; border-color: #5a30
 html[data-theme='dark'] .failure-name { color: #f0a8a0; }
 html[data-theme='dark'] .failure-result { color: #d8b6b0; }
 html[data-theme='dark'] .disclaimer-list li { color: #d6b34d; }
+
+/* BEGIN cl-hero standard — managed, keep in sync across fleet.
+   Colors adapted to this demo's hanji (light) / warm-ink (dark) palette.
+   Title/sub/why-body use explicit foregrounds that pass axe contrast in BOTH
+   themes; the why-box tint + border reuse the demo's Taegukgi-navy accents. */
+.cl-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:clamp(1rem,4vw,3rem);flex-wrap:wrap;margin:clamp(1rem,3vw,2rem) 0 1.5rem;}
+.cl-hero-main{flex:1 1 22rem;min-width:min(100%,20rem);}
+.cl-hero-title{margin:0;font-size:clamp(1.6rem,3.8vw,2.7rem);font-weight:700;line-height:1.1;letter-spacing:.01em;color:#2a2520;}
+.cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;color:#5a5248;}
+.cl-hero-why{flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid #a8bfe0;border-radius:10px;padding:.85rem 1.05rem;background:#eef3fb;}
+.cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;color:#2d4270;}
+.cl-hero-why-text{margin:.35rem 0 0;font-size:.95rem;line-height:1.5;color:#2a2520;}
+@media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-why{flex-basis:auto;width:100%;}}
+html[data-theme='dark'] .cl-hero-title{color:#ece7da;}
+html[data-theme='dark'] .cl-hero-sub{color:#b3ab9b;}
+html[data-theme='dark'] .cl-hero-why{border-color:#38445c;background:#1a1f2b;}
+html[data-theme='dark'] .cl-hero-why-label{color:#9cc0f5;}
+html[data-theme='dark'] .cl-hero-why-text{color:#ece7da;}
+/* END cl-hero standard */
+
+/* BEGIN cl-hero standard — managed, keep in sync across fleet.
+   This lab themes via explicit html[data-theme='dark'] overrides (not CSS vars),
+   so light values inline below and dark values follow. Accent = Taegukgi navy
+   (#003478 light / #4f8ae0 dark); tints/borders mirror .kpqc-panel. Body text
+   uses the page foreground (#2a2520 / #ece7da) for AA contrast in both themes. */
+.cl-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:clamp(1rem,4vw,3rem);flex-wrap:wrap;margin:clamp(1rem,3vw,2rem) 0 1.5rem;}
+.cl-hero-main{flex:1 1 22rem;min-width:min(100%,20rem);}
+.cl-hero-title{margin:0;font-size:clamp(1.6rem,3.8vw,2.7rem);font-weight:700;line-height:1.1;letter-spacing:.01em;color:#1a1715;}
+.cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;color:#5a5348;}
+.cl-hero-why{flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid #a8bfe0;border-radius:10px;padding:.85rem 1.05rem;background:#eef3fb;}
+.cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;color:#003478;}
+.cl-hero-why-text{margin:.35rem 0 0;font-size:.95rem;line-height:1.5;color:#2d4270;}
+@media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-why{flex-basis:auto;width:100%;}}
+html[data-theme='dark'] .cl-hero-title{color:#ece7da;}
+html[data-theme='dark'] .cl-hero-sub{color:#b3ab9b;}
+html[data-theme='dark'] .cl-hero-why{border-color:#33425f;background:#1c2230;}
+html[data-theme='dark'] .cl-hero-why-label{color:#7faaee;}
+html[data-theme='dark'] .cl-hero-why-text{color:#bcd0ef;}
+/* END cl-hero standard */
