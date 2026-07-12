@@ -134,15 +134,18 @@
         <div class="cl-hero-main">
           <h1 class="cl-hero-title">Quantum Vault</h1>
           <p class="cl-hero-sub"
-             data-en="Threshold envelope encryption · SMAUG-T + HAETAE"
-             data-ko="임계값 봉투 암호화 · SMAUG-T + HAETAE">Threshold envelope encryption · SMAUG-T + HAETAE</p>
+             data-en="2-of-3 Shamir · AES-256-GCM · SMAUG-T · HAETAE"
+             data-ko="2-of-3 Shamir · AES-256-GCM · SMAUG-T · HAETAE">2-of-3 Shamir · AES-256-GCM · SMAUG-T · HAETAE</p>
+          <p class="cl-hero-desc"
+             data-en="Seals a secret under an AES-256-GCM key that is split 2-of-3 with Shamir, wraps each share with the SMAUG-T post-quantum KEM, and signs the container with HAETAE — so you can watch several primitives compose into one seal/open pipeline."
+             data-ko="비밀을 AES-256-GCM 키로 봉인하고 그 키를 Shamir로 2-of-3 분할한 뒤, 각 조각을 SMAUG-T 양자내성 KEM으로 감싸고 컨테이너를 HAETAE로 서명합니다 — 여러 기본 요소가 하나의 봉인/해제 파이프라인으로 결합되는 과정을 볼 수 있습니다.">Seals a secret under an AES-256-GCM key that is split 2-of-3 with Shamir, wraps each share with the SMAUG-T post-quantum KEM, and signs the container with HAETAE — so you can watch several primitives compose into one seal/open pipeline.</p>
         </div>
         <aside class="cl-hero-why" aria-label="Why it matters">
           <span class="cl-hero-why-label"
                 data-en="WHY IT MATTERS" data-ko="왜 중요한가">WHY IT MATTERS</span>
           <p class="cl-hero-why-text"
-             data-en="One secret is split across three keyholders, so any two can open the box but no single person can alone. Post-quantum algorithms (SMAUG-T, HAETAE) wrap and sign the vault, keeping it safe even from future quantum computers."
-             data-ko="하나의 비밀이 세 명의 키홀더에게 나뉘어, 아무 두 명이면 상자를 열 수 있지만 한 사람만으로는 열 수 없습니다. 양자내성 알고리즘(SMAUG-T, HAETAE)이 볼트를 감싸고 서명하여 미래의 양자 컴퓨터로부터도 안전하게 지킵니다.">One secret is split across three keyholders, so any two can open the box but no single person can alone. Post-quantum algorithms (SMAUG-T, HAETAE) wrap and sign the vault, keeping it safe even from future quantum computers.</p>
+             data-en="No single keyholder can open the vault and no lost key locks it forever — trust is spread across people, not staked on one. And because the wrapping is post-quantum, secrets sealed today stay shut even after quantum computers arrive."
+             data-ko="어떤 키홀더도 혼자서는 볼트를 열 수 없고, 키 하나를 잃어도 영영 잠기지 않습니다 — 신뢰가 한 사람이 아니라 여러 사람에게 분산됩니다. 게다가 봉인이 양자내성이라, 오늘 봉인한 비밀은 양자 컴퓨터가 등장한 뒤에도 닫힌 채로 남습니다.">No single keyholder can open the vault and no lost key locks it forever — trust is spread across people, not staked on one. And because the wrapping is post-quantum, secrets sealed today stay shut even after quantum computers arrive.</p>
         </aside>
       </header>
 
