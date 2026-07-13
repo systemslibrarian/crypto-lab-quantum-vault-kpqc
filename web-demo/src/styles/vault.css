@@ -790,6 +790,29 @@ body {
   margin-top: 12px;
 }
 
+/* "Go deeper" expander that gates the prescriptive reference panels */
+.go-deeper {
+  margin-top: 12px;
+}
+.go-deeper-summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  background: #f0eee8;
+  border: 1px solid #d4d0c8;
+  border-left: 4px solid #6a6460;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #2a2520;
+  list-style-position: inside;
+}
+.go-deeper[open] > .go-deeper-summary {
+  margin-bottom: 4px;
+  border-left-color: #003478;
+  color: #003478;
+}
+.go-deeper > .kpqc-panel:first-of-type { margin-top: 8px; }
+
 .kpqc-panel-title {
   font-size: 0.92rem;
   font-weight: 700;
@@ -922,6 +945,107 @@ body {
 .how-intro {
   font-weight: 600;
   color: #1a1715;
+}
+
+/* ---- "Inside step 3": two-layer SMAUG-T (password vs KEM) mini-diagram ---- */
+.step3-zoom {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #cfc8bb;
+  border-left: 4px solid #7c3aed;
+  border-radius: 8px;
+  background: #f7f4fb;
+}
+.step3-zoom-title {
+  font-weight: 700;
+  color: #4c1d95;
+  margin: 0 0 4px;
+  font-size: 0.94rem;
+}
+.step3-zoom-sub,
+.step3-zoom-foot {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #3a3530;
+  margin: 0 0 10px;
+}
+.step3-zoom-foot { margin: 10px 0 0; font-weight: 600; }
+.layer-diagram {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.layer-node {
+  border: 1px solid #d4d0c8;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.layer-pw { border-left: 4px solid #003478; }
+.layer-kem { border-left: 4px solid #7c3aed; }
+.layer-badge {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-bottom: 3px;
+}
+.layer-pw .layer-badge { color: #003478; }
+.layer-kem .layer-badge { color: #6d28d9; }
+.layer-body {
+  display: block;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  color: #3a3530;
+}
+.layer-arrow {
+  text-align: center;
+  color: #6d28d9;
+  font-weight: 600;
+  font-size: 0.86rem;
+  padding: 5px 0;
+  line-height: 1.2;
+}
+.layer-arrow-note {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: #6a6460;
+}
+
+/* ---- 2-D lattice sketch: grounds the "nearest point is hard in high-D" claim ---- */
+.lattice-viz {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #cfc8bb;
+  border-left: 4px solid #14603f;
+  border-radius: 8px;
+  background: #f3f8f5;
+}
+.lattice-title {
+  font-weight: 700;
+  color: #14603f;
+  margin: 0 0 8px;
+  font-size: 0.94rem;
+}
+.lattice-figure {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lattice-svg {
+  flex: 0 0 auto;
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+  color: #6a7d72;
+}
+.lattice-caption {
+  flex: 1 1 220px;
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: #3a3530;
+  margin: 0 !important;
 }
 
 /* Glossary — inline click-to-expand definitions */
@@ -1076,6 +1200,54 @@ body {
 }
 .ks-verdict.ks-ok { color: #14603f; }
 .ks-verdict.ks-bad { color: #C60C30; }
+
+/* ---- Keyholder colour bands: tie each share row to Alice/Bob/Carol ---- */
+.ks-row.ks-share-a .ks-label { color: #b45309; }  /* amber  — Alice */
+.ks-row.ks-share-b .ks-label { color: #1d4ed8; }  /* blue   — Bob   */
+.ks-row.ks-share-c .ks-label { color: #7c3aed; }  /* violet — Carol */
+.ks-row.ks-share-a .ks-strip { box-shadow: inset 0 0 0 2px #f59e0b; }
+.ks-row.ks-share-b .ks-strip { box-shadow: inset 0 0 0 2px #3b82f6; }
+.ks-row.ks-share-c .ks-strip { box-shadow: inset 0 0 0 2px #8b5cf6; }
+
+/* ---- Original key + per-cell match markers (open-side comparison) ---- */
+.ks-row.ks-original .ks-label { color: #003478; }
+.ks-vs {
+  text-align: center;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #14603f;
+  padding: 2px 0 4px;
+}
+.ks-cell { position: relative; }
+.ks-cell-match { box-shadow: inset 0 0 0 2px #14603f; }
+.ks-cell-miss  { box-shadow: inset 0 0 0 2px #C60C30; }
+.ks-mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.85), 0 0 1px rgba(0, 0, 0, 0.9);
+}
+.ks-caption.ks-unknowable {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid #C60C30;
+  background: rgba(198, 12, 48, 0.06);
+  border-radius: 0 4px 4px 0;
+}
+
+/* ---- Share-merge animation (open side): shares converge into the key ---- */
+.ks-merge { transition: transform 560ms ease, opacity 560ms ease; }
+.ks-merge.ks-converge { transform: translateY(10px) scaleY(0.9); opacity: 0.35; }
+.ks-merge.ks-diverge  { transform: translateX(14px); opacity: 0.4; }
+@media (prefers-reduced-motion: reduce) {
+  .ks-merge, .keystrip { transition: none; }
+}
 
 /* ==========================================================
    KR Redesign — Demo credentials table
@@ -1529,6 +1701,8 @@ html[data-theme='dark'] .hint-box-num { color: #7faaee; }
 html[data-theme='dark'] .hint-passwords code { background: #1e2840; color: #9cc0f5; }
 
 /* KpqC info panels */
+html[data-theme='dark'] .go-deeper-summary { background: #201d16; border-color: #4a4438; border-left-color: #9a9080; color: #ece7da; }
+html[data-theme='dark'] .go-deeper[open] > .go-deeper-summary { border-left-color: #4f8ae0; color: #8fb4f5; }
 html[data-theme='dark'] .kpqc-panel { background: #211e17; border-color: #38332a; }
 html[data-theme='dark'] .kpqc-panel-title { color: #ece7da; border-bottom-color: #4f8ae0; }
 html[data-theme='dark'] .kpqc-panel p { color: #c4bcab; }
@@ -1549,6 +1723,26 @@ html[data-theme='dark'] .pipeline-diagram .pd-arrow { color: #9a9080; }
 /* Try-it CTA */
 html[data-theme='dark'] .try-cta { background: #16202e; border-color: #33507a; border-left-color: #4f8ae0; color: #b7d2f2; }
 html[data-theme='dark'] .how-intro { color: #ece7da; }
+
+/* Inside-step-3 two-layer diagram */
+html[data-theme='dark'] .step3-zoom { background: #201a2b; border-color: #453a5c; border-left-color: #a684f0; }
+html[data-theme='dark'] .step3-zoom-title { color: #c9b3f7; }
+html[data-theme='dark'] .step3-zoom-sub,
+html[data-theme='dark'] .step3-zoom-foot { color: #d3ccbe; }
+html[data-theme='dark'] .layer-node { background: #211e17; border-color: #4a4438; }
+html[data-theme='dark'] .layer-pw { border-left-color: #4f8ae0; }
+html[data-theme='dark'] .layer-kem { border-left-color: #a684f0; }
+html[data-theme='dark'] .layer-pw .layer-badge { color: #8fb4f5; }
+html[data-theme='dark'] .layer-kem .layer-badge { color: #c9b3f7; }
+html[data-theme='dark'] .layer-body { color: #d3ccbe; }
+html[data-theme='dark'] .layer-arrow { color: #c9b3f7; }
+html[data-theme='dark'] .layer-arrow-note { color: #9a9080; }
+
+/* 2-D lattice sketch */
+html[data-theme='dark'] .lattice-viz { background: #16211b; border-color: #35473d; border-left-color: #4fae86; }
+html[data-theme='dark'] .lattice-title { color: #98dcb4; }
+html[data-theme='dark'] .lattice-svg { color: #8aa89a; }
+html[data-theme='dark'] .lattice-caption { color: #d3ccbe; }
 
 /* Glossary */
 html[data-theme='dark'] .glossary { border-top-color: #38332a; }
@@ -1577,6 +1771,17 @@ html[data-theme='dark'] .ks-strip { background: #15130f; }
 html[data-theme='dark'] .ks-split-arrow { color: #9a9080; }
 html[data-theme='dark'] .ks-verdict.ks-ok { color: #98dcb4; }
 html[data-theme='dark'] .ks-verdict.ks-bad { color: #f0a8a0; }
+html[data-theme='dark'] .ks-row.ks-original .ks-label { color: #7faaee; }
+html[data-theme='dark'] .ks-row.ks-share-a .ks-label { color: #f0b866; }
+html[data-theme='dark'] .ks-row.ks-share-b .ks-label { color: #8fb4f5; }
+html[data-theme='dark'] .ks-row.ks-share-c .ks-label { color: #c0a6f5; }
+html[data-theme='dark'] .ks-vs { color: #98dcb4; }
+html[data-theme='dark'] .ks-cell-match { box-shadow: inset 0 0 0 2px #98dcb4; }
+html[data-theme='dark'] .ks-cell-miss  { box-shadow: inset 0 0 0 2px #f0a8a0; }
+html[data-theme='dark'] .ks-caption.ks-unknowable {
+  border-left-color: #f0a8a0;
+  background: rgba(240, 168, 160, 0.08);
+}
 
 /* Tamper button */
 html[data-theme='dark'] .btn-tamper { border-color: #a8453d !important; color: #ef6b62 !important; }

@@ -7,7 +7,7 @@ import { loadVaultState, saveVaultState, clearVaultState, emptyVaultState, seria
 import type { VaultState } from './vault/state';
 import { generateDemoBoxes, removeDemoBoxes, clearDemoTracker } from './vault/demo';
 import { sealMessageWithVisual, openBox } from './crypto/pipeline';
-import type { SealedBox } from './crypto/pipeline';
+import type { SealedBox, OpenVisual } from './crypto/pipeline';
 import { exportQvault, vaultBoxToSealedBox, exportFullVault, importFullVault, QvaultImportError } from './vault/file';
 import { renderVaultWall } from './ui/wall';
 import {
@@ -22,6 +22,13 @@ import { revealMessage, showGibberish } from './ui/reveal';
 import { qs, byId } from './ui/dom';
 import { sleep } from './crypto/utils';
 import { setLang, getLang, t } from './i18n';
+
+/** Wipe the key-material copies an OpenVisual carried for the strip animation. */
+function zeroizeOpenVisual(v: OpenVisual): void {
+  v.reconstructedKey?.fill(0);
+  v.originalKey?.fill(0);
+  for (const s of v.recoveredShares) s?.fill(0);
+}
 
 const initDiagnostics: string[] = [];
 
@@ -180,6 +187,8 @@ async function init(): Promise<void> {
     // Animate pipeline from the REAL open result — distinct failure modes and
     // the genuine reconstructed key-strip are driven by result.visual.
     await animateOpenPipeline(pipelineArea, result.visual);
+    // Zeroize the visualization copies of key material once rendered.
+    zeroizeOpenVisual(result.visual);
 
     if (result.success) {
       updateRetrieveTitle(panelEl, `Box ${boxNumber} — ${t('decrypted')}`);
@@ -229,6 +238,7 @@ async function init(): Promise<void> {
 
     const result = await openBox(tampered, [null, null, null]);
     await animateOpenPipeline(pipelineArea, result.visual);
+    zeroizeOpenVisual(result.visual);
 
     updateRetrieveTitle(panelEl, `Box ${boxNumber} — ${t('accessDenied')}`);
     const msgEl = document.createElement('div');

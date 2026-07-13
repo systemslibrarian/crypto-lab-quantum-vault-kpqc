@@ -58,6 +58,20 @@ export interface OpenVisual {
   signatureValid: boolean;
   /** The bytes Lagrange interpolation produced — the true AES key iff >= 2 valid shares. */
   reconstructedKey: Uint8Array | null;
+  /**
+   * The genuine per-keyholder Shamir share bytes recovered by SMAUG-T unlock,
+   * aligned to the 3 password slots (null where the password was wrong/absent).
+   * Real GF(2^8) share rows — used to animate the actual pieces combining.
+   */
+  recoveredShares: [Uint8Array | null, Uint8Array | null, Uint8Array | null];
+  /**
+   * The TRUE original AES key, for the side-by-side "does it match?" comparison.
+   * Only knowable when >= 2 shares are recovered (Lagrange is then exact), so it
+   * is non-null exactly when the open succeeds. Below threshold it is `null`
+   * BECAUSE one share cannot reveal the key — that unknowability is the security
+   * guarantee the visualization is teaching, never a fabricated reference.
+   */
+  originalKey: Uint8Array | null;
 }
 
 export type OpenResult =
@@ -188,13 +202,23 @@ export async function openBox(
       gibberish: garbage,
       validShareCount: 0,
       // Integrity failure: signature did not verify. No share was even attempted.
-      visual: { shareStatus: [false, false, false], signatureValid: false, reconstructedKey: null },
+      visual: {
+        shareStatus: [false, false, false],
+        signatureValid: false,
+        reconstructedKey: null,
+        recoveredShares: [null, null, null],
+        originalKey: null,
+      },
     };
   }
 
   const validShares: Share[] = [];
   let validShareCount = 0;
   const shareStatus: [boolean, boolean, boolean] = [false, false, false];
+  // Real recovered share rows per keyholder slot — snapshotted for the animation
+  // BEFORE the working copies are zeroized below. Genuine GF(2^8) bytes.
+  const recoveredShares: [Uint8Array | null, Uint8Array | null, Uint8Array | null] =
+    [null, null, null];
 
   // Step 2 — SMAUG-T unlock: for each non-empty password —
   //   PBKDF2(password) → decrypt SMAUG-T SK → decapsulate → AES-GCM decrypt share
@@ -205,6 +229,7 @@ export async function openBox(
     try {
       const shareData = await unwrapShare(box.wrappedShares[i], pw);
       validShares.push({ index: i + 1, data: shareData });
+      recoveredShares[i] = shareData.slice(); // real bytes for the merge animation
       validShareCount++;
       shareStatus[i] = true;
     } catch {
@@ -220,7 +245,7 @@ export async function openBox(
       success: false,
       gibberish: garbage,
       validShareCount: 0,
-      visual: { shareStatus, signatureValid: true, reconstructedKey: null },
+      visual: { shareStatus, signatureValid: true, reconstructedKey: null, recoveredShares, originalKey: null },
     };
   }
 
@@ -230,6 +255,11 @@ export async function openBox(
   // BEFORE zeroization. With >= 2 shares this equals the true AES key; with 1
   // share it is the genuinely-wrong reconstruction (unrelated bytes) — never faked.
   const keySnapshot = reconstructedKey.slice();
+  // With >= 2 valid shares Lagrange is exact, so this reconstruction IS the true
+  // original key — a genuine reference for the side-by-side match, not a stored
+  // copy. Below threshold the original is mathematically unknowable, so we leave
+  // it null (the visualization then teaches exactly that unknowability).
+  const originalKey = validShares.length >= 2 ? keySnapshot.slice() : null;
   // Zeroize share data — sensitive key material, no longer needed after reconstruction.
   for (const share of validShares) share.data.fill(0);
 
@@ -242,7 +272,7 @@ export async function openBox(
       success: true,
       message: decode(plaintext),
       validShareCount,
-      visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot },
+      visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot, recoveredShares, originalKey },
     };
   } catch {
     reconstructedKey.fill(0);
@@ -254,7 +284,7 @@ export async function openBox(
       success: false,
       gibberish,
       validShareCount,
-      visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot },
+      visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot, recoveredShares, originalKey },
     };
   }
 }

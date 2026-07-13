@@ -154,7 +154,15 @@ export async function animateOpenPipeline(
   await sleep(500);
   if (visual.reconstructedKey) {
     const vizEl = viz(container);
-    if (vizEl) renderReconstructStrip(vizEl, visual.reconstructedKey, enough);
+    if (vizEl) {
+      await renderReconstructStrip(
+        vizEl,
+        visual.reconstructedKey,
+        enough,
+        visual.recoveredShares,
+        visual.originalKey,
+      );
+    }
   }
   if (!enough) {
     // Amber, not red: this is a confidentiality shortfall (too few shares), a

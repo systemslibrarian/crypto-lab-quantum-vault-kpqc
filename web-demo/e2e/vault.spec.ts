@@ -182,6 +182,34 @@ test.describe('Quantum Vault — seal/open pipeline', () => {
     // Per-step narration is present (labels gain meaning, not just buzzwords).
     await expect(page.locator('#pipeline-narration')).not.toBeEmpty();
     await expect(page.locator('#retrieve-result')).toContainText(DEMO['06'].secret);
+
+    // Headline intuition made VISIBLE: the true original key strip is rendered
+    // above the rebuilt one, and every compared cell is a match (green ✓) — the
+    // "same colors as the original" claim is shown side by side, not asserted.
+    await expect(page.locator('.keystrip .ks-row.ks-original')).toBeVisible();
+    await expect(page.locator('.keystrip .ks-cell-match').first()).toBeVisible();
+    // With 2 identical keys, no cell should be marked as a mismatch.
+    await expect(page.locator('.keystrip .ks-cell-miss')).toHaveCount(0);
+    // The two recovered shares that combined are shown, tied to their keyholders.
+    await expect(page.locator('.keystrip .ks-share.ks-merge')).toHaveCount(2);
+  });
+
+  test('below-threshold open shows no false original and flags unknowability', async ({
+    page,
+  }) => {
+    await gotoLoadedVault(page);
+    // One correct password → one recovered share → below the 2-of-3 threshold.
+    await attemptOpen(page, '06', [DEMO['06'].passwords[0]]);
+
+    await expect(page.locator('.keystrip .ks-verdict.ks-bad')).toBeVisible({
+      timeout: 30_000,
+    });
+    // Honest: with one share the original is unknowable, so NO original strip is
+    // fabricated for comparison — instead the unknowability note is shown.
+    await expect(page.locator('.keystrip .ks-row.ks-original')).toHaveCount(0);
+    await expect(page.locator('.keystrip .ks-unknowable')).toBeVisible();
+    // Exactly one recovered share strip is shown (the lone valid keyholder).
+    await expect(page.locator('.keystrip .ks-share.ks-merge')).toHaveCount(1);
   });
 
   test('tamper demo trips HAETAE integrity check (red), never the secret', async ({

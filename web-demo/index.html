@@ -286,6 +286,91 @@
           </li>
         </ol>
 
+        <!-- INSIDE STEP 3 — the SMAUG-T "quantum-safe lock" is really TWO nested
+             layers. This mini-diagram separates what YOUR PASSWORD does (unlock the
+             keyholder's post-quantum secret key via PBKDF2) from what the KEM does
+             (decapsulate to recover the wrapping key that unlocks the share). The
+             KEM is the least-taught primitive; here its encapsulate/decapsulate is
+             shown, not just named. -->
+        <div class="step3-zoom" aria-labelledby="step3-zoom-title">
+          <p class="step3-zoom-title" id="step3-zoom-title"
+             data-en="Inside step 3: two nested locks, not one"
+             data-ko="3단계 속: 하나가 아니라 두 겹의 잠금">
+            Inside step 3: two nested locks, not one
+          </p>
+          <p class="step3-zoom-sub"
+             data-en="“A quantum-safe lock” is shorthand for two separate wrappings. The password and the KEM protect different things — collapsing them hides where the post-quantum guarantee actually lives."
+             data-ko="“양자내성 잠금”은 사실 두 겹의 감싸기를 줄인 말입니다. 비밀번호와 KEM은 서로 다른 것을 보호합니다.">
+            “A quantum-safe lock” is shorthand for two separate wrappings. The password and the KEM protect different things — collapsing them hides where the post-quantum guarantee actually lives.
+          </p>
+          <ol class="layer-diagram" role="list">
+            <li class="layer-node layer-pw">
+              <span class="layer-badge"
+                    data-en="Layer 1 — your password" data-ko="1층 — 비밀번호">Layer 1 — your password</span>
+              <span class="layer-body"
+                    data-en="Password → PBKDF2 (600k iters) → an AES key that unlocks this keyholder’s SMAUG-T secret key. This is the ONLY step your password touches."
+                    data-ko="비밀번호 → PBKDF2(60만 회) → 이 키홀더의 SMAUG-T 비밀 키를 여는 AES 키. 비밀번호가 관여하는 유일한 단계입니다.">
+                Password → PBKDF2 (600k iters) → an AES key that unlocks this keyholder’s SMAUG-T secret key. This is the ONLY step your password touches.
+              </span>
+            </li>
+            <li class="layer-arrow" aria-hidden="true">↓
+              <span class="layer-arrow-note"
+                    data-en="now you hold the SMAUG-T secret key" data-ko="이제 SMAUG-T 비밀 키를 얻음">
+                now you hold the SMAUG-T secret key
+              </span>
+            </li>
+            <li class="layer-node layer-kem">
+              <span class="layer-badge"
+                    data-en="Layer 2 — the post-quantum KEM" data-ko="2층 — 양자내성 KEM">Layer 2 — the post-quantum KEM</span>
+              <span class="layer-body"
+                    data-en="At seal time SMAUG-T ENCAPSULATED a random 32-byte shared secret against the keyholder’s public key. On open, DECAPSULATE with the secret key recovers that same shared secret — the wrapping key that finally unlocks the Shamir share. THIS is the layer a quantum attacker can’t break."
+                    data-ko="봉인 시 SMAUG-T가 키홀더의 공개 키에 대해 무작위 32바이트 공유 비밀을 캡슐화(encapsulate)했습니다. 열 때 비밀 키로 디캡슐화(decapsulate)하면 같은 공유 비밀 — 샤미르 조각을 여는 감싸기 키 — 를 되찾습니다. 이 층이 양자 공격자가 깰 수 없는 부분입니다.">
+                At seal time SMAUG-T <strong>encapsulated</strong> a random 32-byte shared secret against the keyholder’s public key. On open, <strong>decapsulate</strong> with the secret key recovers that same shared secret — the wrapping key that finally unlocks the Shamir share. THIS is the layer a quantum attacker can’t break.
+              </span>
+            </li>
+          </ol>
+          <p class="step3-zoom-foot"
+             data-en="So: crack the password and you still face the KEM; break the KEM (needs a quantum computer that doesn’t exist) and you still face the password. The share only appears when BOTH are peeled."
+             data-ko="즉, 비밀번호를 깨도 여전히 KEM이 남고, KEM을 깨도(존재하지 않는 양자 컴퓨터 필요) 여전히 비밀번호가 남습니다. 두 겹을 모두 벗겨야 조각이 나옵니다.">
+            So: crack the password and you still face the KEM; break the KEM (needs a quantum computer that doesn’t exist) and you still face the password. The share only appears when BOTH are peeled.
+          </p>
+        </div>
+
+        <!-- WHY THE KEM RESISTS QUANTUM — a tiny 2-D lattice makes the lamppost
+             analogy concrete: in 2-D the nearest lattice point to the target is
+             obvious; SMAUG-T lives in hundreds of dimensions where the same
+             "nearest point" search is intractable even for a quantum computer. -->
+        <div class="lattice-viz" aria-labelledby="lattice-title">
+          <p class="lattice-title" id="lattice-title"
+             data-en="Why can’t a quantum computer break layer 2?"
+             data-ko="왜 양자 컴퓨터가 2층을 못 깨나요?">
+            Why can’t a quantum computer break layer 2?
+          </p>
+          <div class="lattice-figure">
+            <svg viewBox="0 0 200 140" class="lattice-svg" role="img"
+                 aria-label="A 2-D grid of dots with a red target point; the nearest grid dot is easy to pick out by eye.">
+              <!-- lattice points -->
+              <g fill="currentColor">
+                <!-- generated 6x5 grid -->
+                <circle cx="20" cy="20" r="3"/><circle cx="55" cy="20" r="3"/><circle cx="90" cy="20" r="3"/><circle cx="125" cy="20" r="3"/><circle cx="160" cy="20" r="3"/>
+                <circle cx="20" cy="50" r="3"/><circle cx="55" cy="50" r="3"/><circle cx="90" cy="50" r="3"/><circle cx="125" cy="50" r="3"/><circle cx="160" cy="50" r="3"/>
+                <circle cx="20" cy="80" r="3"/><circle cx="55" cy="80" r="3"/><circle cx="90" cy="80" r="3"/><circle cx="125" cy="80" r="3"/><circle cx="160" cy="80" r="3"/>
+                <circle cx="20" cy="110" r="3"/><circle cx="55" cy="110" r="3"/><circle cx="90" cy="110" r="3"/><circle cx="125" cy="110" r="3"/><circle cx="160" cy="110" r="3"/>
+              </g>
+              <!-- nearest lattice point highlighted -->
+              <circle cx="90" cy="80" r="6" fill="none" stroke="#14603f" stroke-width="2.5"/>
+              <!-- target (off-lattice) point + line to nearest -->
+              <line x1="105" y1="66" x2="90" y2="80" stroke="#C60C30" stroke-width="1.5" stroke-dasharray="3 2"/>
+              <circle cx="105" cy="66" r="4" fill="#C60C30"/>
+            </svg>
+            <p class="lattice-caption"
+               data-en="In 2-D, picking the lattice dot nearest the red target is trivial — you just look. SMAUG-T’s lattice has hundreds of dimensions, where “find the nearest point” (the Module-LWE problem) has no known efficient solution, classical OR quantum. That gap is the whole security guarantee."
+               data-ko="2차원에서는 빨간 목표에 가장 가까운 격자 점을 고르기가 아주 쉽습니다 — 눈으로 보면 됩니다. SMAUG-T의 격자는 수백 차원이며, 거기서 “가장 가까운 점 찾기”(Module-LWE 문제)는 고전이든 양자든 효율적인 해법이 알려져 있지 않습니다. 이 격차가 곧 보안 보증입니다.">
+              In 2-D, picking the lattice dot nearest the red target is trivial — you just look. SMAUG-T’s lattice has hundreds of dimensions, where “find the nearest point” (the Module-LWE problem) has no known efficient solution, classical OR quantum. That gap is the whole security guarantee.
+            </p>
+          </div>
+        </div>
+
         <!-- Inline click-to-expand glossary: newcomer definition + one-line analogy -->
         <div class="glossary">
           <p class="glossary-lead"
@@ -431,6 +516,18 @@
         </p>
       </section>
 
+      <!-- GO DEEPER — expert-facing prescriptive reference. Gated behind a reveal
+           so the first-scroll path stays: try a box → watch the pipeline → read
+           the four-step story. These do/don't cards name alternatives (AES-CBC,
+           RSA-PKCS1v1.5, …) a newcomer hasn't met yet, so they open on demand. -->
+      <details class="go-deeper">
+        <summary class="go-deeper-summary">
+          <span data-en="Go deeper — when to use each primitive (and what breaks if you don’t)"
+                data-ko="더 깊이 — 각 기본 요소를 언제 쓰는지 (그리고 안 쓰면 무엇이 깨지는지)">
+            Go deeper — when to use each primitive (and what breaks if you don’t)
+          </span>
+        </summary>
+
       <!-- Decision Engine: Fast Crypto Rules -->
       <section class="kpqc-panel decision-engine" aria-labelledby="decision-title">
         <h2 class="kpqc-panel-title" id="decision-title">
@@ -529,6 +626,7 @@
           </div>
         </div>
       </section>
+      </details>
 
       <!-- Disclaimers -->
       <section class="kpqc-panel disclaimers" aria-labelledby="disclaimers-title">
