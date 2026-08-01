@@ -14,13 +14,36 @@ auditing a new backend, or accepting pull requests that touch cryptographic code
 - [ ] **R-001** All key generation uses a CSPRNG (`rand::thread_rng()` or OS-level).
 - [ ] **R-002** The file key $K$ is generated with `rng.fill_bytes()`, not seeded from user input.
 - [ ] **R-003** The AES-GCM nonce is generated with `rng.fill_bytes()` — never hardcoded or derived.
-- [ ] **R-004** Shamir **non-leading** polynomial coefficients are drawn uniformly over the full
-      field, 0 included (`rng.fill_bytes`). Forcing them nonzero rules out one candidate per secret
-      byte for a single-share holder and breaks the perfect-secrecy claim. Only the **leading**
-      coefficient is rejection-sampled to be nonzero (`while coeffs[leading] == 0`), so the
-      polynomial has degree exactly `threshold - 1`. The TypeScript demo must match, and must
-      *resample* rather than map `0 -> 1` (a `0 -> 1` map makes the value 1 twice as likely as any
-      other field element).
+- [ ] **R-004** **Every** Shamir polynomial coefficient above the constant term — the **leading**
+      coefficient `a_{threshold-1}` included — is drawn uniformly over the full field, 0 included
+      (a single `rng.fill_bytes(&mut coeffs[1..])`, no rejection loop, no `0 -> 1` map). The
+      TypeScript demo must match, byte for byte.
+
+      *Why the leading coefficient is not an exception.* Fix any `threshold - 1` shares. For each
+      candidate secret `S` there is exactly one coefficient vector that hits those shares and has
+      `f(0) = S`, and that vector's leading coefficient is an affine, non-degenerate function of
+      `S`. So barring the leading coefficient from being 0 makes exactly one candidate secret
+      unreachable: the adversary can *rule it out*, and the 256 candidates are no longer equally
+      likely. That is a 1/256-per-byte leak in exactly the property the docs claim
+      ("reveals zero information", "perfect secrecy", "information-theoretically secure",
+      "a single share reveals NOTHING"). At the shipped 2-of-3 setting the sole non-constant
+      coefficient *is* the leading one, so the constraint applied to every byte of every real key —
+      restricting only the non-leading coefficients would be a no-op there.
+
+      *Why the resulting degree drop is harmless.* A zero leading coefficient (probability 1/256)
+      makes the polynomial degree less than `threshold - 1`. It does **not** let `threshold - 1`
+      shares reconstruct in any meaningful sense: interpolating `threshold - 1` shares yields the
+      true secret exactly when the degree dropped, which is probability 1/256 — the same as
+      guessing — and the shareholders cannot tell the degenerate case from the full-degree one,
+      since the two views are identically distributed. Correctness is likewise unaffected: any
+      `threshold` points determine a unique polynomial of degree at most `threshold - 1`, so
+      Lagrange interpolation at `x = 0` still returns the secret.
+
+      *Regression trap.* A test asserting `reconstruct(threshold - 1 shares) != secret` will now
+      fail about 1/256 of the time per byte, and that flakiness is correct behaviour, not a bug.
+      Do not "fix" it by reintroducing the nonzero constraint. See
+      `shamir_under_threshold_reveals_nothing` in `crates/qv-core/tests/property_tests.rs` for the
+      invariant that actually holds.
 - [ ] **R-005** WASM / browser builds use `getrandom` with `features = ["js"]` to reach `crypto.getRandomValues`.
 - [ ] **R-006** The dev backend (`randombytes_shim.c`) uses `getrandom(2)` / `arc4random_buf(3)`, never `rand()`.
 

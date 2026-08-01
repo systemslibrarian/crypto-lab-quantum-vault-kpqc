@@ -5,9 +5,14 @@
 // (0x11B = AES polynomial is irreducible but 2 has order 51 there, not 255.)
 //
 // Critical property: reconstructing with fewer than `threshold` shares produces
-// mathematically incorrect output (wrong bytes), NOT an error. This is the
+// mathematically unrelated output (wrong bytes), NOT an error. This is the
 // fundamental security property of Shamir SSS and is what drives the gibberish
-// reveal on retrieval failure.
+// reveal on retrieval failure. Each such byte is uniform over GF(256) and so
+// coincides with the true byte with probability 1/256 — for the 32-byte key this
+// demo splits, an accidentally correct reconstruction has probability 256^-32.
+// That residual chance is not a defect: it is what "every candidate secret is
+// equally likely" means, and a scheme where under-threshold output could never
+// be right would be leaking.
 
 const EXP = new Uint8Array(512); // EXP[i] = generator^i  (extended for easy mul)
 const LOG = new Uint8Array(256); // LOG[x] = i  where  generator^i = x
@@ -71,31 +76,28 @@ export function splitSecret(
   // Reuse a single buffer for random coefficients so we can wipe it once done
   // rather than creating a fresh allocation (and GC-visible ghost) each iteration.
   const rand = new Uint8Array(threshold - 1);
-  // Scratch buffer for rejection-sampling the leading coefficient; hoisted for
-  // the same reason as `rand` and wiped alongside it.
-  const redraw = new Uint8Array(1);
-
-  // Position of the leading coefficient a_{threshold-1} inside `rand`.
-  const leadingIdx = threshold - 2;
 
   for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
     // Polynomial: f(x) = secret[i] + c1*x + c2*x^2 + ... (over GF(256))
     const coefficients: number[] = [secret[byteIdx]];
     crypto.getRandomValues(rand);
 
-    // The LEADING coefficient must be nonzero so the polynomial has degree
-    // exactly threshold-1; a zero leading term would drop the degree and let
-    // threshold-1 shares reconstruct. Resample (rejection sampling) rather than
-    // mapping 0 -> 1, which would make the value 1 twice as likely as any other.
-    while (rand[leadingIdx] === 0) {
-      crypto.getRandomValues(redraw);
-      rand[leadingIdx] = redraw[0];
-    }
-
-    // Every OTHER coefficient is uniform over the full field, 0 included,
-    // exactly as in Shamir's 1979 construction. Forcing them nonzero would
-    // leak: it rules out one candidate per secret byte for a holder of a single
-    // share, which is precisely the "a single share reveals NOTHING" claim.
+    // EVERY non-constant coefficient — the leading one a_{threshold-1} included —
+    // is uniform over the full field, 0 included, exactly as in Shamir's 1979
+    // construction. Constraining any of them to be nonzero leaks: fix any
+    // threshold-1 shares, and for each candidate secret there is exactly one
+    // coefficient vector consistent with them; its leading coefficient varies
+    // non-degenerately with the candidate, so barring 0 makes exactly one
+    // candidate per secret byte unreachable. That is a 1/256 leak in precisely
+    // the "a single share reveals NOTHING" claim — and at the shipped 2-of-3
+    // setting the single non-constant coefficient IS the leading one, so the
+    // constraint applied to every byte of every real key.
+    //
+    // The degree may therefore drop below threshold-1 (probability 1/256). That
+    // is harmless: `threshold` points still determine a unique polynomial of
+    // degree <= threshold-1, so reconstruction is unaffected; and a holder of
+    // threshold-1 shares cannot distinguish a degenerate polynomial from a
+    // full-degree one, so nothing is given away.
     for (let i = 0; i < threshold - 1; i++) {
       coefficients.push(rand[i]);
     }
@@ -107,7 +109,6 @@ export function splitSecret(
   // Wipe the coefficient buffer — polynomial coefficients are as sensitive as
   // share data since knowing them plus any one share reveals each secret byte.
   rand.fill(0);
-  redraw.fill(0);
 
   return shares;
 }

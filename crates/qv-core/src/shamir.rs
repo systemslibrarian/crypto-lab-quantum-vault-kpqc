@@ -11,11 +11,16 @@
 //! # Security notes
 //! * Share indices are 1-based; index 0 is the secret (never issued as a share).
 //! * Polynomial coefficients other than the constant term are randomly generated
-//!   and zeroized after use. Non-leading coefficients are drawn uniformly over
-//!   the full field (0 included) — that uniformity is what makes fewer than
-//!   `threshold` shares information-theoretically useless. Only the leading
-//!   coefficient is redrawn until nonzero, so the polynomial has degree exactly
-//!   `threshold - 1`.
+//!   and zeroized after use. **Every** non-constant coefficient — the leading one
+//!   `a_{threshold-1}` included — is drawn uniformly over the full field, 0
+//!   included. That uniformity is exactly what makes fewer than `threshold`
+//!   shares information-theoretically useless: for any candidate secret there is
+//!   then exactly one coefficient vector consistent with the observed shares, and
+//!   all such vectors are equally likely, so every candidate stays equally likely.
+//!   Constraining any coefficient to be nonzero destroys that: it makes one
+//!   candidate secret impossible, a 1/256-per-byte leak.
+//! * A zero leading coefficient (probability 1/256) drops the polynomial's degree
+//!   below `threshold - 1`. That is harmless — see `split_secret` for why.
 //! * Share payloads are wrapped in a [`Share`] type that implements
 //!   [`zeroize::ZeroizeOnDrop`].
 
@@ -139,30 +144,33 @@ pub fn split_secret(secret: &[u8], share_count: u8, threshold: u8) -> Result<Vec
         })
         .collect();
 
-    // Index of the leading coefficient a_{threshold-1}.
-    let leading = threshold as usize - 1;
-
     for &byte in secret {
-        // Build a random degree-(threshold-1) polynomial whose constant term is `byte`.
+        // Build a random polynomial of degree AT MOST threshold-1 whose constant
+        // term is `byte`.
         let mut coeffs = vec![0u8; threshold as usize];
         coeffs[0] = byte;
 
-        // Non-leading coefficients are uniform over the FULL field, including 0,
-        // exactly as in Shamir's 1979 construction. Excluding 0 here would leak:
-        // with a_1 != 0 guaranteed, a single share (x, y) rules out the candidate
-        // secret y ^ (a_1 = 0 case) for every byte, so t-1 shares would no longer
-        // leave every secret equally likely and the perfect-secrecy claim would
-        // be false.
+        // ALL non-constant coefficients — including the leading one — are uniform
+        // over the FULL field, 0 included, exactly as in Shamir's 1979
+        // construction. Excluding 0 from any of them leaks. Fix any threshold-1
+        // shares; for each candidate secret S there is exactly one coefficient
+        // vector that both hits those shares and has f(0) = S, and the leading
+        // coefficient of that vector is an affine, non-degenerate function of S.
+        // So restricting the leading coefficient to the 255 nonzero values makes
+        // exactly one candidate secret per byte unreachable — a 1/256 leak in
+        // precisely the property this module claims.
+        //
+        // It is tempting to force the leading term nonzero "so the degree is
+        // exactly threshold-1", but a dropped degree costs nothing:
+        //   * Correctness: any `threshold` points determine a unique polynomial of
+        //     degree <= threshold-1, so Lagrange interpolation at x = 0 still
+        //     returns `byte` whether or not the degree happens to be lower.
+        //   * Security: a holder of threshold-1 shares cannot tell a degenerate
+        //     polynomial from a full-degree one — the two produce identical views.
+        //     Interpolating threshold-1 shares and reading off f(0) recovers the
+        //     secret exactly when the degree dropped, which happens with
+        //     probability 1/256, the same as guessing. Nothing is given away.
         rng.fill_bytes(&mut coeffs[1..]);
-
-        // The LEADING coefficient is the one legitimate exception: it is redrawn
-        // until nonzero so the polynomial has degree exactly threshold-1. A zero
-        // leading term would drop the degree and let threshold-1 shares
-        // reconstruct, weakening the threshold itself. This constraint is on the
-        // degree, not on the information content of any single share.
-        while coeffs[leading] == 0 {
-            rng.fill_bytes(&mut coeffs[leading..=leading]);
-        }
 
         for share in shares.iter_mut() {
             share.data.push(poly_eval(&coeffs, share.index));
@@ -269,6 +277,12 @@ mod tests {
         let secret = b"test secret value";
         let shares = split_secret(secret, 3, 3).unwrap();
         // Two shares for a 3-of-3 scheme should NOT reconstruct correctly.
+        // Each byte coincidentally matches with probability 1/256 (the case where
+        // that byte's leading coefficient was drawn as 0 — see `split_secret`), so
+        // this 17-byte secret matches with probability 256^-17. Deterministic
+        // enough for a fixed-length unit test; see the property test
+        // `shamir_under_threshold_reconstructs_uniformly` for the general claim,
+        // which must NOT assert per-byte inequality.
         let wrong = reconstruct_secret(&shares[0..2]).unwrap();
         assert_ne!(wrong, secret.as_slice());
     }

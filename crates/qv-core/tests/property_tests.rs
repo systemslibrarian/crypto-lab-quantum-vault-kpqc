@@ -55,18 +55,6 @@ proptest! {
         prop_assert_eq!(recovered, secret);
     }
 
-    /// Property: Reconstruction with fewer than threshold shares produces
-    /// bytes that are NOT the original secret.
-    #[test]
-    fn shamir_under_threshold_is_wrong(
-        secret in prop::collection::vec(any::<u8>(), 1..=64),
-    ) {
-        // 3-of-3: using only 2 shares must produce wrong output
-        let shares = split_secret(&secret, 3, 3).map_err(to_test_err)?;
-        let wrong = reconstruct_secret(&shares[0..2]).map_err(to_test_err)?;
-        prop_assert_ne!(wrong, secret);
-    }
-
     /// Property: Reconstruction is order-independent.
     #[test]
     fn shamir_order_independent(
@@ -127,6 +115,100 @@ proptest! {
             KeyShare { index: 1, data: data.clone() },
         ];
         prop_assert!(reconstruct_secret(&shares).is_err());
+    }
+}
+
+// ============================================================================
+// Shamir under-threshold secrecy
+// ============================================================================
+//
+// WHY THIS TEST IS NOT `assert_ne!(reconstruct(t-1 shares), secret)`.
+//
+// The obvious invariant — "too few shares give the wrong answer" — is the WRONG
+// invariant, and an implementation that satisfied it exactly would be broken.
+// Reconstructing from `threshold - 1` shares interpolates the unique lower-degree
+// polynomial through them and reads off f(0). Over GF(256) that value is uniform
+// and independent of the true secret, so it coincides with the true secret byte
+// with probability 1/256. It MUST be able to coincide: perfect secrecy says a
+// holder of `threshold - 1` shares sees all 256 candidate secrets as exactly
+// equally likely, and a candidate that the under-threshold reconstruction can
+// never produce is a candidate the adversary has RULED OUT. Guaranteed
+// inequality is therefore a symptom of a 1/256 leak, not a safety property. (It
+// is precisely the leak that forcing the leading coefficient nonzero created:
+// the excluded value was the true secret itself.)
+//
+// So the test below asserts what actually holds, in both directions:
+//   1. `threshold` shares ALWAYS reconstruct exactly — a hard equality, checked
+//      every trial, so the test cannot be passed by an implementation that just
+//      emits noise.
+//   2. Under threshold, the reconstruction ranges over essentially the whole
+//      field, the true secret included, and hits the true secret at the uniform
+//      rate 1/256 — neither suppressed (adversary can exclude it) nor favoured
+//      (adversary can guess it).
+// A genuinely broken split — degenerate or constant coefficients, secret reuse,
+// or a punctured coefficient range — fails one of these.
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(8))]
+
+    #[test]
+    fn shamir_under_threshold_reveals_nothing(secret_byte in any::<u8>()) {
+        const TRIALS: usize = 4096;
+
+        let mut hits = 0usize;
+        let mut seen = std::collections::HashSet::new();
+
+        for _ in 0..TRIALS {
+            // 3-of-3, so two shares are under threshold.
+            let shares = split_secret(&[secret_byte], 3, 3).map_err(to_test_err)?;
+
+            // (1) All `threshold` shares must always reconstruct exactly. Holds
+            // whether or not the polynomial's degree happened to drop.
+            let full = reconstruct_secret(&shares).map_err(to_test_err)?;
+            prop_assert_eq!(full, vec![secret_byte]);
+
+            let under = reconstruct_secret(&shares[0..2]).map_err(to_test_err)?;
+            seen.insert(under[0]);
+            if under[0] == secret_byte {
+                hits += 1;
+            }
+        }
+
+        // (2a) The under-threshold value must range over the whole field, not a
+        // punctured subset. Restricting a coefficient to nonzero values makes
+        // exactly one field element unreachable, and that is what this catches.
+        // Pr[a given element is missed by chance] = (255/256)^4096 < 1e-6, so
+        // near-total coverage is required, with slack for the birthday tail.
+        prop_assert!(
+            seen.len() >= 250,
+            "under-threshold reconstruction reached only {} of 256 field elements \
+             — a restricted coefficient range is puncturing the adversary's view",
+            seen.len()
+        );
+
+        // (2b) The true secret must itself be reachable. If it never is, a holder
+        // of threshold-1 shares can rule it out: that is the leak, stated directly.
+        prop_assert!(
+            seen.contains(&secret_byte),
+            "the true secret {secret_byte} was never reachable from an \
+             under-threshold reconstruction — it is excluded from the \
+             adversary's view, so the candidates are not equally likely"
+        );
+
+        // (2c) ...and reachable at the uniform rate, not more often. Expected
+        // TRIALS/256 = 16 hits, sd = sqrt(4096 * (1/256) * (255/256)) ~= 3.99.
+        // The bound of 40 sits ~6 sd above the mean, so spurious failure is far
+        // below one in a million, while an implementation that leaks the secret
+        // into the under-threshold reconstruction drives `hits` toward TRIALS.
+        prop_assert!(
+            hits <= 40,
+            "secret {} was recovered from under-threshold shares {} times in {} \
+             trials (expected ~{}) — the split is leaking the secret",
+            secret_byte,
+            hits,
+            TRIALS,
+            TRIALS / 256
+        );
     }
 }
 
