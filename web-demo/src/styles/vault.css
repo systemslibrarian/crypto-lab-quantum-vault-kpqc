@@ -310,6 +310,14 @@ body {
   box-shadow: 0 0 0 3px rgba(0, 52, 120, 0.15);
 }
 
+/* WCAG 2.4.7 — the 15%-alpha shadow above is not a reliable focus indicator;
+   give keyboard users a solid ring. */
+.form-group input:focus-visible,
+.form-group textarea:focus-visible {
+  outline: 2px solid #003478;
+  outline-offset: 2px;
+}
+
 .field-error {
   font-size: 0.78rem;
   color: #c0392b;
@@ -1640,6 +1648,8 @@ html[data-theme='dark'] .form-group input,
 html[data-theme='dark'] .form-group textarea { background: #2a261d; border-color: #4a4438; color: #ece7da; }
 html[data-theme='dark'] .form-group input:focus,
 html[data-theme='dark'] .form-group textarea:focus { border-color: #7faaee; box-shadow: 0 0 0 3px rgba(127,170,238,0.22); }
+html[data-theme='dark'] .form-group input:focus-visible,
+html[data-theme='dark'] .form-group textarea:focus-visible { outline-color: #7faaee; }
 html[data-theme='dark'] .field-error { color: #ef6b62; }
 html[data-theme='dark'] .show-password-toggle { color: #b3ab9b; }
 html[data-theme='dark'] .show-password-toggle input[type="checkbox"] { accent-color: #7faaee; }
@@ -1811,7 +1821,7 @@ html[data-theme='dark'] .failure-name { color: #f0a8a0; }
 html[data-theme='dark'] .failure-result { color: #d8b6b0; }
 html[data-theme='dark'] .disclaimer-list li { color: #d6b34d; }
 
-/* BEGIN cl-hero standard — managed, keep in sync across fleet.
+/* cl-hero.
    This lab themes via explicit html[data-theme='dark'] overrides (not CSS vars),
    so light values inline below and dark values follow. Accent = Taegukgi navy
    (#003478 light / #7faaee dark); tints/borders mirror the demo's navy panels.
@@ -1832,4 +1842,9 @@ html[data-theme='dark'] .cl-hero-desc{color:#b3ab9b;}
 html[data-theme='dark'] .cl-hero-why{border-color:#38445c;background:#1a1f2b;}
 html[data-theme='dark'] .cl-hero-why-label{color:#9cc0f5;}
 html[data-theme='dark'] .cl-hero-why-text{color:#ece7da;}
-/* END cl-hero standard */
+
+/* Mobile: in the column layout the 22rem flex-basis becomes a minimum
+   HEIGHT, padding dead space above the fold. Reset it. */
+@media (max-width: 640px) {
+  .cl-hero-main { flex-basis: auto; min-width: 0; }
+}
