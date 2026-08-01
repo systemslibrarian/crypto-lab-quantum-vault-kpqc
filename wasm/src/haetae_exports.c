@@ -1,7 +1,10 @@
 /*
  * haetae_exports.c — Emscripten-exported wrapper for HAETAE Mode 2 signatures.
  *
- * Compile with default HAETAE_CONFIG_MODE (HAETAE_MODE2 = 128-bit security level, NIST Level 1 equivalent).
+ * Compile with default HAETAE_CONFIG_MODE (HAETAE_MODE2 = NIST PQC category 2).
+ * HAETAE-120/180/260 target categories 2/3/5; Mode 2 is the lowest of the three.
+ * The web demo pairs this with SMAUG-T Level 1 (category 1), so the demo's
+ * overall post-quantum margin is bounded by category 1, roughly AES-128.
  * export_name attribute is the correct mechanism for Emscripten 5 / wasm-ld.
  *
  * HAETAE 1.1.2 uses the context-string API (FIPS 204 style). We always pass

@@ -72,7 +72,9 @@ pub struct QuantumVaultContainer {
     pub created_at: u64,
     /// Random per-container identifier used to derive the outer AEAD nonce.
     pub container_id: Vec<u8>,
-    /// AES-GCM nonce (12 bytes, base64-encoded in JSON).
+    /// AES-GCM nonce (12 bytes). Carries no `serde` attribute, so it serialises
+    /// as a JSON array of decimal byte values like the other `Vec<u8>` fields —
+    /// not base64. See `docs/container-format.md`.
     pub nonce: Vec<u8>,
     /// AES-256-GCM ciphertext (includes the 16-byte authentication tag).
     pub ciphertext: Vec<u8>,

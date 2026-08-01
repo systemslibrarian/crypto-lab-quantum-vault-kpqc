@@ -33,10 +33,13 @@ export async function revealMessage(
   }
 }
 
-// Display rapidly cycling gibberish (from the actual wrong Shamir reconstruction
-// bytes) before settling on the ACCESS DENIED message.
-// wrongBytes come from pipeline.ts — they are the real incorrect bytes from
-// Lagrange interpolation with insufficient shares, so they are genuinely random.
+// Display rapidly cycling gibberish before settling on the ACCESS DENIED message.
+// wrongBytes come from pipeline.ts, where every failure path fills them with
+// crypto.getRandomValues — NOT with the wrong Shamir reconstruction. Deriving the
+// animation from share material would leak it on screen, so openBox deliberately
+// does not (see the "never derive from share material" note in pipeline.ts).
+// These are display bytes only; the real below-threshold Lagrange output is kept
+// separate as visual.reconstructedKey for the key-strip animation.
 export async function showGibberish(
   container: HTMLElement,
   wrongBytes: Uint8Array,

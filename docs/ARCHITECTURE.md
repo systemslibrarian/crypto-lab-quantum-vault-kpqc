@@ -188,23 +188,44 @@ This ensures no KAT DRBG entropy ever enters a production binary.
 
 See [docs/container-format.md](container-format.md) for the full binary layout.
 
-The AES-256-GCM Additional Authenticated Data (AAD) covers the algorithm
-identifiers, threshold, and version, preventing an attacker from silently
-substituting algorithm labels in the container header:
+The AES-256-GCM Additional Authenticated Data (AAD) covers nine fields — the
+algorithm identifiers, the policy parameters, the container identity and the
+nonce — preventing an attacker from silently substituting algorithm labels or
+policy values in the container header
+(`aad_bytes` in `crates/qv-core/src/encrypt.rs`):
 
 ```json
 {
+  "cipher":         "Aes256Gcm",
+  "container_id":   [<uint8>, ...],
+  "created_at":     <uint64>,
   "kem_algorithm":  "<string>",
+  "nonce":          [<uint8>, ...],
+  "share_count":    <uint8>,
   "sig_algorithm":  "<string>",
-  "threshold":      <integer>,
-  "version":        <integer>
+  "threshold":      <uint8>,
+  "version":        <uint8>
 }
 ```
 
-Fields are serialised in alphabetical (key-sorted) order in both Rust
-(`serde_json::json!` with explicitly ordered keys) and TypeScript
-(`JSON.stringify` with keys inserted in alphabetical order), guaranteeing
-byte-identical AAD on both sides of the WASM boundary.
+`container_id` and `nonce` are `Vec<u8>`/`&[u8]` and serialise as JSON arrays of
+decimal byte values, not base64. Fields are emitted in alphabetical (key-sorted)
+order: `serde_json` writes object fields through an internal `BTreeMap`, so the
+output is deterministic regardless of the order the keys appear in the `json!()`
+macro. The AAD is the resulting compact UTF-8 JSON bytes from
+`serde_json::to_vec` — no whitespace, no trailing newline.
+
+The AAD deliberately **excludes** the `shares` array and the `ciphertext`.
+Share-to-recipient binding is enforced one layer up by the HAETAE signature,
+which covers every field including `shares` and is verified *before* any
+decapsulation, so share substitution cannot succeed without also forging the
+signature.
+
+This AAD belongs to the Rust `qv-core` container path only. The browser demo
+under `web-demo/` calls `crypto.subtle.encrypt` with no `additionalData`
+(see `web-demo/src/crypto/aes.ts`); it binds its container context through the
+HAETAE signature over `buildContainerData(...)` instead, so there is no
+AAD to keep byte-identical across the WASM boundary.
 
 ---
 

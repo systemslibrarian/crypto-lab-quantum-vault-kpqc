@@ -180,19 +180,34 @@ It is **recomputed** at decryption time (not stored) from the container fields:
 
 ```json
 {
+  "cipher":        "Aes256Gcm",
+  "container_id":  [/* 16 bytes */],
+  "created_at":    <uint64>,
   "kem_algorithm": "<value>",
+  "nonce":         [/* 12 bytes */],
+  "share_count":   <uint8>,
   "sig_algorithm": "<value>",
   "threshold":     <uint8>,
-  "version":       <uint8>,
-  "container_id":  [/* 16 bytes */]
+  "version":       <uint8>
 }
 ```
 
-Including `container_id` in the AAD prevents an attacker from substituting one
-container's ciphertext into another container's header.
+All nine fields are covered. Including `container_id` and `nonce` in the AAD
+prevents an attacker from substituting one container's ciphertext into another
+container's header; including `created_at`, `threshold` and `share_count` binds
+the ciphertext to the recovery policy it was sealed under.
 
-Keys appear in **alphabetical order** in the serialised form.  Any mismatch in these
-fields causes AES-GCM authentication to fail.
+`container_id` and `nonce` serialise as JSON arrays of decimal byte values (the
+same form used in the container body above), not base64.
+
+Keys appear in **alphabetical order** in the serialised form — `serde_json`
+writes object fields through an internal `BTreeMap`, so this holds regardless of
+the order they are written in the source.  Any mismatch in these fields causes
+AES-GCM authentication to fail.
+
+The AAD excludes `shares` and `ciphertext`; share substitution is prevented by
+the container signature, which covers every field and is verified before any
+decapsulation.
 
 ---
 
