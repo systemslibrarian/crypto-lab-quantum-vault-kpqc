@@ -1851,7 +1851,18 @@ html[data-theme='dark'] .disclaimer-list li { color: #d6b34d; }
    (#003478 light / #7faaee dark); tints/borders mirror the demo's navy panels.
    Title/sub/desc/why-body use explicit foregrounds that pass axe contrast in
    BOTH the hanji (light) and warm-ink (dark) palettes. */
-.cl-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:clamp(1rem,4vw,3rem);flex-wrap:wrap;margin:clamp(1rem,3vw,2rem) 0 1.5rem;}
+/* The hero deliberately breaks out of the 620px reading column.
+   `.page-wrapper` caps content at 620px (588px inner), which is right for prose
+   but cannot hold this two-column hero: `.cl-hero-main` carries a 320px
+   min-width and `.cl-hero-why` a 240px one, so with the gap they need ~608px.
+   The why-box therefore wrapped onto its own line at EVERY viewport size and
+   sat at its 240px minimum, left-aligned, instead of beside the title.
+   The mobile rules further down could not catch it: they key off viewport
+   width, while the real constraint is the container. At 1440px the layout was
+   already wrapped and no media query had fired.
+   Widening only this element restores the fleet-standard side-by-side hero and
+   leaves the prose column untouched. */
+.cl-hero{width:min(1100px,calc(100vw - 2rem));margin-inline-start:calc((100% - min(1100px,calc(100vw - 2rem))) / 2);display:flex;align-items:flex-start;justify-content:space-between;gap:clamp(1rem,4vw,3rem);flex-wrap:wrap;margin-block:clamp(1rem,3vw,2rem) 1.5rem;}
 .cl-hero-main{flex:1 1 22rem;min-width:min(100%,20rem);}
 .cl-hero-title{margin:0;font-size:clamp(1.6rem,3.8vw,2.7rem);font-weight:700;line-height:1.1;letter-spacing:.01em;color:#2a2520;}
 .cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;color:#5a5248;}
