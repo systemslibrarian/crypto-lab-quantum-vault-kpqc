@@ -14,7 +14,13 @@ auditing a new backend, or accepting pull requests that touch cryptographic code
 - [ ] **R-001** All key generation uses a CSPRNG (`rand::thread_rng()` or OS-level).
 - [ ] **R-002** The file key $K$ is generated with `rng.fill_bytes()`, not seeded from user input.
 - [ ] **R-003** The AES-GCM nonce is generated with `rng.fill_bytes()` — never hardcoded or derived.
-- [ ] **R-004** Shamir polynomial coefficients are rejection-sampled to avoid zero (`while v == 0`).
+- [ ] **R-004** Shamir **non-leading** polynomial coefficients are drawn uniformly over the full
+      field, 0 included (`rng.fill_bytes`). Forcing them nonzero rules out one candidate per secret
+      byte for a single-share holder and breaks the perfect-secrecy claim. Only the **leading**
+      coefficient is rejection-sampled to be nonzero (`while coeffs[leading] == 0`), so the
+      polynomial has degree exactly `threshold - 1`. The TypeScript demo must match, and must
+      *resample* rather than map `0 -> 1` (a `0 -> 1` map makes the value 1 twice as likely as any
+      other field element).
 - [ ] **R-005** WASM / browser builds use `getrandom` with `features = ["js"]` to reach `crypto.getRandomValues`.
 - [ ] **R-006** The dev backend (`randombytes_shim.c`) uses `getrandom(2)` / `arc4random_buf(3)`, never `rand()`.
 

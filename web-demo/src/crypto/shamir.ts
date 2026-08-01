@@ -71,14 +71,33 @@ export function splitSecret(
   // Reuse a single buffer for random coefficients so we can wipe it once done
   // rather than creating a fresh allocation (and GC-visible ghost) each iteration.
   const rand = new Uint8Array(threshold - 1);
+  // Scratch buffer for rejection-sampling the leading coefficient; hoisted for
+  // the same reason as `rand` and wiped alongside it.
+  const redraw = new Uint8Array(1);
+
+  // Position of the leading coefficient a_{threshold-1} inside `rand`.
+  const leadingIdx = threshold - 2;
 
   for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
     // Polynomial: f(x) = secret[i] + c1*x + c2*x^2 + ... (over GF(256))
     const coefficients: number[] = [secret[byteIdx]];
     crypto.getRandomValues(rand);
+
+    // The LEADING coefficient must be nonzero so the polynomial has degree
+    // exactly threshold-1; a zero leading term would drop the degree and let
+    // threshold-1 shares reconstruct. Resample (rejection sampling) rather than
+    // mapping 0 -> 1, which would make the value 1 twice as likely as any other.
+    while (rand[leadingIdx] === 0) {
+      crypto.getRandomValues(redraw);
+      rand[leadingIdx] = redraw[0];
+    }
+
+    // Every OTHER coefficient is uniform over the full field, 0 included,
+    // exactly as in Shamir's 1979 construction. Forcing them nonzero would
+    // leak: it rules out one candidate per secret byte for a holder of a single
+    // share, which is precisely the "a single share reveals NOTHING" claim.
     for (let i = 0; i < threshold - 1; i++) {
-      // Ensure non-zero high-degree coefficient to keep degree = threshold-1
-      coefficients.push(rand[i] === 0 ? 1 : rand[i]);
+      coefficients.push(rand[i]);
     }
     for (let s = 0; s < totalShares; s++) {
       shares[s].data[byteIdx] = evaluatePolynomial(coefficients, shares[s].index);
@@ -88,6 +107,7 @@ export function splitSecret(
   // Wipe the coefficient buffer — polynomial coefficients are as sensitive as
   // share data since knowing them plus any one share reveals each secret byte.
   rand.fill(0);
+  redraw.fill(0);
 
   return shares;
 }

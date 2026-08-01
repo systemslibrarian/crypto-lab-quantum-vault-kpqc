@@ -10,8 +10,12 @@
 //!
 //! # Security notes
 //! * Share indices are 1-based; index 0 is the secret (never issued as a share).
-//! * Polynomial coefficients other than the constant term are randomly generated;
-//!   zeroized after use.
+//! * Polynomial coefficients other than the constant term are randomly generated
+//!   and zeroized after use. Non-leading coefficients are drawn uniformly over
+//!   the full field (0 included) — that uniformity is what makes fewer than
+//!   `threshold` shares information-theoretically useless. Only the leading
+//!   coefficient is redrawn until nonzero, so the polynomial has degree exactly
+//!   `threshold - 1`.
 //! * Share payloads are wrapped in a [`Share`] type that implements
 //!   [`zeroize::ZeroizeOnDrop`].
 
@@ -135,17 +139,29 @@ pub fn split_secret(secret: &[u8], share_count: u8, threshold: u8) -> Result<Vec
         })
         .collect();
 
+    // Index of the leading coefficient a_{threshold-1}.
+    let leading = threshold as usize - 1;
+
     for &byte in secret {
         // Build a random degree-(threshold-1) polynomial whose constant term is `byte`.
         let mut coeffs = vec![0u8; threshold as usize];
         coeffs[0] = byte;
-        for c in coeffs[1..].iter_mut() {
-            // Rejection-sample to avoid zero coefficients where practical.
-            let mut v = 0u8;
-            while v == 0 {
-                v = rng.next_u32() as u8;
-            }
-            *c = v;
+
+        // Non-leading coefficients are uniform over the FULL field, including 0,
+        // exactly as in Shamir's 1979 construction. Excluding 0 here would leak:
+        // with a_1 != 0 guaranteed, a single share (x, y) rules out the candidate
+        // secret y ^ (a_1 = 0 case) for every byte, so t-1 shares would no longer
+        // leave every secret equally likely and the perfect-secrecy claim would
+        // be false.
+        rng.fill_bytes(&mut coeffs[1..]);
+
+        // The LEADING coefficient is the one legitimate exception: it is redrawn
+        // until nonzero so the polynomial has degree exactly threshold-1. A zero
+        // leading term would drop the degree and let threshold-1 shares
+        // reconstruct, weakening the threshold itself. This constraint is on the
+        // degree, not on the information content of any single share.
+        while coeffs[leading] == 0 {
+            rng.fill_bytes(&mut coeffs[leading..=leading]);
         }
 
         for share in shares.iter_mut() {
