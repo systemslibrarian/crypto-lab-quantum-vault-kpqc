@@ -126,9 +126,13 @@ to brute-force AES.
 
 **Mitigation:**  
 SMAUG-T and HAETAE are based on module lattice problems (MLWE, MLWR, MSIS),
-believed to resist known quantum algorithms at Level 3 (≈128 bits
-post-quantum security). AES-256 provides ≥128 bits even under Grover's
-algorithm.
+for which no efficient quantum algorithm is known. The Rust CLI runs SMAUG-T
+Level 3 / HAETAE Mode 3 — NIST PQC category 3, comparable to an exhaustive key
+search on AES-192. The web demo runs SMAUG-T Level 1 / HAETAE Mode 2, so its
+margin is set by its weakest component at category 1, comparable to AES-128.
+These are different categories, not two ways of saying "128-bit"; which one
+applies depends on the build. AES-256 provides ≈128 bits even under Grover's
+algorithm in both builds.
 
 **Verdict: Defended (assuming lattice assumptions hold against quantum adversaries).**
 

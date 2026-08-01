@@ -138,8 +138,8 @@
           <span class="cl-hero-why-label"
                 data-en="WHY IT MATTERS" data-ko="왜 중요한가">WHY IT MATTERS</span>
           <p class="cl-hero-why-text"
-             data-en="No single keyholder can open the vault and no lost key locks it forever — trust is spread across people, not staked on one. And because the wrapping is post-quantum, secrets sealed today stay shut even after quantum computers arrive."
-             data-ko="어떤 키홀더도 혼자서는 볼트를 열 수 없고, 키 하나를 잃어도 영영 잠기지 않습니다 — 신뢰가 한 사람이 아니라 여러 사람에게 분산됩니다. 게다가 봉인이 양자내성이라, 오늘 봉인한 비밀은 양자 컴퓨터가 등장한 뒤에도 닫힌 채로 남습니다.">No single keyholder can open the vault and no lost key locks it forever — trust is spread across people, not staked on one. And because the wrapping is post-quantum, secrets sealed today stay shut even after quantum computers arrive.</p>
+             data-en="No single keyholder can open the vault and no lost key locks it forever — trust is spread across people, not staked on one. And because the wrapping is post-quantum, secrets sealed today should stay shut even after quantum computers arrive — provided the module-lattice problems underneath (MLWE/MLWR for SMAUG-T, MSIS for HAETAE) stay hard against quantum algorithms. Believed, not proven."
+             data-ko="어떤 키홀더도 혼자서는 볼트를 열 수 없고, 키 하나를 잃어도 영영 잠기지 않습니다 — 신뢰가 한 사람이 아니라 여러 사람에게 분산됩니다. 게다가 봉인이 양자내성이라, 오늘 봉인한 비밀은 양자 컴퓨터가 등장한 뒤에도 닫힌 채로 남을 것입니다 — 단, 그 바탕의 모듈 격자 문제(SMAUG-T의 MLWE/MLWR, HAETAE의 MSIS)가 양자 알고리즘에도 계속 어렵다는 전제에서입니다. 증명된 것이 아니라 믿어지는 것입니다.">No single keyholder can open the vault and no lost key locks it forever — trust is spread across people, not staked on one. And because the wrapping is post-quantum, secrets sealed today should stay shut even after quantum computers arrive — provided the module-lattice problems underneath (MLWE/MLWR for SMAUG-T, MSIS for HAETAE) stay hard against quantum algorithms. Believed, not proven.</p>
         </aside>
       </header>
 
@@ -317,9 +317,9 @@
               <span class="layer-badge"
                     data-en="Layer 2 — the post-quantum KEM" data-ko="2층 — 양자내성 KEM">Layer 2 — the post-quantum KEM</span>
               <span class="layer-body"
-                    data-en="At seal time SMAUG-T ENCAPSULATED a random 32-byte shared secret against the keyholder’s public key. On open, DECAPSULATE with the secret key recovers that same shared secret — the wrapping key that finally unlocks the Shamir share. THIS is the layer a quantum attacker can’t break."
-                    data-ko="봉인 시 SMAUG-T가 키홀더의 공개 키에 대해 무작위 32바이트 공유 비밀을 캡슐화(encapsulate)했습니다. 열 때 비밀 키로 디캡슐화(decapsulate)하면 같은 공유 비밀 — 샤미르 조각을 여는 감싸기 키 — 를 되찾습니다. 이 층이 양자 공격자가 깰 수 없는 부분입니다.">
-                At seal time SMAUG-T <strong>encapsulated</strong> a random 32-byte shared secret against the keyholder’s public key. On open, <strong>decapsulate</strong> with the secret key recovers that same shared secret — the wrapping key that finally unlocks the Shamir share. THIS is the layer a quantum attacker can’t break.
+                    data-en="At seal time SMAUG-T ENCAPSULATED a random 32-byte shared secret against the keyholder’s public key. On open, DECAPSULATE with the secret key recovers that same shared secret — the wrapping key that finally unlocks the Shamir share. THIS is the layer a quantum attacker can’t break — as long as Module-LWE/LWR stays hard against quantum algorithms. Nobody has proved it does."
+                    data-ko="봉인 시 SMAUG-T가 키홀더의 공개 키에 대해 무작위 32바이트 공유 비밀을 캡슐화(encapsulate)했습니다. 열 때 비밀 키로 디캡슐화(decapsulate)하면 같은 공유 비밀 — 샤미르 조각을 여는 감싸기 키 — 를 되찾습니다. 이 층이 양자 공격자가 깰 수 없는 부분입니다 — 단, Module-LWE/LWR이 양자 알고리즘에도 계속 어렵다는 전제에서입니다. 이는 아직 증명되지 않았습니다.">
+                At seal time SMAUG-T <strong>encapsulated</strong> a random 32-byte shared secret against the keyholder’s public key. On open, <strong>decapsulate</strong> with the secret key recovers that same shared secret — the wrapping key that finally unlocks the Shamir share. THIS is the layer a quantum attacker can’t break — as long as Module-LWE/LWR stays hard against quantum algorithms. Nobody has proved it does.
               </span>
             </li>
           </ol>
@@ -503,6 +503,16 @@
                </span>
           </li>
         </ul>
+        <p class="kpqc-panel-subhead"
+           data-en="Parameter sets in this build:"
+           data-ko="이 빌드의 파라미터 세트:">
+          Parameter sets in this build:
+        </p>
+        <p class="kpqc-panel-note"
+           data-en="This browser demo runs SMAUG-T Level 1 and HAETAE Mode 2 — the lowest parameter set in each family, chosen for smaller keys and a faster load. They map to NIST PQC category 1 and category 2, so the pair is bounded by category 1, roughly the effort of an exhaustive key search on AES-128. The Rust CLI in this repository runs the higher SMAUG-T Level 3 / HAETAE Mode 3 (category 3, roughly AES-192)."
+           data-ko="이 브라우저 데모는 SMAUG-T Level 1과 HAETAE Mode 2를 사용합니다 — 각 계열에서 가장 낮은 파라미터 세트이며, 키 크기를 줄이고 로딩을 빠르게 하려고 선택했습니다. 각각 NIST PQC 카테고리 1과 카테고리 2에 해당하므로, 둘을 합친 안전 여유는 카테고리 1 — 대략 AES-128 전수 키 탐색 수준 — 으로 제한됩니다. 이 저장소의 Rust CLI는 더 높은 SMAUG-T Level 3 / HAETAE Mode 3 (카테고리 3, 대략 AES-192)를 사용합니다.">
+          This browser demo runs SMAUG-T Level 1 and HAETAE Mode 2 — the lowest parameter set in each family, chosen for smaller keys and a faster load. They map to NIST PQC category 1 and category 2, so the pair is bounded by category 1, roughly the effort of an exhaustive key search on AES-128. The Rust CLI in this repository runs the higher SMAUG-T Level 3 / HAETAE Mode 3 (category 3, roughly AES-192).
+        </p>
         <p class="kpqc-panel-attribution"
            data-en="The implementations are derived from reference code produced by Korean cryptography researchers as part of the KpqC competition."
            data-ko="이 구현은 KpqC 경쟁에 참여한 한국 암호 연구진이 작성한 레퍼런스 코드를 기반으로 합니다.">

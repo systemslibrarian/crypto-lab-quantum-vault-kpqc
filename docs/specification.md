@@ -93,7 +93,10 @@ $$C \leftarrow \text{AES-256-GCM}_{K}(\text{nonce},\ F,\ \text{AAD})$$
 
 where the Additional Authenticated Data is (see §6.1):
 
-$$\text{AAD} = \text{JSON}\!\left\{\text{"kem\_algorithm"}, \text{"sig\_algorithm"}, \text{"threshold"}, \text{"version"}\right\}$$
+$$\text{AAD} = \text{JSON}\!\left\{\begin{array}{l}
+\text{"cipher"},\ \text{"container\_id"},\ \text{"created\_at"},\ \text{"kem\_algorithm"},\ \text{"nonce"},\\
+\text{"share\_count"},\ \text{"sig\_algorithm"},\ \text{"threshold"},\ \text{"version"}
+\end{array}\right\}$$
 
 Keys are sorted alphabetically to ensure deterministic serialisation.
 
@@ -129,7 +132,8 @@ $$\sigma \leftarrow \text{SIG.Sign}(\text{sig\_sk},\ M_\text{canon})$$
 function Encrypt(F, pks, sig_sk, n, t):
   K   ← random(32)
   IV  ← random(12)
-  AAD ← serialize_aad(version, t, kem_alg, sig_alg)
+  AAD ← serialize_aad(cipher, container_id, created_at, kem_alg,
+                      nonce=IV, share_count=n, sig_alg, threshold=t, version)
   C   ← AES_GCM_Encrypt(K, IV, F, AAD)
   shares ← ShamirSplit(K, n, t)
   zeroize(K)
@@ -201,14 +205,34 @@ algorithm-substitution and downgrade attacks:
 
 ```json
 {
+  "cipher":         "Aes256Gcm",
+  "container_id":   [<uint8>, ...],
+  "created_at":     <uint64>,
   "kem_algorithm":  "<string>",
+  "nonce":          [<uint8>, ...],
+  "share_count":    <uint8>,
   "sig_algorithm":  "<string>",
   "threshold":      <uint8>,
   "version":        <uint8>
 }
 ```
 
-JSON keys are sorted alphabetically; the AAD is the canonical UTF-8 JSON bytes.
+All nine fields are present; the order above is the wire order.  `cipher` is the
+externally-tagged `CipherSuite` unit variant, so it serialises as the JSON string
+`"Aes256Gcm"`.  `container_id` and `nonce` are `Vec<u8>`/`&[u8]` and serialise as
+JSON arrays of decimal byte values, not base64.  JSON keys are sorted
+alphabetically — `serde_json` writes object fields through an internal `BTreeMap`,
+so the output is deterministic regardless of the order the fields appear in the
+`json!()` macro — and the AAD is the resulting compact UTF-8 JSON bytes
+(no whitespace, no trailing newline) as produced by `serde_json::to_vec`.
+
+The AAD deliberately **excludes** the `shares` array and the `ciphertext`.
+Share-to-recipient binding is enforced one layer up by the HAETAE signature (§6.2),
+which covers every field including `shares` and is verified *before* any
+decapsulation, so share substitution cannot succeed without also forging the
+signature.
+
+See `crates/qv-core/src/encrypt.rs::aad_bytes` for the authoritative construction.
 
 ### 6.2 Signing Canonical Byte String
 
@@ -368,5 +392,7 @@ regardless of the adversary's computational power.
 3. KpqC Competition. "SMAUG-T Specification v1.1," 2024.
 4. KpqC Competition. "HAETAE Specification v1.1," 2024.
 5. NIST FIPS 197. Advanced Encryption Standard (AES). 2001.
-6. Mihir Bellare, Phillip Rogaway. "Entity Authentication and Key Distribution."
-   CRYPTO 1993. (IND-CCA2 KEM definition)
+6. Ronald Cramer, Victor Shoup. "Design and Analysis of Practical Public-Key
+   Encryption Schemes Secure against Adaptive Chosen Ciphertext Attack."
+   SIAM Journal on Computing 33(1):167–226, 2003; extended from CRYPTO 1998.
+   (KEM/DEM framework and the IND-CCA2 KEM definition)

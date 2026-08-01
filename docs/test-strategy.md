@@ -109,7 +109,11 @@ cargo test --workspace && cd web-demo && npm run test
 
 - **AES-256-GCM**: [NIST SP 800-38D](https://csrc.nist.gov/publications/detail/sp/800-38d/final)
 - **Shamir SSS**: Custom deterministic vectors with fixed RNG seed
-- **ML-KEM / ML-DSA**: N/A (demo uses CRYSTALS stubs, not NIST vectors)
+- **SMAUG-T / HAETAE**: N/A. This project uses the KpqC algorithms SMAUG-T (KEM)
+  and HAETAE (signature), not the NIST CRYSTALS family (ML-KEM / ML-DSA), so NIST
+  PQC KAT files do not apply. Coverage comes from round-trip, tamper and
+  differential tests against the KpqC reference implementations instead. The
+  `dev-backend` SHA-256/XOR stubs are for tests only and carry no vectors.
 
 ## Adding New Tests
 

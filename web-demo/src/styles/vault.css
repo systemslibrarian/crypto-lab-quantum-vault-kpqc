@@ -861,6 +861,14 @@ body {
   border-left: 3px solid #d4d0c8;
 }
 
+/* Reduced-parameter disclosure: styled as a caveat, not body copy, so the
+   learner can see at a glance that this build is not the strongest one. */
+.kpqc-panel-note {
+  padding-left: 12px;
+  border-left: 3px solid #ba7517;
+  color: #4a443c !important;
+}
+
 .algo-kem-tag {
   color: #003478;
 }
@@ -1720,6 +1728,7 @@ html[data-theme='dark'] .kpqc-panel-subhead { color: #ece7da; }
 html[data-theme='dark'] .kpqc-algo-list li { color: #c4bcab; border-left-color: #4a4438; }
 html[data-theme='dark'] .algo-kem-tag { color: #7faaee; }
 html[data-theme='dark'] .algo-sig-tag { color: #ef6b62; }
+html[data-theme='dark'] .kpqc-panel-note { color: #c9c0ae !important; border-left-color: #a5751f; }
 html[data-theme='dark'] .kpqc-panel-attribution { color: #9a9080 !important; }
 
 /* Architecture pipeline diagram */

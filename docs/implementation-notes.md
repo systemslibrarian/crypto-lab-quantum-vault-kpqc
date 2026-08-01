@@ -255,11 +255,18 @@ set of each algorithm.  The Rust CLI uses Level 3 / Mode 3.
 The web demo stores three `WrappedShare` records per container, each containing
 a PK, a wrapped SK, a KEM ciphertext, and two AES-GCM outputs.  Using Level 1 /
 Mode 2 reduces per-box storage by roughly 3 × (400 B PK + 480 B SK + 320 B CT)
-≈ 3.6 KB per box.  In a session-storage–backed app this is not critical, but
+≈ 3.6 KB per box.  In a `localStorage`-backed app this is not critical, but
 keeping the WASM binary smaller also reduces initial load time.
 
-Both level choices maintain 128-bit post-quantum security — the same target as
-AES-256 under Grover's algorithm for a quantum adversary.
+The two builds do **not** target the same strength, and the difference is the
+point of the trade-off above.  SMAUG-T Level 1 targets NIST PQC category 1
+(comparable to an exhaustive key search on AES-128) and SMAUG-T Level 3 targets
+category 3 (comparable to AES-192).  HAETAE Mode 2 targets category 2 and Mode 3
+targets category 3.  A composite is only as strong as its weakest component, so
+the web demo's post-quantum margin is category 1 (≈ AES-128, set by SMAUG-T
+Level 1) while the Rust CLI's is category 3 (≈ AES-192).  AES-256-GCM is used
+unchanged in both builds; Grover's algorithm reduces it to roughly a 2¹²⁸
+search either way.
 
 ### 6.2 GF(2⁸) Polynomial 0x11d
 
@@ -285,9 +292,15 @@ by whoever holds the SK at the time) but not attribution — the public key is
 stored in the clear and any consumer can verify it, but the identity of the
 sealer is not tracked.
 
-**Session storage only:** `VaultState` is serialised to `sessionStorage`.
-Closing the browser tab destroys all sealed boxes.  This is intentional for the
-demo; a production deployment would persist to an encrypted backend.
+**Browser-local storage only:** `VaultState` is serialised to `localStorage`
+under the key `quantum-vault-data` (`src/vault/state.ts`).  Note that this is
+`localStorage`, not `sessionStorage` — sealed boxes therefore **survive** closing
+the tab and the browser, and persist per-origin until "Clear vault" is used or
+the profile is wiped.  Anyone with access to the browser profile can read the
+stored containers offline; see the offline-brute-force row in
+`docs/threat-model.md §5`.  This is intentional for the demo (the boxes are meant
+to still be there on your next visit); a production deployment would persist to
+an encrypted backend instead.
 
 **No HSM or secure enclave:** All key material exists in the JavaScript heap
 during crypto operations.  A compromised browser extension or malicious script
