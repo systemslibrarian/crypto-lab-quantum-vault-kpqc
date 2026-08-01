@@ -294,7 +294,8 @@ during crypto operations.  A compromised browser extension or malicious script
 on the same origin could read it.  The demo assumes a trusted browser context.
 
 **PBKDF2 iteration count:** 600 000 iterations of SHA-256 is used for new deposits,
-following current guidance (NIST SP 800-132 rev 1, 2023).  Legacy v2 containers
+following current OWASP Password Storage guidance (2023) for PBKDF2-HMAC-SHA256;
+NIST SP 800-132 (2010) only sets a floor of 1 000 iterations.  Legacy v2 containers
 with 100 000 iterations are still supported for backward compatibility.  The
 iteration count is stored per-share, allowing gradual migration.
 

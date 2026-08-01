@@ -49,8 +49,8 @@ Verifier         — holds the encryptor's signature public key sig_pk
 
 | Parameter | Value | Reference |
 |-----------|-------|-----------|
-| KEM | SMAUG-T Level 1 | KpqC Round 1 |
-| Signature | HAETAE Mode 2 | KpqC Round 1 |
+| KEM | SMAUG-T Level 1 | KpqC Round 2 (selected 2025) |
+| Signature | HAETAE Mode 2 | KpqC Round 2 (selected 2025) |
 | Symmetric cipher | AES-256-GCM | NIST SP 800-38D |
 | Secret sharing | Shamir over GF(2⁸) | Shamir 1979 |
 | Container format | JSON v1 | docs/container-format.md |
@@ -362,7 +362,7 @@ regardless of the adversary's computational power.
 
 ## References
 
-1. Amos Shamir. "How to Share a Secret." CACM 22(11), 1979.
+1. Adi Shamir. "How to Share a Secret." CACM 22(11), 1979.
 2. NIST SP 800-38D. Recommendation for Block Cipher Modes of Operation:
    Galois/Counter Mode (GCM). 2007.
 3. KpqC Competition. "SMAUG-T Specification v1.1," 2024.

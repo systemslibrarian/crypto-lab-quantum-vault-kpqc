@@ -34,12 +34,12 @@ use std::fmt;
 ///
 /// | ID | Description | Security Level |
 /// |----|-------------|----------------|
-/// | `SMAUG-T-3` | SMAUG-T Level 3 (KPQC Round 4) | AES-192 equivalent |
+/// | `SMAUG-T-3` | SMAUG-T Level 3 — KpqC Round 2, selected 2025 | AES-192 equivalent |
 /// | `dev-kem` | Development-only stub KEM | **NONE - TESTING ONLY** |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum KemAlgorithm {
-    /// SMAUG-T Level 3 — lattice-based KEM from KPQC Round 4.
+    /// SMAUG-T Level 3 — lattice-based KEM from KpqC Round 2 (selected 2025).
     ///
     /// This is the production KEM. It provides IND-CCA2 security against
     /// quantum adversaries at approximately AES-192 equivalent security.
@@ -148,12 +148,12 @@ impl fmt::Display for KemAlgorithm {
 ///
 /// | ID | Description | Security Level |
 /// |----|-------------|----------------|
-/// | `HAETAE-3` | HAETAE Level 3 (KPQC Round 4) | AES-192 equivalent |
+/// | `HAETAE-3` | HAETAE Level 3 — KpqC Round 2, selected 2025 | AES-192 equivalent |
 /// | `dev-sig` | Development-only stub signature | **NONE - TESTING ONLY** |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum SignatureAlgorithm {
-    /// HAETAE Level 3 — lattice-based signature from KPQC Round 4.
+    /// HAETAE Level 3 — lattice-based signature from KpqC Round 2 (selected 2025).
     ///
     /// This is the production signature scheme. It provides EUF-CMA security
     /// against quantum adversaries at approximately AES-192 equivalent security.

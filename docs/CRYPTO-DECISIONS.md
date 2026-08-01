@@ -238,7 +238,7 @@ cannot observe decrypt behavior to learn about the plaintext.
 | Standard | Relevance |
 |----------|-----------|
 | NIST SP 800-38D | AES-GCM specification |
-| NIST SP 800-132 | PBKDF2 recommendation (≥600k iterations for SHA-256) |
+| NIST SP 800-132 | PBKDF2 specification (sets a 1 000-iteration floor; the 600k figure used here is OWASP 2023 guidance) |
 | NIST FIPS 203 (ML-KEM) | Post-quantum KEM standard (SMAUG-T is the Korean equivalent) |
 | NIST FIPS 204 (ML-DSA) | Post-quantum signature standard (HAETAE is the Korean equivalent) |
 | Shamir, "How to Share a Secret" (1979) | Original SSS paper |
