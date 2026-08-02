@@ -28,6 +28,24 @@ async function openAllDetails(page: Page): Promise<void> {
   });
 }
 
+/**
+ * The vault buttons animate `color` over 150ms, so a scan fired immediately
+ * after the theme toggle samples the light-theme text colour part-way through
+ * its blend toward the dark one, against a background that has already
+ * switched. That reported a serious contrast violation on #btn-export-vault,
+ * #btn-clear-vault, #btn-reset and the Import vault label, whose settled
+ * values measure about 11:1. Zero out motion so axe sees endpoint colours —
+ * the endpoints themselves are still fully scanned.
+ */
+async function neutralizeMotion(page: Page): Promise<void> {
+  await page.addStyleTag({
+    content: `*,*::before,*::after{
+      animation-duration:0s!important;animation-delay:0s!important;
+      transition-duration:0s!important;transition-delay:0s!important;
+    }`,
+  });
+}
+
 async function scan(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   const summary = results.violations.map((v) => ({
@@ -42,12 +60,14 @@ async function scan(page: Page): Promise<void> {
 test('no WCAG A/AA violations in light theme (default)', async ({ page }) => {
   await gotoLoadedVault(page);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await neutralizeMotion(page);
   await openAllDetails(page);
   await scan(page);
 });
 
 test('no WCAG A/AA violations in dark theme', async ({ page }) => {
   await gotoLoadedVault(page);
+  await neutralizeMotion(page);
   await page.locator('#cl-theme-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await openAllDetails(page);
