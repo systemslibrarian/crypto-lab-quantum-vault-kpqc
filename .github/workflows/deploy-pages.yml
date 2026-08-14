@@ -81,9 +81,14 @@ jobs:
         working-directory: web-demo
         run: npx playwright install --with-deps chromium
 
-      - name: Accessibility gate (axe-core, WCAG A/AA)
+      # The whole browser suite: e2e/vault.spec.ts (the real seal/open pipeline,
+      # both failure modes and the tamper) plus e2e/a11y.spec.ts (WCAG A/AA in
+      # both themes at 1280px and 380px). Running only test:a11y here meant the
+      # functional suite never blocked a deploy — a broken seal could ship so
+      # long as the broken page was accessible.
+      - name: Browser pipeline and accessibility gate
         working-directory: web-demo
-        run: npm run test:a11y
+        run: npm run test:e2e
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
