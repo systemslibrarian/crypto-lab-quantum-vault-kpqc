@@ -29,9 +29,18 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'npm run dev -- --port 4213 --strictPort',
+    // Build before serving: the suite must run against the PRODUCTION bundle,
+    // not the dev server. Two reasons, both of which have bitten this fleet.
+    // `vite preview` only serves whatever is already in dist/, so without the
+    // `npm run build &&` a failing build leaves the previous good bundle in
+    // place and the suite passes green against source that no longer compiles —
+    // which also silently voids any mutation test run against src/. And the dev
+    // server sends the COOP/COEP headers from `vite.config.ts`'s `server`
+    // block, which GitHub Pages cannot send at all, so the dev server was never
+    // the document that ships.
+    command: 'npm run build && npm run preview -- --port 4213 --strictPort',
     port: 4213,
     reuseExistingServer: !CI,
-    timeout: 60_000,
+    timeout: 180_000,
   },
 });

@@ -1,75 +1,60 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test'
+import {
+  boot,
+  driveAllStates,
+  expectBaselineNotStale,
+  NARROW,
+  reportCollected,
+  watchPageErrors,
+} from './gate'
 
 /**
- * WCAG regression gate. Deploys are already gated on the seal/open pipeline
- * (vault.spec.ts); this gates them on accessibility the same way. Scans the
- * full page with every <details> expanded, in both themes.
+ * WCAG A/AA regression gate.
  *
- * This repo defaults to the LIGHT hanji palette; dark is reached via the toggle.
+ * The lab is driven along everything it teaches: the arrival state, where the
+ * KpqC WASM has loaded, three demo boxes have really been sealed (nine PBKDF2
+ * runs at 600k iterations) and the hint banner is up; the skip link focused;
+ * both branches of the classical/post-quantum comparison; all five disclosures
+ * opened through their own summaries; the hint banner dismissed; the deposit
+ * form on an empty box, rejected twice — once empty, once with three identical
+ * passwords — then with the passwords revealed, then sealing for real; the
+ * below-threshold open, where one share turns the SMAUG-T pill amber and the
+ * key strip visibly diverges; the successful two-of-three open, where the
+ * rebuilt key strip is compared cell by cell against the true original; the
+ * tamper, which is a different failure mode and stops at a red HAETAE pill
+ * before any share is touched; the retrieve form on a demo box; the vault
+ * cleared to nine empty boxes and reset back; and the Korean locale with its
+ * own demo-box set. Every one of those states is scanned, in both themes, at
+ * desktop and phone width.
+ *
+ * See `gate.ts` for why nothing is injected into the page (the old spec killed
+ * motion with `addStyleTag`, bypassing this lab's own reduced-motion block and
+ * the `matchMedia` branch in `keystrip.ts`), why no disclosure is force-opened
+ * (the old spec set `.open = true` on all five before its only scan), why the
+ * panel is opened at all (it does not exist until a box is clicked, so nothing
+ * in it had ever been scanned), why the lab's defaults are asserted rather than
+ * assumed, and why `violations` is not the whole oracle.
  */
 
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+for (const theme of ['dark', 'light'] as const) {
+  test(`no WCAG A/AA violations in ${theme} theme`, async ({ page }) => {
+    test.setTimeout(1_800_000)
+    const errors = watchPageErrors(page)
+    await boot(page, theme)
+    await driveAllStates(page, theme)
+    expect(errors, errors.join('\n')).toEqual([])
+    expectBaselineNotStale()
+    reportCollected()
+  })
 
-/** Load the app and wait until the demo boxes are sealed + rendered. */
-async function gotoLoadedVault(page: Page): Promise<void> {
-  await page.goto('.');
-  // Box 06 gaining `.occupied` means init + WASM crypto are fully ready.
-  await expect(page.locator('[data-box="06"].occupied')).toBeVisible({
-    timeout: 30_000,
-  });
+  test(`no WCAG A/AA violations in ${theme} theme at 380px`, async ({ page }) => {
+    test.setTimeout(1_800_000)
+    const errors = watchPageErrors(page)
+    await page.setViewportSize(NARROW)
+    await boot(page, theme)
+    await driveAllStates(page, `${theme} @380px`)
+    expect(errors, errors.join('\n')).toEqual([])
+    expectBaselineNotStale()
+    reportCollected()
+  })
 }
-
-async function openAllDetails(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    for (const details of document.querySelectorAll('details')) {
-      details.open = true;
-    }
-  });
-}
-
-/**
- * The vault buttons animate `color` over 150ms, so a scan fired immediately
- * after the theme toggle samples the light-theme text colour part-way through
- * its blend toward the dark one, against a background that has already
- * switched. That reported a serious contrast violation on #btn-export-vault,
- * #btn-clear-vault, #btn-reset and the Import vault label, whose settled
- * values measure about 11:1. Zero out motion so axe sees endpoint colours —
- * the endpoints themselves are still fully scanned.
- */
-async function neutralizeMotion(page: Page): Promise<void> {
-  await page.addStyleTag({
-    content: `*,*::before,*::after{
-      animation-duration:0s!important;animation-delay:0s!important;
-      transition-duration:0s!important;transition-delay:0s!important;
-    }`,
-  });
-}
-
-async function scan(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
-  const summary = results.violations.map((v) => ({
-    id: v.id,
-    impact: v.impact,
-    help: v.help,
-    nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 5),
-  }));
-  expect(summary).toEqual([]);
-}
-
-test('no WCAG A/AA violations in light theme (default)', async ({ page }) => {
-  await gotoLoadedVault(page);
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await neutralizeMotion(page);
-  await openAllDetails(page);
-  await scan(page);
-});
-
-test('no WCAG A/AA violations in dark theme', async ({ page }) => {
-  await gotoLoadedVault(page);
-  await neutralizeMotion(page);
-  await page.locator('#cl-theme-toggle').click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await openAllDetails(page);
-  await scan(page);
-});
