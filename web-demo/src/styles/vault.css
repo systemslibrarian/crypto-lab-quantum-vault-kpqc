@@ -20,10 +20,15 @@ html {
      behind them — so the border is the only thing that makes the control
      visible, and WCAG 2.1 SC 1.4.11 requires 3:1. The old literal #c8c4bc
      measured 1.74:1 at best / 1.14:1 at worst; --border-strong is 3.53:1 on
-     .panel-inner, 3.20:1 on the page (#f0ede6), 3.74:1 on #fff. The old
-     #c8c4bc literal stays as-is on decorative rules (card outlines, dividers,
-     .pd-step) and on the .btn-vault-action / .btn-reset buttons, which have
-     their own rules. */
+     .panel-inner, 3.20:1 on the page (#f0ede6), 3.74:1 on #fff.
+     It is used by EVERY control that draws its own edge — the form fields, the
+     .btn-vault-action / .btn-reset row and the .pq-btn pair. Those buttons used
+     to keep the literal #c8c4bc, which measured 1.49:1 against the page, and
+     .pq-btn kept #b9b4aa, 1.89:1 against its panel; both of those fills are
+     within 1.1:1 of what is behind them, so the border was the only delineator
+     either had. The literal stays only on DECORATIVE rules — card outlines,
+     dividers, .pd-step — which are not UI components and which 1.4.11 does not
+     reach. */
   --border-strong: #86847e;
 }
 
@@ -121,7 +126,10 @@ body {
 .deposit-box {
   aspect-ratio: 1 / 0.85;
   border-radius: 6px;
-  border: 2px solid #888780;
+  /* The box IS the control (role="button"), and its fill is 1.39:1 against the
+     .vault-section wall behind it — so the border is the only thing 1.4.11 can
+     be satisfied by. #888780 was 1.70:1; #56554f is 3.52:1. */
+  border: 2px solid #56554f;
   background: #D3D1C7;
   display: flex;
   flex-direction: column;
@@ -138,7 +146,11 @@ body {
 }
 
 .deposit-box:hover {
-  border-color: #666460;
+  /* Hover has to stay MORE prominent than the resting edge above, and it has to
+     clear 3:1 in its own right — a reader sits in this state for as long as the
+     pointer rests on a box, including right after clicking it. #666460 was
+     2.78:1; #3a3934 is 5.45:1. */
+  border-color: #3a3934;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 
@@ -151,13 +163,16 @@ body {
   outline-offset: 2px;
 }
 
+/* The occupied fill is 1.85:1 on the wall, so again only the border delineates.
+   #BA7517 was 1.75:1; #7a4a0c is 3.51:1 and still unmistakably the amber that
+   separates an occupied box from an empty one. */
 .deposit-box.occupied {
   background: #FAEEDA;
-  border-color: #BA7517;
+  border-color: #7a4a0c;
 }
 
 .deposit-box.occupied:hover {
-  border-color: #8a5510;
+  border-color: #5c3708; /* was #8a5510, 2.92:1; now 4.93:1 */
 }
 
 .deposit-box.selected {
@@ -268,7 +283,12 @@ body {
   border: none;
   font-size: 1.1rem;
   cursor: pointer;
-  color: #888;
+  /* The ✕ is the panel's close control and it is TEXT at 1.1rem — 17.6px, under
+     the 18.66px/bold that would make it large text — so 1.4.3 asks 4.5:1, not
+     3:1. #888 measured 3.34:1 on the panel it sits on (#faf8f4) and 3.03:1 on
+     the page. #6b6a62 is the warm grey the rest of this palette uses and is
+     5.12:1 / 4.65:1. The dark theme's #9a9080 already measured 5.35:1. */
+  color: #6b6a62;
   padding: 2px 6px;
   border-radius: 4px;
   line-height: 1;
@@ -528,9 +548,12 @@ body {
   transition: background-color 200ms, color 200ms;
 }
 
+/* Ink measured against each pill's own fill, not against the page. `.pending`
+   is 0.72rem/600 — ordinary text, so 4.5:1, not 3:1. The shipped #888780 was
+   2.85:1 on this fill; #636257 is 4.86:1. */
 .pipeline-step.pending {
   background: #e8e4de;
-  color: #888780;
+  color: #636257;
 }
 
 .pipeline-step.active {
@@ -538,13 +561,17 @@ body {
   color: #fff;
 }
 
+/* #1D9E75 carried white at 3.39:1 in BOTH themes (the dark override repeated
+   the same hex). #157a5b is the same green, darkened until white clears
+   4.5:1 — 5.29:1. */
 .pipeline-step.done {
-  background: #1D9E75;
+  background: #157a5b;
   color: #fff;
 }
 
+/* #E24B4A carried white at 3.93:1. #c53531 is 5.35:1. */
 .pipeline-step.failed {
-  background: #E24B4A;
+  background: #c53531;
   color: #fff;
 }
 
@@ -555,11 +582,13 @@ body {
   color: #fff;
 }
 
+/* No `opacity` here. It de-emphasised a line that is already smaller than the
+   label above it, so the cue was duplicated — and it dragged the pending pill's
+   sub-label from 4.86:1 to 4.40:1, under the 4.5:1 floor, for nothing. */
 .step-sub {
   display: block;
   font-size: 0.62rem;
   font-weight: 600;
-  opacity: 0.95;
   margin-top: 2px;
   line-height: 1.15;
 }
@@ -694,7 +723,7 @@ body {
   background: none;
   color: #3a3530;
   font-weight: 600;
-  border: 1px solid #c8c4bc;
+  border: 1px solid var(--border-strong);
   border-radius: 5px;
   padding: 6px 14px;
   font-size: 0.82rem;
@@ -723,7 +752,7 @@ body {
   background: none;
   color: #3a3530;
   font-weight: 600;
-  border: 1px solid #c8c4bc;
+  border: 1px solid var(--border-strong);
   border-radius: 5px;
   padding: 6px 14px;
   font-size: 0.82rem;
@@ -1134,7 +1163,7 @@ body {
 }
 .pq-btn {
   padding: 7px 12px;
-  border: 1px solid #b9b4aa;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   background: #fff;
   color: #3a3530;
@@ -1643,8 +1672,8 @@ html[data-theme='dark'] .btn-dismiss:hover { background: #2a3550; }
 
 /* Vault wall + deposit boxes */
 html[data-theme='dark'] .vault-section { background: #2a2620; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.4); }
-html[data-theme='dark'] .deposit-box { background: #37322a; border-color: #544d40; }
-html[data-theme='dark'] .deposit-box:hover { border-color: #7a715d; }
+html[data-theme='dark'] .deposit-box { background: #37322a; border-color: #857e6e; } /* was #544d40, 1.80:1; now 3.73:1 */
+html[data-theme='dark'] .deposit-box:hover { border-color: #9c9484; } /* was #7a715d, 3.11:1; now 5.00:1, still stronger than the resting edge */
 html[data-theme='dark'] .deposit-box:focus-visible { outline-color: #7faaee; }
 html[data-theme='dark'] .deposit-box.occupied { background: #2f2716; border-color: #9a7322; }
 html[data-theme='dark'] .deposit-box.occupied:hover { border-color: #c79a3c; }
@@ -1679,12 +1708,23 @@ html[data-theme='dark'] .show-password-toggle input[type="checkbox"] { accent-co
 html[data-theme='dark'] .panel-note { color: #b3ab9b; }
 
 /* Buttons */
-html[data-theme='dark'] .btn-primary { background: #1f5fc0; }
+/* WCAG 1.4.11 again, and this is the fill rather than a border: .btn-primary
+   draws `border: none`, so its own background is the entire control boundary
+   and it is measured against the .panel-inner (#211e17) it sits on. #1f5fc0 was
+   2.74:1 there; #2a6ad0 is 3.26:1 and still carries white text at 5.16:1. The
+   hover fill was already over the line (3.62:1) and is left alone, so hover is
+   still the brighter of the two. */
+html[data-theme='dark'] .btn-primary { background: #2a6ad0; }
 html[data-theme='dark'] .btn-primary:hover { background: #2f72d8; }
 html[data-theme='dark'] .btn-primary:disabled { background: #33405c; color: #9aa6bd; }
 html[data-theme='dark'] .btn-outline { color: #7faaee; border-color: #4f74b8; }
 html[data-theme='dark'] .btn-outline:hover { background: #1e2840; }
-html[data-theme='dark'] .btn-outline.btn-delete { color: #ef6b62; border-color: #a8453d; }
+/* The danger edge. .btn-outline has no fill, so this border is the whole
+   boundary; #a8453d measured 2.84:1 on the panel (it cleared 3:1 only on the
+   darker page behind it, which is not where these buttons live). #b4504a is
+   3.35:1 on the panel and 3.71:1 on the page. Same token on .btn-tamper and on
+   the two destructive hovers below, so all four move together. */
+html[data-theme='dark'] .btn-outline.btn-delete { color: #ef6b62; border-color: #b4504a; }
 html[data-theme='dark'] .btn-outline.btn-delete:hover { background: #2e1a18; }
 
 /* Export / import */
@@ -1695,10 +1735,10 @@ html[data-theme='dark'] .import-status.success { color: #5cbf8f; }
 html[data-theme='dark'] .import-status.error { color: #ef6b62; }
 
 /* Pipeline */
-html[data-theme='dark'] .pipeline-step.pending { background: #2a261d; color: #8a8276; }
+html[data-theme='dark'] .pipeline-step.pending { background: #2a261d; color: #a0978a; } /* was #8a8276, 3.97:1; now 5.23:1 */
 html[data-theme='dark'] .pipeline-step.active { background: #1f5fc0; }
-html[data-theme='dark'] .pipeline-step.done { background: #1d9e75; }
-html[data-theme='dark'] .pipeline-step.failed { background: #d8453f; }
+html[data-theme='dark'] .pipeline-step.done { background: #157a5b; } /* white was 3.39:1 here too */
+html[data-theme='dark'] .pipeline-step.failed { background: #c53531; } /* was #d8453f, white at 4.34:1 */
 html[data-theme='dark'] .pipeline-step.warn { background: #9a5b00; }
 html[data-theme='dark'] .pipeline-arrow { color: #6a6258; }
 html[data-theme='dark'] .pipeline-narration { color: #d8d0bf; }
@@ -1719,10 +1759,10 @@ html[data-theme='dark'] .algo-badge.algo-sym .algo-dot { background: #5cbf8f; }
 
 /* Vault management buttons */
 html[data-theme='dark'] .btn-vault-action,
-html[data-theme='dark'] .btn-reset { color: #cfc7b6; border-color: #4a4438; }
+html[data-theme='dark'] .btn-reset { color: #cfc7b6; border-color: var(--border-strong); } /* #4a4438 was 1.92:1 on the page */
 html[data-theme='dark'] .btn-vault-action:hover { color: #7faaee; border-color: #4f74b8; }
 html[data-theme='dark'] .btn-vault-action.btn-danger:hover,
-html[data-theme='dark'] .btn-reset:hover { color: #ef6b62; border-color: #a8453d; }
+html[data-theme='dark'] .btn-reset:hover { color: #ef6b62; border-color: #b4504a; }
 
 /* Footer */
 html[data-theme='dark'] .site-footer { color: #8a8276; border-top-color: #38332a; }
@@ -1789,7 +1829,7 @@ html[data-theme='dark'] .gloss-item > p { color: #c4bcab; }
 /* Classical vs post-quantum */
 html[data-theme='dark'] .pq-compare { border-top-color: #38332a; }
 html[data-theme='dark'] .pq-lead { color: #ece7da; }
-html[data-theme='dark'] .pq-btn { background: #2a261d; border-color: #4a4438; color: #cfc7b6; }
+html[data-theme='dark'] .pq-btn { background: #2a261d; border-color: var(--border-strong); color: #cfc7b6; } /* #4a4438 was 1.72:1 on the panel */
 html[data-theme='dark'] .pq-btn-active { background: #4f8ae0; border-color: #4f8ae0; color: #0d1420; }
 html[data-theme='dark'] .pq-body-classical { background: #2a1614; border-color: #d8453f; color: #f0b4ac; }
 html[data-theme='dark'] .pq-body-post { background: #12261b; border-color: #1d9e75; color: #98dcb4; }
@@ -1818,7 +1858,7 @@ html[data-theme='dark'] .ks-caption.ks-unknowable {
 }
 
 /* Tamper button */
-html[data-theme='dark'] .btn-tamper { border-color: #a8453d !important; color: #ef6b62 !important; }
+html[data-theme='dark'] .btn-tamper { border-color: #b4504a !important; color: #ef6b62 !important; }
 html[data-theme='dark'] .btn-tamper:hover:not(:disabled) { background: #2a1614 !important; }
 
 /* Demo credentials table */

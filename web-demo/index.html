@@ -2,8 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Everything this page needs is served from its own origin: the two KpqC
+         WASM modules, the bundle, the stylesheet. The policy says so exactly —
+         no third-party origin is named, because none is contacted. It used to
+         allow https://fonts.googleapis.com under style-src and
+         https://fonts.gstatic.com under font-src for a webfont that has since
+         been dropped; see the note where the <link> used to be. -->
     <meta http-equiv="Content-Security-Policy"
-          content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; object-src 'none'; base-uri 'none';" />
+          content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'none';" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Browser-based demonstration of Korean post-quantum cryptographic algorithms (SMAUG-T KEM + HAETAE signature) compiled to WebAssembly — AES-256-GCM, Shamir SSS, real KpqC WASM" />
     <title>Quantum Vault KPQC</title>
@@ -16,8 +22,23 @@
         document.documentElement.setAttribute('data-theme', saved ?? 'light');
       })();
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+    <!-- A same-origin icon, so a fresh visit does not 404 on /favicon.ico. -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <!-- NO WEBFONT. This used to pull Noto Sans from fonts.googleapis.com. The
+         font stack in src/styles/vault.css is unchanged and still names it
+         first, so a reader who has it installed still gets it; what is gone is
+         the download. Fetching it from Google cost more than it bought:
+           - it was the ONLY third-party request this otherwise offline,
+             browser-only demo made, on a page that ships its own WASM;
+           - `display=swap` repainted the whole page when it arrived, which is a
+             layout shift a reader with prefers-reduced-motion still gets;
+           - a cross-origin stylesheet cannot be read by anything running IN the
+             page, so any in-page tool re-fetches it over XHR — which this
+             page's own `default-src 'self'` then blocked, logging a Content
+             Security Policy error on every accessibility scan. Widening the
+             policy to permit that fetch would have traded a deterministic
+             failure for a network-dependent one.
+         'Pretendard' and system-ui cover both the Latin and the Korean text. -->
   </head>
   <body>
 <style>
@@ -47,14 +68,29 @@
   .cl-btn{
     display:inline-flex;align-items:center;gap:.4rem;
     padding:.5rem .85rem;border-radius:10px;
-    border:1px solid color-mix(in srgb, var(--accent, #35d6bb) 38%, transparent);
+    /* WCAG 1.4.11. These buttons have no fill, so this border is the whole
+       control boundary — and mixing the PAGE's --accent tied the ratio to each
+       lab's palette. This lab sets --accent:#003478, the Taegukgi navy, on an
+       always-dark #0b1512 bar: at 38% that border measured 1.14:1, and for a
+       hue that dark 3:1 is unreachable at ANY mix percentage. --cl-ink is
+       already mixed toward the bar's near-white ink, so mixing THAT is
+       accent-independent — the same move crypto-lab-schnorr-forge made. The
+       percentage is 85 rather than that lab's 70 because the percentage is not
+       accent-independent even when the colour is: 70% of this navy-derived ink
+       measures 2.97:1, just under the line. 85% is 3.80:1 here, and every
+       lighter accent in the fleet only scores higher. */
+    border:1px solid color-mix(in srgb, var(--cl-ink) 85%, transparent);
     background:transparent;color:var(--cl-ink);cursor:pointer;
     font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.1em;
     text-transform:uppercase;text-decoration:none;transition:background .15s,border-color .15s,color .15s;
   }
   .cl-btn:hover{
     background:color-mix(in srgb, var(--accent, #35d6bb) 14%, transparent);
-    border-color:var(--accent, #35d6bb);color:#eafff8;
+    /* Hover has the same problem and is not a lesser state: a pointer rests
+       here for as long as it takes to read the label. The bare navy --accent
+       measured 1.58:1 on the bar. Full-strength --cl-ink is 4.80:1 — brighter
+       than the resting 85% mix, so hover still reads as the stronger edge. */
+    border-color:var(--cl-ink);color:#eafff8;
   }
   .cl-btn svg{width:15px;height:15px}
   .cl-icon{padding:.5rem .6rem;font-size:.95rem}
@@ -304,7 +340,7 @@
              (decapsulate to recover the wrapping key that unlocks the share). The
              KEM is the least-taught primitive; here its encapsulate/decapsulate is
              shown, not just named. -->
-        <div class="step3-zoom" aria-labelledby="step3-zoom-title">
+        <div class="step3-zoom" role="group" aria-labelledby="step3-zoom-title">
           <p class="step3-zoom-title" id="step3-zoom-title"
              data-en="Inside step 3: two nested locks, not one"
              data-ko="3단계 속: 하나가 아니라 두 겹의 잠금">
@@ -352,7 +388,7 @@
              analogy concrete: in 2-D the nearest lattice point to the target is
              obvious; SMAUG-T lives in hundreds of dimensions where the same
              "nearest point" search is intractable even for a quantum computer. -->
-        <div class="lattice-viz" aria-labelledby="lattice-title">
+        <div class="lattice-viz" role="group" aria-labelledby="lattice-title">
           <p class="lattice-title" id="lattice-title"
              data-en="Why can’t a quantum computer break layer 2?"
              data-ko="왜 양자 컴퓨터가 2층을 못 깨나요?">
