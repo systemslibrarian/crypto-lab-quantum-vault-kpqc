@@ -215,15 +215,12 @@ export async function assertListsKeepTheirSemantics(page: Page): Promise<void> {
  * the emulation is applied imperatively BEFORE the navigation and then
  * *asserted* from inside the page.
  *
- * The theme is seeded through `localStorage` rather than by clicking the
- * toggle, which pins down a real failure mode as a side effect: `index.html`'s
- * anti-flash script reads `localStorage.getItem('theme')` and `main.ts`'s
- * `setupThemeToggle` writes `localStorage.setItem('theme', …)`. If those keys
- * drift apart the theme silently stops persisting, and this boot fails on
- * `data-theme` rather than quietly scanning one theme twice. Note that THIS
- * LAB'S DEFAULT IS LIGHT, not dark — the warm hanji palette is the intended
- * look — so the seed is what makes "dark" a real configuration rather than a
- * post-hoc toggle, which is how the old spec reached it.
+ * THIS LAB IS LIGHT, and it is the only one in the fleet that is. The warm
+ * hanji (한지) paper palette is the intended, culturally-aware look for a demo
+ * of Korean post-quantum cryptography, so where every other lab pins dark this
+ * one pins light. There is no toggle and no second theme to reach: `index.html`
+ * stamps `data-theme="light"` before first paint, and this boot asserts it
+ * rather than seeding a preference the page would overwrite anyway.
  *
  * The defaults are asserted at length because the entire vault is built by
  * JavaScript into empty hosts, after a real KpqC WASM load and NINE PBKDF2
@@ -243,7 +240,6 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   // so a drive without this clicks Reset and silently gets nothing, then
   // asserts against a page that never changed.
   page.on('dialog', (d) => void d.accept())
-  await page.addInitScript((t) => localStorage.setItem('theme', t), theme)
   await page.goto('.')
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),

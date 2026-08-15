@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <!-- Everything this page needs is served from its own origin: the two KpqC
@@ -14,16 +14,19 @@
     <meta name="description" content="Browser-based demonstration of Korean post-quantum cryptographic algorithms (SMAUG-T KEM + HAETAE signature) compiled to WebAssembly — AES-256-GCM, Shamir SSS, real KpqC WASM" />
     <title>Quantum Vault KPQC</title>
     <script>
-      // Dark is the only theme. Pin it before first paint, and overwrite any
-      // 'light' a visitor stored back when the header carried a theme toggle.
+      // This lab is the fleet's one light exception, on purpose: the warm hanji
+      // (한지) paper palette with Korean-flag navy/red accents is the intended,
+      // culturally-aware look for a demo of Korean post-quantum cryptography.
+      // Every other lab pins dark; this one pins light, and like the rest it
+      // carries no toggle and overwrites whatever a visitor had stored.
       (function () {
         try {
-          localStorage.setItem('theme', 'dark');
-          localStorage.setItem('cv-theme', 'dark');
-          localStorage.setItem('cl-theme', 'dark');
-          localStorage.setItem('crypto-lab-theme', 'dark');
+          localStorage.setItem('theme', 'light');
+          localStorage.setItem('cv-theme', 'light');
+          localStorage.setItem('cl-theme', 'light');
+          localStorage.setItem('crypto-lab-theme', 'light');
         } catch (e) {}
-        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-theme', 'light');
       })();
     </script>
     <!-- A same-origin icon, so a fresh visit does not 404 on /favicon.ico. -->
