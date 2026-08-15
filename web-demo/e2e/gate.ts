@@ -887,6 +887,6 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
 
   // Hover on the always-dark shared bar, whose ink is a `color-mix` axe cannot
   // resolve in either state.
-  await page.locator('#cl-theme-toggle').hover()
-  await scanAt('the shared top bar theme toggle hovered')
+  await page.locator('.cl-topbar .cl-btn').first().hover()
+  await scanAt('a shared top bar control hovered')
 }
