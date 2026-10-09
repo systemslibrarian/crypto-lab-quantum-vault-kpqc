@@ -4,8 +4,8 @@
 # Prerequisites:
 #   - Emscripten SDK (emsdk) installed and activated, e.g.:
 #       source ~/emsdk/emsdk_env.sh
-#   - Vendor sources present under wasm/vendor/ (see README.md for how to
-#     clone / extract them)
+#   - Vendor sources present under wasm/vendor/. Exact upstream source pins
+#     and the original compiler are not recorded; see wasm/PROVENANCE.md.
 #
 # Outputs:
 #   wasm/dist/smaug.js   + smaug.wasm
@@ -20,6 +20,24 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
+# Report absent source inputs before invoking a compiler or creating outputs.
+SMAUG_VENDOR="$SCRIPT_DIR/vendor/smaug-t/reference_implementation"
+HAETAE_VENDOR="$SCRIPT_DIR/vendor/haetae/HAETAE-1.1.2/reference_implementation"
+missing=0
+for required in "$SMAUG_VENDOR/include" "$SMAUG_VENDOR/src" "$HAETAE_VENDOR/include" "$HAETAE_VENDOR/src"; do
+  if [ ! -d "$required" ]; then
+    printf 'UNREAD: required vendor directory is absent: %s\n' "$required" >&2
+    missing=1
+  fi
+done
+if [ "$missing" -ne 0 ]; then
+  printf '%s\n' 'Build not attempted. Exact source/compiler provenance remains unknown; see wasm/PROVENANCE.md.' >&2
+  exit 2
+fi
+if ! command -v emcc >/dev/null 2>&1; then
+  printf '%s\n' 'UNREAD: emcc is unavailable; build not attempted.' >&2
+  exit 2
+fi
 mkdir -p "$DIST"
 
 # ── SMAUG-T Level 1 ────────────────────────────────────────────────────────────
