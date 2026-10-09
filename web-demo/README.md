@@ -10,12 +10,12 @@ An interactive browser demo that visualises every layer of the Quantum Vault cry
 
 ```bash
 # from the web-demo/ directory
-npm install
+npm ci
 npm run dev
 # open http://localhost:5173
 ```
 
-Requires Node ≥ 18.
+Requires Node 22.19+, 24, or 26+ (the deployment workflow uses Node 24).
 
 ---
 
@@ -36,7 +36,7 @@ The passwords are also shown in the hint banner and the **"How this box works"**
 ## Running Tests
 
 ```bash
-npm run test          # run all unit tests once (Vitest)
+npm run test          # Vitest unit tests and publisher request controls
 npm run test:watch    # watch mode
 
 npm run test:e2e:install   # one-time: download the Playwright Chromium build
@@ -56,7 +56,7 @@ the dev server and exercises the genuine KpqC WASM pipeline — no mocks:
 - one correct / two wrong passwords stay below threshold → **ACCESS DENIED**, secret never shown
 - seal a fresh secret into an empty box, then reopen it (full round-trip)
 
-Both suites run in CI (`.github/workflows/ci.yml`).
+Both suites run in `.github/workflows/deploy-pages.yml`, alongside Rust application tests and binary/hash consistency checks. Browser execution of the committed WASM does not establish reproducible source-to-binary provenance.
 
 ---
 
@@ -135,6 +135,8 @@ npm run build   # TypeScript type-check + Vite production build → dist/
 ```
 
 Deployed to GitHub Pages via `.github/workflows/deploy-pages.yml`.
+
+`npm run deploy` requests that workflow on the remote `main` branch using authenticated GitHub CLI access. Both the Rust and web application gates must pass before deployment. It does not publish a local `dist/` directory; the request controls in `npm test` replace only the external GitHub command and never dispatch a workflow.
 
 ---
 
