@@ -287,10 +287,10 @@ for the formal field definition.
 
 **No key persistence:** The HAETAE signing keypair is ephemeral — generated at
 seal time and stored only as `sigPublicKey` in the container.  The SK is
-discarded after signing.  This provides authenticity (the container was sealed
-by whoever holds the SK at the time) but not attribution — the public key is
-stored in the clear and any consumer can verify it, but the identity of the
-sealer is not tracked.
+discarded after signing. Verification establishes consistency under the included
+key, not that it is the original sealer's key. Anyone can generate a new keypair
+and re-sign changed public container data. No independent key pin or identity
+binding is checked; this replacement alone does not decrypt the encrypted shares.
 
 **Browser-local storage only:** `VaultState` is serialised to `localStorage`
 under the key `quantum-vault-data` (`src/vault/state.ts`).  Note that this is

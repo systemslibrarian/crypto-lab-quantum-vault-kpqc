@@ -614,6 +614,14 @@ body {
   font-weight: 700;
 }
 
+.signature-trust-note {
+  color: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 1rem 0;
+  overflow-wrap: anywhere;
+}
+
 .pipeline-viz { margin-top: 4px; }
 
 /* Tamper demo button — warns the learner it triggers an integrity failure. */

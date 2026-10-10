@@ -345,16 +345,18 @@ information-theoretic security of Shamir Secret Sharing.
 
 ### 7.2 Integrity
 
-An adversary who modifies *any* field in the container (including the nonce,
-ciphertext, or shares) will cause the HAETAE signature verification (Step 1 of
-decryption) to fail with overwhelming probability, under the EUF-CMA security
-of HAETAE.
+Under a fixed, independently authenticated verification key, modifying signed
+fields without a matching signature fails verification under the assumed
+EUF-CMA security of HAETAE. The browser instead uses the key included in the
+replaceable container. A new keypair can re-sign changed public container data
+and pass that check; this does not recover encrypted shares or plaintext.
 
 ### 7.3 Authenticity
 
-The container binds the signer identity to the specific algorithm choices,
-threshold policy, and all key-share ciphertexts. A substitution of even a
-single KEM ciphertext is detectable.
+The signature covers the serialized fields, not an independently established
+signer identity. Binding a public key to an original sender requires a separate
+trust anchor. The browser provides none; replacing its embedded key and signing
+with the replacement key remains possible. See threat-model §3.4 and §5.
 
 ### 7.4 Post-Quantum Resistance
 

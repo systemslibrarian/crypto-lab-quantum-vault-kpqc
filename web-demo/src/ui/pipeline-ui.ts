@@ -58,6 +58,7 @@ function createPipelineHTML(steps: StepConfig[]): string {
   return `
     <div class="pipeline" role="list">${parts.join('')}</div>
     <p class="pipeline-narration" id="pipeline-narration" role="status" aria-live="polite"></p>
+    <p class="signature-trust-note">${t('signatureTrust')}</p>
     <div class="pipeline-viz" id="pipeline-viz"></div>`;
 }
 
