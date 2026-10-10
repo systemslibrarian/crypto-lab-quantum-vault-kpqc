@@ -429,7 +429,8 @@ body {
 }
 
 .btn-primary:disabled {
-  background: #7a96c0;
+  /* This fill also paints the first enabled frame when a request completes. */
+  background: #425b80;
   cursor: not-allowed;
 }
 
@@ -612,6 +613,14 @@ body {
 .pipeline-narration.narr-fail {
   color: #a31420;
   font-weight: 700;
+}
+
+.signature-trust-note {
+  color: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 1rem 0;
+  overflow-wrap: anywhere;
 }
 
 .pipeline-viz { margin-top: 4px; }

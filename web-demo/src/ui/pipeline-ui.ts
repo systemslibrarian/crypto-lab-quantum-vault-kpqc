@@ -58,6 +58,7 @@ function createPipelineHTML(steps: StepConfig[]): string {
   return `
     <div class="pipeline" role="list">${parts.join('')}</div>
     <p class="pipeline-narration" id="pipeline-narration" role="status" aria-live="polite"></p>
+    <p class="signature-trust-note">${t('signatureTrust')}</p>
     <div class="pipeline-viz" id="pipeline-viz"></div>`;
 }
 
@@ -160,7 +161,7 @@ export async function animateOpenPipeline(
         visual.reconstructedKey,
         enough,
         visual.recoveredShares,
-        visual.originalKey,
+        visual.aesAuthenticated,
       );
     }
   }
@@ -177,5 +178,12 @@ export async function animateOpenPipeline(
   setStep(container, 'aes', 'active');
   narrate(container, 'narrAesDecrypt');
   await sleep(500);
-  setStep(container, 'aes', 'done');
+  setStep(container, 'aes', visual.aesAuthenticated ? 'done' : 'failed');
+  if (!visual.aesAuthenticated) {
+    const narration = container.querySelector<HTMLElement>('#pipeline-narration');
+    if (narration) {
+      narration.textContent = t('ksAuthFailed');
+      narration.classList.add('narr-fail');
+    }
+  }
 }
