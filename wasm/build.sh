@@ -23,23 +23,6 @@ DIST="$SCRIPT_DIR/dist"
 # Report absent source inputs before invoking a compiler or creating outputs.
 SMAUG_VENDOR="$SCRIPT_DIR/vendor/smaug-t/reference_implementation"
 HAETAE_VENDOR="$SCRIPT_DIR/vendor/haetae/HAETAE-1.1.2/reference_implementation"
-missing=0
-for required in "$SMAUG_VENDOR/include" "$SMAUG_VENDOR/src" "$HAETAE_VENDOR/include" "$HAETAE_VENDOR/src"; do
-  if [ ! -d "$required" ]; then
-    printf 'UNREAD: required vendor directory is absent: %s\n' "$required" >&2
-    missing=1
-  fi
-done
-if [ "$missing" -ne 0 ]; then
-  printf '%s\n' 'Build not attempted. Exact source/compiler provenance remains unknown; see wasm/PROVENANCE.md.' >&2
-  exit 2
-fi
-if ! command -v emcc >/dev/null 2>&1; then
-  printf '%s\n' 'UNREAD: emcc is unavailable; build not attempted.' >&2
-  exit 2
-fi
-mkdir -p "$DIST"
-
 # ── SMAUG-T Level 1 ────────────────────────────────────────────────────────────
 SMAUG_SRC="$SCRIPT_DIR/vendor/smaug-t/reference_implementation"
 
@@ -61,6 +44,59 @@ SMAUG_C_FILES=(
   "$SCRIPT_DIR/src/randombytes_wasm.c"
   "$SCRIPT_DIR/src/smaug_exports.c"
 )
+
+# ── HAETAE Mode 2 ──────────────────────────────────────────────────────────────
+HAETAE_SRC="$SCRIPT_DIR/vendor/haetae/HAETAE-1.1.2/reference_implementation"
+
+HAETAE_C_FILES=(
+  "$HAETAE_SRC/src/decompose.c"
+  "$HAETAE_SRC/src/encoding.c"
+  "$HAETAE_SRC/src/fft.c"
+  "$HAETAE_SRC/src/fips202.c"
+  "$HAETAE_SRC/src/fixpoint.c"
+  "$HAETAE_SRC/src/ntt.c"
+  "$HAETAE_SRC/src/packing.c"
+  "$HAETAE_SRC/src/poly.c"
+  "$HAETAE_SRC/src/polyfix.c"
+  "$HAETAE_SRC/src/polymat.c"
+  "$HAETAE_SRC/src/polyvec.c"
+  "$HAETAE_SRC/src/reduce.c"
+  "$HAETAE_SRC/src/sampler.c"
+  "$HAETAE_SRC/src/sign.c"
+  "$HAETAE_SRC/src/symmetric-shake.c"
+  "$SCRIPT_DIR/src/randombytes_wasm.c"
+  "$SCRIPT_DIR/src/haetae_exports.c"
+)
+
+missing=0
+for required in "$SMAUG_VENDOR/include" "$SMAUG_VENDOR/src" "$HAETAE_VENDOR/include" "$HAETAE_VENDOR/src"; do
+  if [ ! -d "$required" ]; then
+    printf 'UNREAD: required vendor directory is absent: %s\n' "$required" >&2
+    missing=1
+  fi
+done
+if [ "$missing" -ne 0 ]; then
+  printf '%s\n' 'Build not attempted. Exact source/compiler provenance remains unknown; see wasm/PROVENANCE.md.' >&2
+  exit 2
+fi
+# Existing directories alone can still contain an incomplete source capture.
+# Check inputs for BOTH algorithms before the first compiler or output directory.
+for required in "${SMAUG_C_FILES[@]}" "${HAETAE_C_FILES[@]}" \
+  "$SMAUG_VENDOR/include/kem.h" "$HAETAE_VENDOR/include/api.h"; do
+  if [ ! -f "$required" ] || [ ! -r "$required" ]; then
+    printf 'UNREAD: required build input is missing or unreadable: %s\n' "$required" >&2
+    missing=1
+  fi
+done
+if [ "$missing" -ne 0 ]; then
+  printf '%s\n' 'Build not attempted. Source existence does not establish provenance; see wasm/PROVENANCE.md.' >&2
+  exit 2
+fi
+if ! command -v emcc >/dev/null 2>&1; then
+  printf '%s\n' 'UNREAD: emcc is unavailable; build not attempted.' >&2
+  exit 2
+fi
+mkdir -p "$DIST"
 
 # ── Constant-Time Hardening Flags ──────────────────────────────────────────────
 # -O1:              Mild optimization; avoids aggressive transforms that break CT
@@ -89,29 +125,6 @@ emcc \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/smaug.js"
 echo "   → $DIST/smaug.js + smaug.wasm"
-
-# ── HAETAE Mode 2 ──────────────────────────────────────────────────────────────
-HAETAE_SRC="$SCRIPT_DIR/vendor/haetae/HAETAE-1.1.2/reference_implementation"
-
-HAETAE_C_FILES=(
-  "$HAETAE_SRC/src/decompose.c"
-  "$HAETAE_SRC/src/encoding.c"
-  "$HAETAE_SRC/src/fft.c"
-  "$HAETAE_SRC/src/fips202.c"
-  "$HAETAE_SRC/src/fixpoint.c"
-  "$HAETAE_SRC/src/ntt.c"
-  "$HAETAE_SRC/src/packing.c"
-  "$HAETAE_SRC/src/poly.c"
-  "$HAETAE_SRC/src/polyfix.c"
-  "$HAETAE_SRC/src/polymat.c"
-  "$HAETAE_SRC/src/polyvec.c"
-  "$HAETAE_SRC/src/reduce.c"
-  "$HAETAE_SRC/src/sampler.c"
-  "$HAETAE_SRC/src/sign.c"
-  "$HAETAE_SRC/src/symmetric-shake.c"
-  "$SCRIPT_DIR/src/randombytes_wasm.c"
-  "$SCRIPT_DIR/src/haetae_exports.c"
-)
 
 echo "▶ Building HAETAE Mode 2 (constant-time hardened)..."
 emcc \

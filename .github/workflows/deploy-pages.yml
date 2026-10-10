@@ -129,6 +129,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Verify incomplete WASM build inputs fail before compilation
+        run: python3 -B -m unittest discover -s wasm/tests -v
+
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
