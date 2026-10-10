@@ -8,13 +8,14 @@ describe('signature trust explanation', () => {
   it('keeps the persistent English and Korean warning consistent with runtime narration', () => {
     const paragraph = html.match(/<p id="signature-trust-note"[\s\S]*?<\/p>/)?.[0];
     expect(paragraph).toBeTruthy();
+    if (!paragraph) throw new Error('Persistent signature trust warning is missing');
     for (const lang of ['en', 'ko'] as const) {
       setLang(lang);
-      const attribute = paragraph!.match(new RegExp(`data-${lang}="([^"]+)"`))?.[1];
+      const attribute = paragraph.match(new RegExp(`data-${lang}="([^"]+)"`))?.[1];
       expect(attribute).toBe(t('signatureTrust'));
     }
     setLang('en');
-    expect(paragraph!.replace(/<[^>]+>/g, '').trim()).toBe(t('signatureTrust'));
+    expect(paragraph.replace(/<[^>]+>/g, '').trim()).toBe(t('signatureTrust'));
   });
 
   it('states the included-key replacement limit in English without weakening the invalid-signature gate', () => {
