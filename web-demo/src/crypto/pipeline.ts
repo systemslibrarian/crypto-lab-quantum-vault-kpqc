@@ -56,7 +56,7 @@ export interface OpenVisual {
   shareStatus: [boolean, boolean, boolean];
   /** Whether the container's HAETAE signature verified (integrity gate). */
   signatureValid: boolean;
-  /** The bytes Lagrange interpolation produced — the true AES key iff >= 2 valid shares. */
+  /** Actual Lagrange output; its use is confirmed only by authenticated decryption. */
   reconstructedKey: Uint8Array | null;
   /**
    * The genuine per-keyholder Shamir share bytes recovered by SMAUG-T unlock,
@@ -64,14 +64,8 @@ export interface OpenVisual {
    * Real GF(2^8) share rows — used to animate the actual pieces combining.
    */
   recoveredShares: [Uint8Array | null, Uint8Array | null, Uint8Array | null];
-  /**
-   * The TRUE original AES key, for the side-by-side "does it match?" comparison.
-   * Only knowable when >= 2 shares are recovered (Lagrange is then exact), so it
-   * is non-null exactly when the open succeeds. Below threshold it is `null`
-   * BECAUSE one share cannot reveal the key — that unknowability is the security
-   * guarantee the visualization is teaching, never a fabricated reference.
-   */
-  originalKey: Uint8Array | null;
+  /** True only after AES-GCM decryption actually succeeds, never from share count alone. */
+  aesAuthenticated: boolean;
 }
 
 export type OpenResult =
@@ -208,7 +202,7 @@ export async function openBox(
         signatureValid: false,
         reconstructedKey: null,
         recoveredShares: [null, null, null],
-        originalKey: null,
+        aesAuthenticated: false,
       },
     };
   }
@@ -246,21 +240,16 @@ export async function openBox(
       success: false,
       gibberish: garbage,
       validShareCount: 0,
-      visual: { shareStatus, signatureValid: true, reconstructedKey: null, recoveredShares, originalKey: null },
+      visual: { shareStatus, signatureValid: true, reconstructedKey: null, recoveredShares, aesAuthenticated: false },
     };
   }
 
   // Step 3 — Shamir reconstruct: correct only if validShares.length >= threshold (2)
   const reconstructedKey = reconstructSecret(validShares);
   // Snapshot the *real* Lagrange output for the on-screen key-strip animation
-  // BEFORE zeroization. With >= 2 shares this equals the true AES key; with 1
-  // share it is the genuinely-wrong reconstruction (unrelated bytes) — never faked.
+  // BEFORE zeroization. This is a candidate, not an independently observed
+  // original. Successful AES-GCM decryption is the check used by the display.
   const keySnapshot = reconstructedKey.slice();
-  // With >= 2 valid shares Lagrange is exact, so this reconstruction IS the true
-  // original key — a genuine reference for the side-by-side match, not a stored
-  // copy. Below threshold the original is mathematically unknowable, so we leave
-  // it null (the visualization then teaches exactly that unknowability).
-  const originalKey = validShares.length >= 2 ? keySnapshot.slice() : null;
   // Zeroize share data — sensitive key material, no longer needed after reconstruction.
   for (const share of validShares) share.data.fill(0);
 
@@ -273,7 +262,7 @@ export async function openBox(
       success: true,
       message: decode(plaintext),
       validShareCount,
-      visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot, recoveredShares, originalKey },
+      visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot, recoveredShares, aesAuthenticated: true },
     };
   } catch {
     reconstructedKey.fill(0);
@@ -285,7 +274,7 @@ export async function openBox(
       success: false,
       gibberish,
       validShareCount,
-      visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot, recoveredShares, originalKey },
+      visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot, recoveredShares, aesAuthenticated: false },
     };
   }
 }

@@ -183,13 +183,11 @@ test.describe('Quantum Vault — seal/open pipeline', () => {
     await expect(page.locator('#pipeline-narration')).not.toBeEmpty();
     await expect(page.locator('#retrieve-result')).toContainText(DEMO['06'].secret);
 
-    // Headline intuition made VISIBLE: the true original key strip is rendered
-    // above the rebuilt one, and every compared cell is a match (green ✓) — the
-    // "same colors as the original" claim is shown side by side, not asserted.
-    await expect(page.locator('.keystrip .ks-row.ks-original')).toBeVisible();
-    await expect(page.locator('.keystrip .ks-cell-match').first()).toBeVisible();
-    // With 2 identical keys, no cell should be marked as a mismatch.
-    await expect(page.locator('.keystrip .ks-cell-miss')).toHaveCount(0);
+    // Confirmation comes from actual authenticated decryption, not a copied strip.
+    await expect(page.locator('.keystrip .ks-verdict.ks-ok')).toContainText('successful authenticated decryption');
+    await expect(page.locator('.keystrip .ks-evidence-note')).toContainText('no independent original-key comparison');
+    await expect(page.locator('.keystrip .ks-row.ks-original')).toHaveCount(0);
+    await expect(page.locator('.keystrip .ks-cell-match, .keystrip .ks-cell-miss')).toHaveCount(0);
     // The two recovered shares that combined are shown, tied to their keyholders.
     await expect(page.locator('.keystrip .ks-share.ks-merge')).toHaveCount(2);
   });
