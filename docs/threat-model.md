@@ -78,8 +78,9 @@ Recover $F$ from a stolen backup.
 
 **Mitigation:**  
 As above — fewer than $t$ shares provide no information about $K$.
-The container's HAETAE signature prevents silent modification before a
-compromised $t$-share attack.
+With an independently authenticated verification key, the container's HAETAE
+signature detects modification without a matching signature. The browser instead
+uses an unpinned embedded key; replacing it and re-signing is not prevented (§3.4).
 
 **Verdict: Defended against passive access; $t$-share active attack is out of scope (see §5).**
 
@@ -101,16 +102,30 @@ compromised $t$-share attack.
 HAETAE signs the following container fields: `nonce`, `ciphertext`, all per-participant
 `kemCiphertext`, `wrappedShare`, `shareNonce`, `publicKey`, `wrappedSecretKey`, and `skNonce`
 values, plus the signature verification key `sigPublicKey` and the `createdAt` timestamp.
-Any modification to these fields invalidates the signature.
+Changing these fields while retaining the old signature invalidates that signature.
 Decryption aborts on signature failure *before* any KEM or AES operation.
 
-The binding of `sigPublicKey` in the signed corpus prevents an attacker from substituting
-the signature and verification key pair while preserving container integrity.
+Including `sigPublicKey` in the corpus does **not** prevent replacing the key and
+signature together. The browser verifies the key supplied by the same container,
+without an independent trust anchor. An attacker can change `createdAt`, generate
+their own HAETAE keypair, replace `sigPublicKey`, and sign the changed public
+corpus. It verifies under that replacement key. No original signing key or
+participant password is needed to re-sign; the encrypted shares and ciphertext
+stay unchanged, so this operation alone does not recover the secret.
 
-The AAD in AES-256-GCM additionally binds the threshold and algorithm choice to
-the ciphertext, providing a second layer of defense.
+Defending against that replacement requires a verification key authenticated
+outside the replaceable container (for example, an independently authenticated
+pin or a validated PKI binding). No such check is implemented in the browser.
+The existing unchanged-key tamper demo proves its narrower early-rejection path.
 
-**Verdict: Defended.**
+The Rust format separately binds threshold and algorithm metadata through AES-GCM
+AAD. The browser's `aes.ts` does not supply AAD; Rust-format claims must not be
+assumed for the browser. AES-GCM ciphertext authentication remains a separate
+check from signer-key authenticity.
+
+**Verdict: Unchanged-signature edits are rejected; active key-and-signature
+replacement is not defended in the browser. Trusted-key distribution remains
+out of scope (§5).**
 
 ---
 
@@ -193,7 +208,9 @@ algorithm.
 - Base64 decoding failures are caught and mapped to `CORRUPTED_DATA`.
 - JSON parsing errors are caught and mapped to `INVALID_JSON`.
 
-**Verdict: Defended against integrity attacks; import uses existing verified code paths.**
+**Verdict: Invalid signatures and malformed structures are rejected; imported
+self-signed containers have the same unpinned-key limitation as §3.4. Successful
+import does not authenticate an original sender.**
 
 ---
 
@@ -203,8 +220,8 @@ algorithm.
 |----------|-----------|------------|
 | Confidentiality ($< t$ shares) | Information-theoretic (perfect secrecy) | Correct Shamir SSS |
 | Confidentiality (KEM layer) | Computational | MLWE / MLWR (SMAUG-T IND-CCA2) |
-| Integrity | Computational | MSIS (HAETAE EUF-CMA) |
-| Authenticity | Computational | HAETAE EUF-CMA |
+| Signature integrity under a fixed authenticated key | Computational | HAETAE EUF-CMA and authentic key distribution; browser key is unpinned |
+| Original-sender authenticity in the browser | Not established | Embedded key can be replaced; an independent trust anchor is absent |
 | Quantum resistance | Computational | Lattice hard problems resist quantum |
 | Post-quantum symmetric | 128-bit under Grover | AES-256 security |
 
@@ -222,7 +239,7 @@ The following are **not** in Quantum Vault's current threat model:
 | **Offline brute-force against localStorage** | Sealed containers stored in `localStorage` are accessible to anyone with physical or OS-level access to the browser profile. An attacker can exfiltrate the container and mount an offline dictionary attack against participant passwords with no rate limiting or lockout. PBKDF2 (600 000 iterations) raises the cost but does not eliminate the risk. Users should choose strong, unique passwords. |
 | **Malicious encryptor** | The encryptor can embed arbitrary plaintext; Quantum Vault makes no claims about what is encrypted |
 | **Signature key distribution** | The authenticity of `sig_pk` is out of scope — a TOFU or PKI layer is required |
-| **Deniability** | The HAETAE signature creates a non-repudiable binding between the signer and the container |
+| **Deniability / non-repudiation** | A self-signed embedded key does not establish an original sender's identity; any stronger assertion requires independently authenticated key ownership |
 | **Key revocation** | There is no mechanism to revoke a recipient's key share |
 | **Quantum attacks on GF(2⁸)** | Quantum algorithms provide a small speedup for Gaussian elimination over finite fields but do not threaten SSS at current parameters |
 

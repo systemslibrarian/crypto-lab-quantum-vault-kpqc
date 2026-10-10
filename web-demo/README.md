@@ -121,10 +121,31 @@ AES-256-GCM  →  Shamir split  →  SMAUG-T wrap  →  HAETAE sign
 HAETAE verify  →  SMAUG-T unlock  →  Shamir reconstruct  →  AES-256-GCM
 ```
 
-1. **HAETAE verify** — reject tampered containers immediately
+1. **HAETAE verify** — reject invalid signatures under the key included in the container
 2. **SMAUG-T unlock** (for each password) — PBKDF2 → decrypt SK → decapsulate → recover Shamir share
 3. **Shamir reconstruct** — requires ≥ 2 valid shares; fewer → wrong bytes → AES auth fails
 4. **AES-256-GCM** — decrypt ciphertext; wrong key → DOMException
+
+### Signature trust boundary
+
+The included signing key is not independently authenticated. Changes with the
+old signature fail, but anyone can generate a new HAETAE keypair and re-sign
+changed public container data. This does not recover the encrypted shares or
+secret. A successful signature check or file import does not authenticate the
+original sender. Stronger authenticity requires a key trusted outside the
+replaceable container; this demo implements no such pin or PKI binding.
+
+The real shipped-WASM positive and negative controls are in
+`e2e/signature-trust.spec.ts`: old-signature edits and key-only replacement fail;
+new-key re-signing verifies, while verification under the original key rejects
+it. The unchanged encrypted contents still open with the legitimate passwords.
+Run with `npx playwright test e2e/signature-trust.spec.ts --workers=1 --retries=0`.
+The Node pipeline tests mock KpqC and do not replace this browser control or
+establish reproducible source-to-WASM provenance.
+
+[NIST SP 800-89](https://csrc.nist.gov/pubs/sp/800/89/final) distinguishes
+signature verification from assurance of a key owner's identity. This is a
+general trust principle, not a claim that HAETAE is a FIPS-approved algorithm.
 
 ---
 

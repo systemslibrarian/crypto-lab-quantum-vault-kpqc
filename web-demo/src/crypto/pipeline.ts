@@ -85,8 +85,9 @@ export type OpenResult =
 // encoding is injective and matches the Rust core spec §6.2.
 // The `signature` field is intentionally excluded.
 //
-// sigPublicKey and createdAt are included so the signature binds its own
-// verification key and timestamp and cannot be transplanted to another container.
+// sigPublicKey and createdAt are covered by this signature. That does not
+// authenticate the included key: a new keypair can re-sign changed public data.
+// No independent trusted-key pin or signer-identity binding is implemented here.
 function buildContainerData(
   ciphertext: Uint8Array,
   nonce: Uint8Array,
@@ -192,7 +193,7 @@ export async function openBox(
   box: SealedBox,
   passwords: [string | null, string | null, string | null],
 ): Promise<OpenResult> {
-  // Step 1 — HAETAE verify: reject tampered containers outright
+  // Step 1 — HAETAE verify under the unpinned key supplied by this container.
   const containerData = buildContainerData(box.ciphertext, box.nonce, box.wrappedShares, box.sigPublicKey, box.createdAt);
   const valid = haetaeVerify(box.signature, containerData, box.sigPublicKey);
   if (!valid) {
