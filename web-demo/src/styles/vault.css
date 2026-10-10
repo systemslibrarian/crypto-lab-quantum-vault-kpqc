@@ -429,7 +429,8 @@ body {
 }
 
 .btn-primary:disabled {
-  background: #7a96c0;
+  /* This fill also paints the first enabled frame when a request completes. */
+  background: #425b80;
   cursor: not-allowed;
 }
 
