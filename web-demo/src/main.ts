@@ -26,7 +26,6 @@ import { setLang, getLang, t } from './i18n';
 /** Wipe the key-material copies an OpenVisual carried for the strip animation. */
 function zeroizeOpenVisual(v: OpenVisual): void {
   v.reconstructedKey?.fill(0);
-  v.originalKey?.fill(0);
   for (const s of v.recoveredShares) s?.fill(0);
 }
 
@@ -213,7 +212,9 @@ async function init(): Promise<void> {
       resultEl.replaceChildren(msgEl);
 
       await showGibberish(msgEl, result.gibberish);
-      msgEl.textContent = `${t('accessDeniedMsg')} — ${t('needPasswords')} ${result.validShareCount} ${t('correct')}`;
+      msgEl.textContent = result.validShareCount >= 2 && result.visual.signatureValid
+        ? `${t('accessDeniedMsg')} — ${t('ksAuthFailed')}`
+        : `${t('accessDeniedMsg')} — ${t('needPasswords')} ${result.validShareCount} ${t('correct')}`;
 
       // Pause so the user reads the denial, then reset inputs for retry
       await sleep(1500);
