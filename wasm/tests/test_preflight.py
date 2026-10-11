@@ -43,10 +43,22 @@ class BuildPreflight(unittest.TestCase):
 printf '%s\\n' "$*" >> "$PREFLIGHT_CALLS"
 count=$(wc -l < "$PREFLIGHT_CALLS" | tr -d ' ')
 if [ "$count" = "${PREFLIGHT_FAIL_CALL:-0}" ]; then exit 17; fi
+if [ "$count" = "${PREFLIGHT_SKIP_OUTPUT_CALL:-0}" ]; then exit 0; fi
 while [ "$#" -gt 0 ]; do
   if [ "$1" = '-o' ]; then
     shift
+    if [ "${PREFLIGHT_EMPTY_OUTPUTS:-0}" = 1 ]; then
+      : > "$1"
+      : > "${1%.js}.wasm"
+      break
+    fi
+    if [ "${PREFLIGHT_LINK_OUTPUTS:-0}" = 1 ]; then
+      ln -s "$PREFLIGHT_CALLS" "$1"
+      ln -s "$PREFLIGHT_CALLS" "${1%.js}.wasm"
+      break
+    fi
     printf 'fixture loader\\n' > "$1"
+    if [ "${PREFLIGHT_LOADER_ONLY:-0}" = 1 ]; then break; fi
     printf 'fixture binary\\n' > "${1%.js}.wasm"
     break
   fi
@@ -111,6 +123,50 @@ done
         self.assertIn(str(self.smaug / "src/io.c"), calls[0])
         self.assertIn(str(self.haetae / "src/sign.c"), calls[1])
         self.assertEqual(len(list((self.wasm / "dist").glob("*.wasm"))), 2)
+
+    def test_successful_compiler_with_missing_outputs_is_incomplete(self):
+        for call in ("1", "2"):
+            with self.subTest(call=call):
+                result = self.run_build(PREFLIGHT_SKIP_OUTPUT_CALL=call)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("UNREAD", result.stderr)
+                self.assertNotIn("Build complete", result.stdout)
+                self.assertEqual(len(self.calls.read_text().splitlines()), int(call))
+                shutil.rmtree(self.wasm / "dist")
+                self.calls.unlink()
+
+    def test_loader_without_binary_is_incomplete(self):
+        result = self.run_build(PREFLIGHT_LOADER_ONLY="1")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("UNREAD", result.stderr)
+        self.assertNotIn("Build complete", result.stdout)
+        self.assertEqual(len(self.calls.read_text().splitlines()), 1)
+
+    def test_empty_outputs_are_incomplete(self):
+        result = self.run_build(PREFLIGHT_EMPTY_OUTPUTS="1")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("UNREAD", result.stderr)
+        self.assertNotIn("Build complete", result.stdout)
+
+    def test_symlink_outputs_are_incomplete(self):
+        result = self.run_build(PREFLIGHT_LINK_OUTPUTS="1")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("UNREAD", result.stderr)
+        self.assertNotIn("Build complete", result.stdout)
+
+    def test_preexisting_output_evidence_is_preserved_before_compilation(self):
+        dist = self.wasm / "dist"
+        dist.mkdir()
+        before = {name: ("historical:" + name).encode()
+                  for name in ("smaug.js", "smaug.wasm", "haetae.js", "haetae.wasm")}
+        for name, content in before.items():
+            (dist / name).write_bytes(content)
+        result = self.run_build()
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("UNREAD", result.stderr)
+        self.assertNotIn("Build complete", result.stdout)
+        self.assertFalse(self.calls.exists())
+        self.assertEqual({path.name: path.read_bytes() for path in dist.iterdir()}, before)
 
     def test_first_compiler_failure_is_not_success(self):
         result = self.run_build(PREFLIGHT_FAIL_CALL="1")

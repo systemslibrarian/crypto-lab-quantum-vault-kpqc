@@ -96,7 +96,26 @@ if ! command -v emcc >/dev/null 2>&1; then
   printf '%s\n' 'UNREAD: emcc is unavailable; build not attempted.' >&2
   exit 2
 fi
-mkdir -p "$DIST"
+# Existing outputs could make a partial or silent compiler look successful.
+# Preserve them; rerun in a fresh source copy rather than overwriting evidence.
+if [ -e "$DIST" ] || [ -L "$DIST" ]; then
+  printf 'UNREAD: output path already exists; preserve it and use a fresh source copy: %s\n' "$DIST" >&2
+  exit 2
+fi
+mkdir "$DIST"
+
+verify_outputs() {
+  local incomplete_output=0
+  for output in "$@"; do
+    if [ ! -f "$output" ] || [ ! -r "$output" ] || [ ! -s "$output" ] || [ -L "$output" ]; then
+      printf 'UNREAD: compiler did not produce a nonempty readable regular artifact: %s\n' "$output" >&2
+      incomplete_output=1
+    fi
+  done
+  if [ "$incomplete_output" -ne 0 ]; then
+    return 2
+  fi
+}
 
 # ── Constant-Time Hardening Flags ──────────────────────────────────────────────
 # -O1:              Mild optimization; avoids aggressive transforms that break CT
@@ -124,6 +143,7 @@ emcc \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/smaug.js"
+verify_outputs "$DIST/smaug.js" "$DIST/smaug.wasm"
 echo "   → $DIST/smaug.js + smaug.wasm"
 
 echo "▶ Building HAETAE Mode 2 (constant-time hardened)..."
@@ -142,6 +162,7 @@ emcc \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/haetae.js"
+verify_outputs "$DIST/haetae.js" "$DIST/haetae.wasm"
 echo "   → $DIST/haetae.js + haetae.wasm"
 
 echo ""
