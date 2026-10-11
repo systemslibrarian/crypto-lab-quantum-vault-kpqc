@@ -1,0 +1,95 @@
+{
+  "checkedAt": "2026-10-10T22:09:36.175811+00:00",
+  "labHistoricalGitlinkCommit": "4f3cde61189372acdb572fd234fb380df2349443",
+  "candidates": [
+    {
+      "repository": "CryptoLabInc/SMAUG-T",
+      "commit": "bbc463cd788eae36c6d155cef667ac9dbd9054cd",
+      "path": "SMAUG-T.zip",
+      "gitBlobSha": "38842ea90315530448f5ac2f70d72d9c8f99fa85",
+      "archiveSha256": "d7213f1618282cbcb4090abe808a164f9689062f2b65b34fd86496b9923200d7",
+      "entries": 72,
+      "referencePaths": [
+        "SMAUG-T-1.1.1/reference_implementation/include/params.h",
+        "SMAUG-T-1.1.1/reference_implementation/include/api.h",
+        "SMAUG-T-1.1.1/reference_implementation/kat/PQCgenKAT_kem.c",
+        "SMAUG-T-1.1.1/reference_implementation/kat/kat_kem.c",
+        "SMAUG-T-1.1.1/reference_implementation/kat/kat_api.h",
+        "SMAUG-T-1.1.1/reference_implementation/src/kem.c"
+      ],
+      "topLevel": [
+        "SMAUG-T-1.1.1"
+      ],
+      "immutableDownloadUrl": "https://raw.githubusercontent.com/CryptoLabInc/SMAUG-T/bbc463cd788eae36c6d155cef667ac9dbd9054cd/SMAUG-T.zip",
+      "relationshipToActiveBrowserBinary": "unverified historical candidate"
+    },
+    {
+      "repository": "CryptoLabInc/HAETAE",
+      "commit": "743c31df48183fc8c8a39a4f50a634da1c4af03a",
+      "path": "HAETAE.zip",
+      "gitBlobSha": "12d479821aa0db82ce83a3df0891cacb21b76e01",
+      "archiveSha256": "9b69afb55ed96a20d9626b3ea729c291f9e4bfd8d880b740fcb30f6955c4ca72",
+      "entries": 69,
+      "referencePaths": [
+        "HAETAE-1.1.2/reference_implementation/include/params.h",
+        "HAETAE-1.1.2/reference_implementation/include/api.h",
+        "HAETAE-1.1.2/reference_implementation/kat/PQCgenKAT_sign.c",
+        "HAETAE-1.1.2/reference_implementation/kat/kat_sign.c",
+        "HAETAE-1.1.2/reference_implementation/kat/kat_api.h",
+        "HAETAE-1.1.2/reference_implementation/src/sign.c"
+      ],
+      "topLevel": [
+        "HAETAE-1.1.2"
+      ],
+      "immutableDownloadUrl": "https://raw.githubusercontent.com/CryptoLabInc/HAETAE/743c31df48183fc8c8a39a4f50a634da1c4af03a/HAETAE.zip",
+      "relationshipToActiveBrowserBinary": "unverified historical candidate"
+    }
+  ],
+  "scope": "Authenticated historical upstream source candidates; mapping to active shipped browser binaries has not been established",
+  "missingSMAUGInputs": [
+    "reference_implementation/src/io.c",
+    "reference_implementation/include/kem.h"
+  ],
+  "shippedOriginalCompiler": null,
+  "measuredCandidateCompiler": {
+    "executable": "/opt/homebrew/opt/emscripten/bin/emcc",
+    "version": "6.0.10-git"
+  },
+  "candidateBuild": {
+    "scriptSha": "d55627991368b4a26a6e3bc2c288d6ac68c9a1be",
+    "command": "bash wasm/build.sh",
+    "startedAt": "2026-10-10T22:10:28.835172+00:00",
+    "finishedAt": "2026-10-10T22:10:29.661666+00:00",
+    "exitCode": 1,
+    "diagnostic": "emcc: error: required SMAUG-T source src/io.c does not exist",
+    "producedArtifacts": [],
+    "sourceFilesModified": false
+  },
+  "haetaeOnlyDiagnostic": {
+    "command": "bash -x haetae-only-control.sh",
+    "scope": "Unmodified HAETAE source list, wrapper and flags from current build.sh, isolated compiler cache; SMAUG-T was not compiled",
+    "compiler": "Emscripten 6.0.10-git",
+    "exitCode": 0,
+    "artifacts": [
+      {
+        "artifact": "haetae.wasm",
+        "candidateSha256": "640c8e5fa0ece70e6ae9cc8e9b07d959b836334c964f6a57bd3f0da5fc441821",
+        "candidateBytes": 33310,
+        "shippedPath": "web-demo/public/haetae.wasm",
+        "shippedSha256": "9510374922d602ec19da80c9ce4eea1262da45920425b5e6ce6c953ce8d3652e",
+        "shippedBytes": 42683,
+        "byteIdentical": false
+      },
+      {
+        "artifact": "haetae.js",
+        "candidateSha256": "de22a7456aff06afedcf9472f0f6b4f5b36b585e3b55b730f8061fba4875c81d",
+        "candidateBytes": 28107,
+        "shippedPath": "web-demo/src/crypto/wasm/haetae.js",
+        "shippedSha256": "e0d5aed3080b4f4629aa283f7b8a3b52722671deeaf9f96cd9c0107203316a5a",
+        "shippedBytes": 12137,
+        "byteIdentical": false
+      }
+    ],
+    "relationshipToShippedBinary": "unverified; both outputs differ"
+  }
+}

@@ -4,8 +4,8 @@
 # Prerequisites:
 #   - Emscripten SDK (emsdk) installed and activated, e.g.:
 #       source ~/emsdk/emsdk_env.sh
-#   - Vendor sources present under wasm/vendor/ (see README.md for how to
-#     clone / extract them)
+#   - Vendor sources present under wasm/vendor/. Exact upstream source pins
+#     and the original compiler are not recorded; see wasm/PROVENANCE.md.
 #
 # Outputs:
 #   wasm/dist/smaug.js   + smaug.wasm
@@ -20,8 +20,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
-mkdir -p "$DIST"
-
+# Report absent source inputs before invoking a compiler or creating outputs.
+SMAUG_VENDOR="$SCRIPT_DIR/vendor/smaug-t/reference_implementation"
+HAETAE_VENDOR="$SCRIPT_DIR/vendor/haetae/HAETAE-1.1.2/reference_implementation"
 # ── SMAUG-T Level 1 ────────────────────────────────────────────────────────────
 SMAUG_SRC="$SCRIPT_DIR/vendor/smaug-t/reference_implementation"
 
@@ -43,6 +44,78 @@ SMAUG_C_FILES=(
   "$SCRIPT_DIR/src/randombytes_wasm.c"
   "$SCRIPT_DIR/src/smaug_exports.c"
 )
+
+# ── HAETAE Mode 2 ──────────────────────────────────────────────────────────────
+HAETAE_SRC="$SCRIPT_DIR/vendor/haetae/HAETAE-1.1.2/reference_implementation"
+
+HAETAE_C_FILES=(
+  "$HAETAE_SRC/src/decompose.c"
+  "$HAETAE_SRC/src/encoding.c"
+  "$HAETAE_SRC/src/fft.c"
+  "$HAETAE_SRC/src/fips202.c"
+  "$HAETAE_SRC/src/fixpoint.c"
+  "$HAETAE_SRC/src/ntt.c"
+  "$HAETAE_SRC/src/packing.c"
+  "$HAETAE_SRC/src/poly.c"
+  "$HAETAE_SRC/src/polyfix.c"
+  "$HAETAE_SRC/src/polymat.c"
+  "$HAETAE_SRC/src/polyvec.c"
+  "$HAETAE_SRC/src/reduce.c"
+  "$HAETAE_SRC/src/sampler.c"
+  "$HAETAE_SRC/src/sign.c"
+  "$HAETAE_SRC/src/symmetric-shake.c"
+  "$SCRIPT_DIR/src/randombytes_wasm.c"
+  "$SCRIPT_DIR/src/haetae_exports.c"
+)
+
+missing=0
+for required in "$SMAUG_VENDOR/include" "$SMAUG_VENDOR/src" "$HAETAE_VENDOR/include" "$HAETAE_VENDOR/src"; do
+  if [ ! -d "$required" ]; then
+    printf 'UNREAD: required vendor directory is absent: %s\n' "$required" >&2
+    missing=1
+  fi
+done
+if [ "$missing" -ne 0 ]; then
+  printf '%s\n' 'Build not attempted. Exact source/compiler provenance remains unknown; see wasm/PROVENANCE.md.' >&2
+  exit 2
+fi
+# Existing directories alone can still contain an incomplete source capture.
+# Check inputs for BOTH algorithms before the first compiler or output directory.
+for required in "${SMAUG_C_FILES[@]}" "${HAETAE_C_FILES[@]}" \
+  "$SMAUG_VENDOR/include/kem.h" "$HAETAE_VENDOR/include/api.h"; do
+  if [ ! -f "$required" ] || [ ! -r "$required" ]; then
+    printf 'UNREAD: required build input is missing or unreadable: %s\n' "$required" >&2
+    missing=1
+  fi
+done
+if [ "$missing" -ne 0 ]; then
+  printf '%s\n' 'Build not attempted. Source existence does not establish provenance; see wasm/PROVENANCE.md.' >&2
+  exit 2
+fi
+if ! command -v emcc >/dev/null 2>&1; then
+  printf '%s\n' 'UNREAD: emcc is unavailable; build not attempted.' >&2
+  exit 2
+fi
+# Existing outputs could make a partial or silent compiler look successful.
+# Preserve them; rerun in a fresh source copy rather than overwriting evidence.
+if [ -e "$DIST" ] || [ -L "$DIST" ]; then
+  printf 'UNREAD: output path already exists; preserve it and use a fresh source copy: %s\n' "$DIST" >&2
+  exit 2
+fi
+mkdir "$DIST"
+
+verify_outputs() {
+  local incomplete_output=0
+  for output in "$@"; do
+    if [ ! -f "$output" ] || [ ! -r "$output" ] || [ ! -s "$output" ] || [ -L "$output" ]; then
+      printf 'UNREAD: compiler did not produce a nonempty readable regular artifact: %s\n' "$output" >&2
+      incomplete_output=1
+    fi
+  done
+  if [ "$incomplete_output" -ne 0 ]; then
+    return 2
+  fi
+}
 
 # ── Constant-Time Hardening Flags ──────────────────────────────────────────────
 # -O1:              Mild optimization; avoids aggressive transforms that break CT
@@ -70,30 +143,8 @@ emcc \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/smaug.js"
+verify_outputs "$DIST/smaug.js" "$DIST/smaug.wasm"
 echo "   → $DIST/smaug.js + smaug.wasm"
-
-# ── HAETAE Mode 2 ──────────────────────────────────────────────────────────────
-HAETAE_SRC="$SCRIPT_DIR/vendor/haetae/HAETAE-1.1.2/reference_implementation"
-
-HAETAE_C_FILES=(
-  "$HAETAE_SRC/src/decompose.c"
-  "$HAETAE_SRC/src/encoding.c"
-  "$HAETAE_SRC/src/fft.c"
-  "$HAETAE_SRC/src/fips202.c"
-  "$HAETAE_SRC/src/fixpoint.c"
-  "$HAETAE_SRC/src/ntt.c"
-  "$HAETAE_SRC/src/packing.c"
-  "$HAETAE_SRC/src/poly.c"
-  "$HAETAE_SRC/src/polyfix.c"
-  "$HAETAE_SRC/src/polymat.c"
-  "$HAETAE_SRC/src/polyvec.c"
-  "$HAETAE_SRC/src/reduce.c"
-  "$HAETAE_SRC/src/sampler.c"
-  "$HAETAE_SRC/src/sign.c"
-  "$HAETAE_SRC/src/symmetric-shake.c"
-  "$SCRIPT_DIR/src/randombytes_wasm.c"
-  "$SCRIPT_DIR/src/haetae_exports.c"
-)
 
 echo "▶ Building HAETAE Mode 2 (constant-time hardened)..."
 emcc \
@@ -111,6 +162,7 @@ emcc \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue"]' \
   -o "$DIST/haetae.js"
+verify_outputs "$DIST/haetae.js" "$DIST/haetae.wasm"
 echo "   → $DIST/haetae.js + haetae.wasm"
 
 echo ""
