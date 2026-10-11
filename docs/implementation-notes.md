@@ -8,10 +8,19 @@
 
 ## Overview
 
-The web demo uses genuine C reference implementations of SMAUG-T and HAETAE,
-compiled to WebAssembly via Emscripten 5.0.3.  This document covers the
-compilation pipeline, the JS↔WASM interface, memory management, and the
-rationale behind key design choices.
+The web demo uses SMAUG-T and HAETAE reference C implementations. On
+2026-10-11, clean builds with an immutable Emscripten 5.0.3 image reproduced
+both active loaders and both WASM files byte for byte. This establishes a
+reproducing environment, not the original publisher's compiler. See
+[the source pins, recipes and evidence](../wasm/PROVENANCE.md).
+
+The compilation examples below describe historical development recipes and
+do **not** reproduce the complete currently shipped pair. The active SMAUG
+uses the historical `getentropy` shim and 16 MiB initial memory; the active
+HAETAE uses the earlier wrapper, `-O2`, 32 MiB initial memory and a 2 MiB
+stack. The exact source-backed commands are in `wasm/reproduction.json`.
+Optimization flags, successful round trips and byte identity do not prove
+constant-time behavior or eliminate allocator timing variation.
 
 ---
 
@@ -139,7 +148,7 @@ HAETAE 1.1.2 follows the FIPS 204–style context-string API.  The shim passes
 | `haetae_publickeybytes` | `(void) → int` | Returns 992 |
 | `haetae_secretkeybytes` | `(void) → int` | Returns 1408 |
 | `haetae_sigbytes` | `(void) → int` | Returns 1474 (maximum) |
-| `haetae_secure_zeroize` | `(uint8_t *buf, size_t len) → void` | Secure memory zeroing (volatile, cannot be elided) |
+| `haetae_secure_zeroize` | `(uint8_t *buf, size_t len) → void` | Present in the current development wrapper; **absent from the active shipped WASM** |
 
 `haetae_sign` writes the actual signature length into `*siglen`.  Since wasm32
 uses 32-bit `size_t`, TypeScript reads this 4-byte value with `getValue(ptr,
@@ -198,9 +207,13 @@ smaugMod._free(sk);
 ```
 
 `_malloc` / `_free` are Emscripten's wrappers around the WASM heap allocator.
-All allocations are freed immediately after copying the output into a JavaScript
-`Uint8Array`; secret keys are zeroized via `_*_secure_zeroize()` exports before
-freeing.  There are no persistent WASM-heap allocations across calls.
+The TypeScript wrappers free their temporary allocations after copying output
+into JavaScript arrays. SMAUG explicitly calls its secure-zeroize export for
+secret buffers. The active HAETAE wrapper calls `_free` without explicit
+zeroization, and its shipped WASM has no `haetae_secure_zeroize` export.
+Freeing memory alone does not establish erasure; JavaScript array copies also
+have a separate lifetime. The historical claim that both paths zeroize their
+secret buffers does not describe the deployed HAETAE implementation.
 
 `INITIAL_MEMORY=4194304` (4 MiB) pre-allocates the WASM heap to avoid timing
 jitter from dynamic memory growth.  `ALLOW_MEMORY_GROWTH=1` remains enabled as

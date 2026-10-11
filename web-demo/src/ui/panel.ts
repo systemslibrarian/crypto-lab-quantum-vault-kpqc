@@ -14,6 +14,17 @@ export interface RetrieveFormData {
   passwords: [string | null, string | null, string | null];
 }
 
+/** Hand off initial focus without interrupting someone already using a form. */
+function focusInitialField(panel: HTMLElement, selector: string): void {
+  const field = panel.querySelector<HTMLElement>(selector);
+  const previousFocus = document.activeElement;
+  setTimeout(() => {
+    if (field?.isConnected && panel.contains(field) && document.activeElement === previousFocus) {
+      field.focus({ preventScroll: true });
+    }
+  }, 50);
+}
+
 export function showDepositPanel(
   panel: HTMLElement,
   boxNumber: string,
@@ -150,10 +161,7 @@ export function showDepositPanel(
     fileInput.value = '';
   });
   // Move focus into the panel so keyboard/screen-reader users land on the first field
-  setTimeout(() => {
-    const first = panel.querySelector<HTMLElement>('textarea, input');
-    first?.focus();
-  }, 50);
+  focusInitialField(panel, 'textarea, input');
 
   qs(panel, '.btn-cancel-x').addEventListener('click', onCancel);
   qs(panel, '#btn-cancel-deposit').addEventListener('click', onCancel);
@@ -290,10 +298,7 @@ export function showRetrievePanel(
   });
 
   // Move focus into the panel so keyboard/screen-reader users start at first password field
-  setTimeout(() => {
-    const first = panel.querySelector<HTMLElement>('input[type="password"]');
-    first?.focus();
-  }, 50);
+  focusInitialField(panel, 'input[type="password"]');
 
   qs(panel, '.btn-cancel-x').addEventListener('click', onCancel);
   qs(panel, '#btn-cancel-retrieve').addEventListener('click', onCancel);

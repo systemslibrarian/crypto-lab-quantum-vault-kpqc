@@ -1,0 +1,691 @@
+{
+  "schemaVersion": 1,
+  "scope": "Reproducing source recipe for the unchanged shipped SMAUG-T and HAETAE browser artifacts; not original compiler identity or a constant-time audit.",
+  "originalCompiler": null,
+  "compiler": {
+    "image": "emscripten/emsdk@sha256:7b5d14203bb4ef20da6f5b71b90c8f37ec09c2776d342efff3bc989ebf1aa873",
+    "version": "5.0.3",
+    "commit": "285c424dfa9e83b03cf8490c65ceadb7c45f28eb",
+    "nodeVersion": "v22.16.0",
+    "systemLibraryFiles": 1913,
+    "systemLibraryInventorySha256": "68b867441285b925a1f8202671f603d465d8e7885a9e0fe73f5da1945f56efb5",
+    "measuredPlatformDescriptorDigest": "sha256:817ece58ca8dfb966d0230019b7aee13c1341b481a60abb33595ab74019b88b4"
+  },
+  "sources": {
+    "smaug": {
+      "kind": "tar",
+      "repository": "hmchoe0528/SMAUG-T_public",
+      "pin": "2c039df23134a2de3c7aa86a4904c9a4734f9def",
+      "url": "https://codeload.github.com/hmchoe0528/SMAUG-T_public/tar.gz/2c039df23134a2de3c7aa86a4904c9a4734f9def",
+      "sha256": "2a202ba4fb3a4946d6d028aef180a1fc1637d78bdc0fe9200f6e30f2c4c71107",
+      "files": [
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/CMakeLists.txt",
+          "path": "smaug/CMakeLists.txt",
+          "sha256": "72a223e301844c4eaf27c7de428e0f3b4ec381daa312baad3a9c2a9941a96a5c",
+          "gitBlob": "bd9e2d43858700f0938be61bf7ece291d8b45a38"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/Makefile",
+          "path": "smaug/Makefile",
+          "sha256": "cfebc3deb95209073e70ff86d12d8610e88c9d97a0b8fc06ee2d88fd5d27538e",
+          "gitBlob": "9629546ec879fc0bb907d230c26a94b5208a688b"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/benchmark/CMakeLists.txt",
+          "path": "smaug/benchmark/CMakeLists.txt",
+          "sha256": "5bdd8a6a016d9b834491d555749f1ee3b69a3a0d48c170909bd3b40653356ef1",
+          "gitBlob": "83a17be32a7d2f35b439585c374e9e07a0c29f64"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/benchmark/PQC_bench.c",
+          "path": "smaug/benchmark/PQC_bench.c",
+          "sha256": "1aff8c996eeca67e6e6cc1860d7fbaffacea37736da081250d52e22d0e1db887",
+          "gitBlob": "77f3ff90038f5fd664666a6e118c52867a7e9081"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/benchmark/cpucycles.c",
+          "path": "smaug/benchmark/cpucycles.c",
+          "sha256": "6a8d37f44c6c4593d3719feac8eefc112caec32977c79184b363e069ba56b9aa",
+          "gitBlob": "b4483017241b8dd38aafeab2a25655f57dd6c6b1"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/benchmark/cpucycles.h",
+          "path": "smaug/benchmark/cpucycles.h",
+          "sha256": "e265e35684386c4f966772ad5dd2320b2444d5bc036d8ee585cd07596a140f03",
+          "gitBlob": "7bd2132b67b0c0c9452e2bf599d4c007c6fc5fa3"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/benchmark/speed.c",
+          "path": "smaug/benchmark/speed.c",
+          "sha256": "ca7a8edf5db69982a4e08bbb3d8ebaff58dc72d2993aed066b31f8ddeb0960b6",
+          "gitBlob": "28ca353cb9d89ce3278f0a491f41bdcdb8241886"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/benchmark/speed_print.c",
+          "path": "smaug/benchmark/speed_print.c",
+          "sha256": "c4d541b4f7bb40ce543edc9733f414c27617b34e80b8a85b0a8edecab48ef8b8",
+          "gitBlob": "10bf57c72fbcca782457e93a6ef8305cfca4b3b8"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/benchmark/speed_print.h",
+          "path": "smaug/benchmark/speed_print.h",
+          "sha256": "bf71105f8e28e23bd83c0f359bbd2707859f818ea7cc84b6012de37befcf64de",
+          "gitBlob": "6db6a2aead00ae454d89c5335769966241e4b5c0"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/cmake/CPM.cmake",
+          "path": "smaug/cmake/CPM.cmake",
+          "sha256": "2a5567119e5ae88621127868edf972936db7b79d92ae0cc0b8dc4030472076bc",
+          "gitBlob": "1a5a0ed55b73f2b6626888329b98ad9151229808"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/api.h",
+          "path": "smaug/include/api.h",
+          "sha256": "f7e10f83338011e7d0b3309843d0efc1f59e09227cff30e29552a910a50b9f3d",
+          "gitBlob": "5d613d98ddc6831d666c98b904aa4cb4e8da8d2c"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/cbd.h",
+          "path": "smaug/include/cbd.h",
+          "sha256": "c5e32c228cd97bf335365c9e9f97244b625dd3f92798146f09b1a45a48b14d3c",
+          "gitBlob": "2943f2c96d1681cdb07d3f6a42d062cc24b7cf36"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/ciphertext.h",
+          "path": "smaug/include/ciphertext.h",
+          "sha256": "ad39856ed2c798b5d90023bc312a28888585ddb5226a62912d28e2b5f72a7e07",
+          "gitBlob": "59607e7af220dcc0ae5c9c8c95f151ad64ce1377"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/dg.h",
+          "path": "smaug/include/dg.h",
+          "sha256": "0edb68b1a54647c611ca919c33fba16e7a68f276eca9bca9fa65d7a455a32c46",
+          "gitBlob": "a55f39dd197a20387e43b80d30654d3a3452023d"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/fips202.h",
+          "path": "smaug/include/fips202.h",
+          "sha256": "7e6a6acf02fc79a341fb4d12f9cdd5473dd25bb017e1c89a5ee7a02d68d60491",
+          "gitBlob": "32296d66d22b5ed819cc3a8e9cf7ac0368572117"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/hash.h",
+          "path": "smaug/include/hash.h",
+          "sha256": "54a21c7c2a8e4fe286672b956c71dab5cf09f2e89782632caa66fc21323fdf53",
+          "gitBlob": "3e48f018fa28fb908d03fa472af5496633ea052e"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/hwt.h",
+          "path": "smaug/include/hwt.h",
+          "sha256": "c6ecf761ba216c9d2f8379377f474be7c8406a7dcea984debc9a1de184b24928",
+          "gitBlob": "24c74fbe4ffa7e32ee8ec11a528ceff8e3782b2c"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/indcpa.h",
+          "path": "smaug/include/indcpa.h",
+          "sha256": "81e095ff374bff1add2b19d4ed733f4816fa8c25bf80a02fe8fa7043812a8fd2",
+          "gitBlob": "b603724bcb13e4a75688e4602f520795b2a987d8"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/io.h",
+          "path": "smaug/include/io.h",
+          "sha256": "177edd3ee9a688d5f8757afb530d2321e3bbded937d850bb6ca05297bdfed577",
+          "gitBlob": "df14453b8f9274973dc892fb4426b2df772ff81c"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/kem.h",
+          "path": "smaug/include/kem.h",
+          "sha256": "7d77d91fed19c3ef828023b60b668e0d1bd7a4b2383b43b25f819c04a01a048f",
+          "gitBlob": "f2494c742ad79dca2fc56e53f45c64bf8b221ab6"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/key.h",
+          "path": "smaug/include/key.h",
+          "sha256": "e653ffe998fae00259e8521125d570183d4417782d705456c5fe887cadabeaab",
+          "gitBlob": "5b53220dae537dfea15315d72d9d216b96dbd47f"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/pack.h",
+          "path": "smaug/include/pack.h",
+          "sha256": "785188d62c229025233f99f6141053f11f85e6cdc0f21880ca3ce89b8ed5af4c",
+          "gitBlob": "5352b7ab15bea6428e23c2ac22647a54dbaf4ed1"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/parameters.h",
+          "path": "smaug/include/parameters.h",
+          "sha256": "02a8feded81f3d48a934f81935832a91a70e04a567b2457be030c5baf8f38c14",
+          "gitBlob": "3ac1334d8b9fc2b917ea7cd42ff00e2e0c3e966f"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/poly.h",
+          "path": "smaug/include/poly.h",
+          "sha256": "8aaad65af9a25e90288c3d6d5cc34a71c694bfb547f16491bba80b4e41078e00",
+          "gitBlob": "cf46ad3677043e75d7143dd79849f68d1367b6c1"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/randombytes.h",
+          "path": "smaug/include/randombytes.h",
+          "sha256": "b358ce5ba4b3911ee0d616141c82a62be3e06371b7c0b884c4e2b9c6409abc8d",
+          "gitBlob": "2a37ee4d6ff43fb6e9e18cc05d3ca44c677925f5"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/rng.h",
+          "path": "smaug/include/rng.h",
+          "sha256": "6a0654ac0e8ce4aad3ea607c688effcc3b9fc77f87be51fc541ccb687ea7e1de",
+          "gitBlob": "e27042bb947926ce3014f471550ea3d853096e75"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/toomcook.h",
+          "path": "smaug/include/toomcook.h",
+          "sha256": "f6691ccc3113d3b1d5456241053237b63f15db9be241e4775c91455c44475b8b",
+          "gitBlob": "aad2eb11c5ba31c5aad27189db6f139491d7fdc1"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/include/verify.h",
+          "path": "smaug/include/verify.h",
+          "sha256": "6abb6eb065dd3048dd8b39cb41b7d79a5514efa3bc44b7f96becf59ad02ca306",
+          "gitBlob": "12f327069323660d281a6c804b8a86d5c500cbea"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/kat/CMakeLists.txt",
+          "path": "smaug/kat/CMakeLists.txt",
+          "sha256": "7d1f5f10ab852a9cb80634197fc22780bada4731f1fc790503669dbd26094135",
+          "gitBlob": "68d43933aa3a3c4b8f3e34eb75ab1ba2ea6e9d78"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/kat/PQCgenKAT_kem.c",
+          "path": "smaug/kat/PQCgenKAT_kem.c",
+          "sha256": "6e874b692611b11f2a696a1966f7bfffe83dfff865ee51cfd126a37e79fd64a1",
+          "gitBlob": "72cb16823ff98707b04e4c284ea23983e9d2e2f6"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/kat/kat_api.h",
+          "path": "smaug/kat/kat_api.h",
+          "sha256": "bc3dbd4418e083ececec6c7c68b72821a7aa68c5af936f0aeb1aa81626a89b57",
+          "gitBlob": "a890f8fa3c61020cce3d4ec917186367dc5658ac"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/kat/kat_encrypt.c",
+          "path": "smaug/kat/kat_encrypt.c",
+          "sha256": "dfc90162564191344c9c84143700b857a2ce26a7ceeef4a493d554bfb7263e7b",
+          "gitBlob": "738a47621d6ac0eaa0cedd7ed72a05ee5d4d8b66"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/kat/kat_kem.c",
+          "path": "smaug/kat/kat_kem.c",
+          "sha256": "84fdf022a0ddc70320cbcb56512db9ce9da789195f607c8d9775e3751dd7931b",
+          "gitBlob": "a466c9235bc11b13b7034fd7ced3a0f3436f9e10"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/cbd.c",
+          "path": "smaug/src/cbd.c",
+          "sha256": "d5c772524f95176171d94e9334877e113dc6fd9a709e261072e5aff5c7532a73",
+          "gitBlob": "d5c9e5a0cb776c063b56c5ea17c192c7a60a334d"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/ciphertext.c",
+          "path": "smaug/src/ciphertext.c",
+          "sha256": "896550e05c7f1153d8d9ecd29c223a36025c99e9cab5d1ef081fe29fcb050c9f",
+          "gitBlob": "98e23cbc2f62b5e642ae221c3ad796b76bcf0cd6"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/dg.c",
+          "path": "smaug/src/dg.c",
+          "sha256": "909a051aa835b500f85cee80c050b684ec3bfaf0641743a2def16dc5ec2a8540",
+          "gitBlob": "082441e6dc6e8cb5bbfb39bf9a7125827c570d96"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/fips202.c",
+          "path": "smaug/src/fips202.c",
+          "sha256": "cfb3603f4b524509a8bb2749889cab4cd64a7394115c65d5caeed64316991bb7",
+          "gitBlob": "0fed2947e49fc31a257f49afc7e73bb82ac0060b"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/hash.c",
+          "path": "smaug/src/hash.c",
+          "sha256": "682f427819b3b15f15e707c975263d69b5a391ace77c232c281893dc709fa8a7",
+          "gitBlob": "643cf7535cc44df4dd81a227f0e60afc3c7e2ce1"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/hwt.c",
+          "path": "smaug/src/hwt.c",
+          "sha256": "0468d7f1c2d3472c0662c016d1036e5d58afdcebbe5c332ea18a6ff1e6f38c31",
+          "gitBlob": "50166d7039b2b045217d3f7017d4215df7325b91"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/indcpa.c",
+          "path": "smaug/src/indcpa.c",
+          "sha256": "89cdac400b3a02c72597cb84c9db201244d931c9e263a70813acbbc7f91f52cf",
+          "gitBlob": "01324f8539081b8aac7f3c8cba575f203df2f1ac"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/io.c",
+          "path": "smaug/src/io.c",
+          "sha256": "408e2dcaa4abd72ba5d322e9ec95676b7945bac05da684a5fb2c746803f1d691",
+          "gitBlob": "fc37106a15c5c37398e071c1f5a8555c31b5ce7b"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/kem.c",
+          "path": "smaug/src/kem.c",
+          "sha256": "36e107ce412cf0050482da083ef6445ef620e7d0cda74d0111592ce065dacbf5",
+          "gitBlob": "f2a0a70d415b34ce9de80a884b556872c35ed3fc"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/key.c",
+          "path": "smaug/src/key.c",
+          "sha256": "353560e986f89189904e1ac80ea3f86e884886606f767aa21a4446ede4d43198",
+          "gitBlob": "04730b3f6cd56fc839b51f1116b392b377619260"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/pack.c",
+          "path": "smaug/src/pack.c",
+          "sha256": "9f19d3549d9ad2dfef8fdc4494693bcc5f31874caf7b7dd4dc1784ebe56af776",
+          "gitBlob": "752324c1d941ea077c26d26f7df1d4f07475580a"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/poly.c",
+          "path": "smaug/src/poly.c",
+          "sha256": "8e92c738377897e90f56b94ae92bbbbfe008c98141a440834d8071bfc6fd9a56",
+          "gitBlob": "e5c1c5ceeffc2a9d2e73ede1aa9db2dccf43c33c"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/randombytes.c",
+          "path": "smaug/src/randombytes.c",
+          "sha256": "25e329ee14454e32b411bc91b6ba22b6e495b03de9de0e31b8ed34b5f55a1e36",
+          "gitBlob": "71c5e54602bd55214e161db5ae8083cfd462903e"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/rng.c",
+          "path": "smaug/src/rng.c",
+          "sha256": "2aa81c2abfbe49c9bad1adaba8a3a9227745027a5b4f9b743fcebaa827307826",
+          "gitBlob": "a20b7d535ab6d8ae61dedbde21d67ae072d7299d"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/toomcook.c",
+          "path": "smaug/src/toomcook.c",
+          "sha256": "d5489fc229c7716d7e733a44cb9ca89bc9995c7ba0c21b9445efea696c5da31f",
+          "gitBlob": "dff898f338e3115120c2b6a31aa9b564a455ba69"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/src/verify.c",
+          "path": "smaug/src/verify.c",
+          "sha256": "7877e29f83f1b3f0426867cfc5d25b5431e7ec9a4b4a3f4b1dd30033aa61cfe1",
+          "gitBlob": "426c8c4e22b2fd2c57ade0ed608907419559b9f7"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/test/CMakeLists.txt",
+          "path": "smaug/test/CMakeLists.txt",
+          "sha256": "b049ae2d75ad7840779e782d0c709f335603b79abd56792c946d6b7c57907f37",
+          "gitBlob": "30ce189d63f9767ba8c27003b60c438bfb0297c5"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/test/UnitTest.cpp",
+          "path": "smaug/test/UnitTest.cpp",
+          "sha256": "f76a5bbfb43b970a8e1f7b06a073908fdfae850fababd91b3ab92b1afa98c6a7",
+          "gitBlob": "d399f7284e89d9714c05032ab15dc73a3ce19f6f"
+        },
+        {
+          "archivePath": "SMAUG-T_public-2c039df23134a2de3c7aa86a4904c9a4734f9def/reference_implementation/test/main.c",
+          "path": "smaug/test/main.c",
+          "sha256": "2dd1906903dcd17ca0dca97d904e28416dec677beb8f783af9284834cfd0ec1e",
+          "gitBlob": "b04d642e2d78a240e0b1bfa21627dd329a5e3f67"
+        }
+      ],
+      "expectedFiles": 52
+    },
+    "haetae": {
+      "kind": "zip",
+      "repository": "CryptoLabInc/HAETAE",
+      "pin": "743c31df48183fc8c8a39a4f50a634da1c4af03a",
+      "url": "https://raw.githubusercontent.com/CryptoLabInc/HAETAE/743c31df48183fc8c8a39a4f50a634da1c4af03a/HAETAE.zip",
+      "sha256": "9b69afb55ed96a20d9626b3ea729c291f9e4bfd8d880b740fcb30f6955c4ca72",
+      "files": [
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/fft.h",
+          "path": "haetae/fft.h",
+          "sha256": "9472c620a6c4883860803a2e879fed21a4b00af862ac11b5b2f236cc1974c5db"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/fips202.h",
+          "path": "haetae/fips202.h",
+          "sha256": "c67414df97bba53295e3f5131507e295a2b729ca43c092e8309d419739ce00c1"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/decompose.h",
+          "path": "haetae/decompose.h",
+          "sha256": "363d32f5172eac507b652fda495236c11376a01d62cc45b163053b2b209251f9"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/params.h",
+          "path": "haetae/params.h",
+          "sha256": "cba72f62fab3f53b4165510afecd1e3d9ebee63cd5e875d2a3e51437db3a5726"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/polyvec.h",
+          "path": "haetae/polyvec.h",
+          "sha256": "a2a64cb0f89018a3fd01012401e9fd285f265c4721255cd9abe8028d4f3e4a60"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/randombytes.h",
+          "path": "haetae/randombytes.h",
+          "sha256": "9a4b4bda5951c3aa0c8af29b5e319dc8f93bf65f038ac0c0044df22039dc6ced"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/polymat.h",
+          "path": "haetae/polymat.h",
+          "sha256": "63ff13454523f9749dede09c258072552239d922e202f147aa86bb8832e083a2"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/config.h",
+          "path": "haetae/config.h",
+          "sha256": "4a9c0d19d428ff0fa2e4163fa5641a966d3a1fa992f57e2a8c71fe5e2866110b"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/sampler.h",
+          "path": "haetae/sampler.h",
+          "sha256": "208f24a6d34351036239eb4a35b4d0c4d24dbe8f73fb54b3e5bcc6c8a27dd5fd"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/fixpoint.h",
+          "path": "haetae/fixpoint.h",
+          "sha256": "4f3542f526b6c356b1ae467d4ce44bc8468d8585a25f5325fca6926b156b33f9"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/encoding.h",
+          "path": "haetae/encoding.h",
+          "sha256": "a6b45d7f5d6e09c7befa736abe834df44a72f1e0cddb67aff0cf1b3615461b76"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/packing.h",
+          "path": "haetae/packing.h",
+          "sha256": "b533193fb3f8590adc257b77b04aa2ed6a11c161d09805affa99af75455c6b7a"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/symmetric.h",
+          "path": "haetae/symmetric.h",
+          "sha256": "0f5db9e019cb2dfb34a96986b8adcfd3f2ecafd6ba2955ca6ee8c5dd21001cc7"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/ntt.h",
+          "path": "haetae/ntt.h",
+          "sha256": "0b2b59261bf3579d5eb63d7e07f2ea48d336a71e26c5b818ee480e55117a4544"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/api.h",
+          "path": "haetae/api.h",
+          "sha256": "a1b7b25a53efffdfaf404942164282677a3c568c927dc502e73824eee1ee50fb"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/common.h",
+          "path": "haetae/common.h",
+          "sha256": "72c062d86e4c6b900fb1df18cfc892526d3ebec17dc2b417db4a76a2531fe5e1"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/reduce.h",
+          "path": "haetae/reduce.h",
+          "sha256": "e7238538fee0a6ab986aff9403651c652592980f1ad6e10453ebdbf5afea5a84"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/rans_byte.h",
+          "path": "haetae/rans_byte.h",
+          "sha256": "54b1760d9c4b67d3ecbcbb4254f41210970541fdd899031163cdfb09dca88a9f"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/poly.h",
+          "path": "haetae/poly.h",
+          "sha256": "2fe642667d2fbbd871931d622d916dfe840dac71fbd0e1f4bdbbf57cbb0940e0"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/include/polyfix.h",
+          "path": "haetae/polyfix.h",
+          "sha256": "ba5b3b326f82de64667062788f0809a545cf285c07167cfb0286438485cb34da"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/symmetric-shake.c",
+          "path": "haetae/symmetric-shake.c",
+          "sha256": "68731ce2106de35b76b89787a7922340b50d663fd562cce566c08a2acb770417"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/ntt.c",
+          "path": "haetae/ntt.c",
+          "sha256": "034e984a72a521aa9b7c9c92bb36dcf133b80f78b1ef85b1e8e556c02ebe6d36"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/poly.c",
+          "path": "haetae/poly.c",
+          "sha256": "bc2194fa0929674b6dee6f876b100b7637c99abf0a196cc53edbf77010720f17"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/reduce.c",
+          "path": "haetae/reduce.c",
+          "sha256": "8806547100d8cffe10c26bfa9ea79dc4747ef4d1e33ae559a1d4d71c097cdf00"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/polyfix.c",
+          "path": "haetae/polyfix.c",
+          "sha256": "cf7935818dae320471e87312468269c30fb21e3003b043cfc8f10dd12a2ed264"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/sign.c",
+          "path": "haetae/sign.c",
+          "sha256": "2dcc7c2a701f1bdaddba3dd12be9eefe571ca51432b54c9e8a67178f83a4ae5b"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/decompose.c",
+          "path": "haetae/decompose.c",
+          "sha256": "16057e4232a74e3f1be035041cc4324dfa260a07a1a276c895afa3b2870fa574"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/fips202.c",
+          "path": "haetae/fips202.c",
+          "sha256": "17e72eee44f8c4a47a39ac4804ce15236b30f2c3ec767c99f92a7838aa79ccab"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/fft.c",
+          "path": "haetae/fft.c",
+          "sha256": "cdb2a8599234c754da5eccc25aca2f761793e7e97a317b5f18ef33698b3c44ad"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/sampler.c",
+          "path": "haetae/sampler.c",
+          "sha256": "53548231f71cd56bfbe3c5218875ffb960bc3dc835b99fa9e46ee654d841b712"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/polymat.c",
+          "path": "haetae/polymat.c",
+          "sha256": "c0c3f60690716d82e5cfefd9841f0300b0a4102211a85c525e5a1caacaa69cab"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/randombytes.c",
+          "path": "haetae/randombytes.c",
+          "sha256": "22fdf706ca5f96e881341247fe2be04e6040f6fffaaaaba01e2ca55e1cea6357"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/polyvec.c",
+          "path": "haetae/polyvec.c",
+          "sha256": "022d28e6dac529e4259b0db5501d6bf93bcb390765054e99f1104a9001889426"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/fixpoint.c",
+          "path": "haetae/fixpoint.c",
+          "sha256": "341cbaf1ecad123218e85dae19ccbbff0dde2df2cc3e5f90c9cdcbdf94246a05"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/encoding.c",
+          "path": "haetae/encoding.c",
+          "sha256": "ad14676fd5a91959abc963334123cc7343b1415a236d6ffc9ae7e225a8270a0d"
+        },
+        {
+          "archivePath": "HAETAE-1.1.2/reference_implementation/src/packing.c",
+          "path": "haetae/packing.c",
+          "sha256": "1b4bb8775425cfa5c7c5f516bb00904c3dc5dfb3014d0d1e6750ab62ce763e07"
+        }
+      ],
+      "expectedFiles": 36
+    }
+  },
+  "wrappers": [
+    {
+      "component": "smaug",
+      "pin": "fcff4c5d00e19a334a455a9a18deee01d8c3b61b",
+      "path": "wasm/src/randombytes_wasm.c",
+      "destination": "smaug-wrapper/randombytes_wasm.c",
+      "sha256": "fb82dfe5ba81b3c86421316cf4540c780acff3541f4e09618e0c7dc410f18eea",
+      "gitBlob": "86fd82105423d380d5882c48444ed6f213987a30"
+    },
+    {
+      "component": "smaug",
+      "pin": "fcff4c5d00e19a334a455a9a18deee01d8c3b61b",
+      "path": "wasm/src/smaug_exports.c",
+      "destination": "smaug-wrapper/smaug_exports.c",
+      "sha256": "fda79bc12f335d0a2b7d3935675c2ac24f7e74cf9191217f03b46adcb6318adc",
+      "gitBlob": "a5fd9972c7925e6295d47c26a5f7151ac7a18961"
+    },
+    {
+      "component": "haetae",
+      "pin": "5ed9181e870e781c1ceefe8354658d781ad8d449",
+      "path": "wasm/src/randombytes_wasm.c",
+      "destination": "haetae-wrapper/randombytes_wasm.c",
+      "sha256": "e4aac05b68e2e3a9d627297f84ca9a49946b56a7fdfb36bf7f7ccb9c910c3505",
+      "gitBlob": "61a38dd8974e07bf8295df6afdfe2c317eb1e6a1"
+    },
+    {
+      "component": "haetae",
+      "pin": "5ed9181e870e781c1ceefe8354658d781ad8d449",
+      "path": "wasm/src/haetae_exports.c",
+      "destination": "haetae-wrapper/haetae_exports.c",
+      "sha256": "8fdd3dc1d16f46f8c1a07f8c719e94d85c164c3be7463ba5d767f42f4faf06a7",
+      "gitBlob": "792c88593ebe203b96a6d068f549586adb883294"
+    }
+  ],
+  "commands": {
+    "smaug": [
+      "-O1",
+      "-fno-tree-vectorize",
+      "-fno-slp-vectorize",
+      "-DNDEBUG",
+      "-DSMAUG_MODE=1",
+      "-I/work/smaug/include",
+      "/work/smaug/src/cbd.c",
+      "/work/smaug/src/ciphertext.c",
+      "/work/smaug/src/dg.c",
+      "/work/smaug/src/fips202.c",
+      "/work/smaug/src/hash.c",
+      "/work/smaug/src/hwt.c",
+      "/work/smaug/src/indcpa.c",
+      "/work/smaug/src/io.c",
+      "/work/smaug/src/kem.c",
+      "/work/smaug/src/key.c",
+      "/work/smaug/src/pack.c",
+      "/work/smaug/src/poly.c",
+      "/work/smaug/src/toomcook.c",
+      "/work/smaug/src/verify.c",
+      "/work/smaug-wrapper/randombytes_wasm.c",
+      "/work/smaug-wrapper/smaug_exports.c",
+      "-s",
+      "WASM=1",
+      "-s",
+      "MODULARIZE=1",
+      "-s",
+      "EXPORT_NAME=createSmaugModule",
+      "-s",
+      "EXPORT_ES6=1",
+      "-s",
+      "ENVIRONMENT=web,node",
+      "-s",
+      "INITIAL_MEMORY=16777216",
+      "-s",
+      "ALLOW_MEMORY_GROWTH=1",
+      "-s",
+      "EXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_smaug_keypair\",\"_smaug_encapsulate\",\"_smaug_decapsulate\",\"_smaug_publickeybytes\",\"_smaug_secretkeybytes\",\"_smaug_ciphertextbytes\",\"_smaug_sharedsecretbytes\",\"_smaug_secure_zeroize\"]",
+      "-s",
+      "EXPORTED_RUNTIME_METHODS=[\"cwrap\",\"getValue\",\"HEAPU8\"]",
+      "-o",
+      "/work/dist/smaug.js"
+    ],
+    "haetae": [
+      "-O2",
+      "-I/work/haetae",
+      "/work/haetae/decompose.c",
+      "/work/haetae/encoding.c",
+      "/work/haetae/fft.c",
+      "/work/haetae/fips202.c",
+      "/work/haetae/fixpoint.c",
+      "/work/haetae/ntt.c",
+      "/work/haetae/packing.c",
+      "/work/haetae/poly.c",
+      "/work/haetae/polyfix.c",
+      "/work/haetae/polymat.c",
+      "/work/haetae/polyvec.c",
+      "/work/haetae/reduce.c",
+      "/work/haetae/sampler.c",
+      "/work/haetae/sign.c",
+      "/work/haetae/symmetric-shake.c",
+      "/work/haetae-wrapper/randombytes_wasm.c",
+      "/work/haetae-wrapper/haetae_exports.c",
+      "-s",
+      "WASM=1",
+      "-s",
+      "MODULARIZE=1",
+      "-s",
+      "EXPORT_NAME=createHaetaeModule",
+      "-s",
+      "ENVIRONMENT=web,node",
+      "-s",
+      "ALLOW_MEMORY_GROWTH=1",
+      "-s",
+      "EXPORTED_FUNCTIONS=[\"_malloc\",\"_free\"]",
+      "-s",
+      "INITIAL_MEMORY=33554432",
+      "-s",
+      "STACK_SIZE=2097152",
+      "-s",
+      "EXPORTED_RUNTIME_METHODS=[\"cwrap\",\"getValue\",\"HEAPU8\",\"HEAPU32\"]",
+      "-o",
+      "/work/dist/haetae.js"
+    ]
+  },
+  "expectedCompiledSources": {
+    "smaug": 16,
+    "haetae": 17
+  },
+  "haetaeModuleAdapter": {
+    "originalSha": "5ed9181e870e781c1ceefe8354658d781ad8d449",
+    "originalSha256": "90d48e5b65fb8adf6d911dd79d1e366eee1a2157f7c4c53fa3395006069fb9db",
+    "recordedESMRevision": "7bc71c6935dcb25ba647a06400146fcd8aca509e",
+    "marker": ";return moduleRtn}})();",
+    "tail": "if(typeof exports===\"object\"&&typeof module===\"object\"){module.exports=createHaetaeModule;module.exports.default=createHaetaeModule}else if(typeof define===\"function\"&&define[\"amd\"])define([],()=>createHaetaeModule);\n",
+    "replacement": "\nexport default createHaetaeModule;\n"
+  },
+  "artifacts": [
+    {
+      "role": "smaug-loader",
+      "path": "web-demo/src/crypto/wasm/smaug.js",
+      "rebuiltPath": "dist/smaug.js",
+      "sha256": "3dbd3f51c6699dd306472d3777f90eab9e80f64db50859201811b1d41f041569",
+      "bytes": 33542
+    },
+    {
+      "role": "smaug-wasm",
+      "path": "web-demo/public/smaug.wasm",
+      "rebuiltPath": "dist/smaug.wasm",
+      "sha256": "349f4bd2c63d3ecdbc8b805148ffc407b119d5eb4de3a4c9e74fc6d842f67838",
+      "bytes": 22345
+    },
+    {
+      "role": "haetae-loader",
+      "path": "web-demo/src/crypto/wasm/haetae.js",
+      "rebuiltPath": "dist/haetae.active-esm.js",
+      "sha256": "e0d5aed3080b4f4629aa283f7b8a3b52722671deeaf9f96cd9c0107203316a5a",
+      "bytes": 12137
+    },
+    {
+      "role": "haetae-wasm",
+      "path": "web-demo/public/haetae.wasm",
+      "rebuiltPath": "dist/haetae.wasm",
+      "sha256": "9510374922d602ec19da80c9ce4eea1262da45920425b5e6ce6c953ce8d3652e",
+      "bytes": 42683
+    }
+  ]
+}

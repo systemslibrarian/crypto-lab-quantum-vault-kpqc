@@ -4,8 +4,9 @@
 # Prerequisites:
 #   - Emscripten SDK (emsdk) installed and activated, e.g.:
 #       source ~/emsdk/emsdk_env.sh
-#   - Vendor sources present under wasm/vendor/. Exact upstream source pins
-#     and the original compiler are not recorded; see wasm/PROVENANCE.md.
+#   - Vendor sources present under wasm/vendor/ for the current development recipe.
+#     To verify unchanged shipped bytes from recovered immutable sources instead,
+#     use --reproduce; see wasm/PROVENANCE.md. The original compiler is unknown.
 #
 # Outputs:
 #   wasm/dist/smaug.js   + smaug.wasm
@@ -19,6 +20,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ "${1:-}" = "--reproduce" ]; then
+  shift
+  exec python3 -B "$SCRIPT_DIR/reproduce.py" "$@"
+fi
 DIST="$SCRIPT_DIR/dist"
 # Report absent source inputs before invoking a compiler or creating outputs.
 SMAUG_VENDOR="$SCRIPT_DIR/vendor/smaug-t/reference_implementation"
