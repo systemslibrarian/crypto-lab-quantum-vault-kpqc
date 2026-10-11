@@ -161,6 +161,16 @@ class ReproductionControls(unittest.TestCase):
         rep.validate_manifest(MANIFEST)
         self.assertEqual(len(rep.validate_stages("\n".join(map(json.dumps, self.stages())), MANIFEST)), 5)
 
+    def test_classic_and_oci_image_ids_require_same_immutable_platform(self):
+        compiler = MANIFEST["compiler"]
+        for identity in (compiler["measuredPlatformDescriptorDigest"], "sha256:" + "1" * 64):
+            row = dict(Id=identity, Architecture="amd64", Os="linux", RepoDigests=[compiler["image"]])
+            rep.validate_image([row], compiler)
+        for field, value in (("Architecture", "arm64"), ("Os", "windows"), ("RepoDigests", []), ("Id", "unreadable")):
+            bad = dict(row); bad[field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError): rep.validate_image([bad], compiler)
+        with self.assertRaises(ValueError): rep.validate_image([], compiler)
+
     def test_partial_failed_timeout_and_malformed_reports(self):
         for mode in ("partial", "failed", "bool", "timeout", "compiler", "node", "cache", "source", "inventory", "compilation", "unfinished"):
             rows = self.stages()

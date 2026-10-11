@@ -8,8 +8,8 @@
     "commit": "285c424dfa9e83b03cf8490c65ceadb7c45f28eb",
     "nodeVersion": "v22.16.0",
     "systemLibraryFiles": 1913,
-    "platformImageId": "sha256:817ece58ca8dfb966d0230019b7aee13c1341b481a60abb33595ab74019b88b4",
-    "systemLibraryInventorySha256": "68b867441285b925a1f8202671f603d465d8e7885a9e0fe73f5da1945f56efb5"
+    "systemLibraryInventorySha256": "68b867441285b925a1f8202671f603d465d8e7885a9e0fe73f5da1945f56efb5",
+    "measuredPlatformDescriptorDigest": "sha256:817ece58ca8dfb966d0230019b7aee13c1341b481a60abb33595ab74019b88b4"
   },
   "sources": {
     "smaug": {

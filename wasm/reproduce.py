@@ -157,6 +157,17 @@ def validate_manifest(manifest):
             raise ValueError("Incomplete or unexplained compiler input")
 
 
+def validate_image(image, compiler):
+    # Classic Docker IDs are config digests; OCI stores can expose manifest
+    # digests instead. The repository digest, OS and architecture are common
+    # to both. Actual compiler/cache identities are separately mandatory.
+    if not isinstance(image, list) or len(image) != 1:
+        raise ValueError("Missing compiler image")
+    row = image[0]
+    if row.get("Architecture") != "amd64" or row.get("Os") != "linux" or compiler["image"] not in row.get("RepoDigests", []) or not re.fullmatch(r"sha256:[a-f0-9]{64}", row.get("Id", "")):
+        raise ValueError("Wrong compiler platform image or repository digest")
+
+
 # Runs inside the digest-pinned compiler image, as an unprivileged user. Every
 # object is fresh; only compiler-image system libraries are reused unchanged.
 CONTAINER = r'''
@@ -259,9 +270,10 @@ def main():
         manifest = json.loads(recipe_bytes)
         validate_manifest(manifest)
         docker = ["docker"] + (["--context", args.docker_context] if args.docker_context else [])
-        image = json.loads(run([*docker, "image", "inspect", "--platform", "linux/amd64", manifest["compiler"]["image"]]))
-        if len(image) != 1 or image[0].get("Architecture") != "amd64" or image[0].get("Os") != "linux" or image[0].get("Id") != manifest["compiler"]["platformImageId"]:
-            raise ValueError("Wrong compiler platform image")
+        help_text = run([*docker, "image", "inspect", "--help"])
+        platform = ["--platform", "linux/amd64"] if "--platform" in help_text else []
+        image = json.loads(run([*docker, "image", "inspect", *platform, manifest["compiler"]["image"]]))
+        validate_image(image, manifest["compiler"])
         scratch = Path(tempfile.mkdtemp(prefix="kpqc-source-rebuild-", dir=args.scratch_root.resolve()))
         report["scratch"] = str(scratch)
         for name, archive in [("smaug", args.smaug_archive), ("haetae", args.haetae_archive)]:
