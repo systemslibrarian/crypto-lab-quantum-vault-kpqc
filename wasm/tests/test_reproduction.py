@@ -74,11 +74,22 @@ class ReproductionControls(unittest.TestCase):
     def test_archive_symlink_is_refused(self):
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz") as z:
-            t = tarfile.TarInfo("ref/link"); t.type = tarfile.SYMTYPE; t.linkname = "/tmp/other"
+            t = tarfile.TarInfo("ref/a.c"); t.type = tarfile.SYMTYPE; t.linkname = "/tmp/other"
             z.addfile(t)
         data, spec = self.archive("tar"); spec["sha256"] = rep.digest(buf.getvalue())
         with self.assertRaises(ValueError): rep.extract_archive(buf.getvalue(), spec, self.root)
         self.assertFalse(list(self.root.iterdir()))
+
+    def test_unselected_archive_links_are_never_extracted_or_followed(self):
+        buffer = io.BytesIO(); data, spec = self.archive("tar")
+        with tarfile.open(fileobj=buffer, mode="w:gz") as z:
+            for name in ("ref/a.c", "ref/b.h"):
+                t = tarfile.TarInfo(name); t.size = 14; z.addfile(t, io.BytesIO(b"fixture source"))
+            t = tarfile.TarInfo("optimized/benchmark-link"); t.type = tarfile.SYMTYPE; t.linkname = "../../ref/a.c"; z.addfile(t)
+        data = buffer.getvalue(); spec["sha256"] = rep.digest(data)
+        rep.extract_archive(data, spec, self.root)
+        self.assertEqual((self.root / "captured/a.c").read_bytes(), b"fixture source")
+        self.assertFalse((self.root / "optimized").exists())
 
     def test_existing_source_and_symlink_destinations_are_preserved(self):
         data, spec = self.archive()

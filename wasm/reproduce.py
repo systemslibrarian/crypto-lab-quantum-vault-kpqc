@@ -38,12 +38,19 @@ def extract_archive(data, spec, destination):
     if digest(data) != spec["sha256"]:
         raise ValueError("Archive digest differs from the pinned source")
     entries = {}
+    selected = {x["archivePath"] for x in spec["files"]}
     if spec["kind"] == "tar":
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
             for member in archive.getmembers():
                 relative(member.name)
-                if member.name in entries or not (member.isfile() or member.isdir()):
+                if member.name in entries or (member.name in selected and not member.isfile()):
                     raise ValueError("Duplicate or unsupported archive entry")
+                # Official archives also contain links in unrelated optimized
+                # benchmark trees. Never extract or follow them. A selected
+                # source must itself be a regular file, not a link target.
+                if not (member.isfile() or member.isdir()):
+                    entries[member.name] = None
+                    continue
                 if member.size > 100 * 1024 * 1024 or sum(len(x) for x in entries.values() if x) + member.size > 512 * 1024 * 1024:
                     raise ValueError("Unpacked archive exceeds collection bound")
                 entries[member.name] = archive.extractfile(member).read() if member.isfile() else None
