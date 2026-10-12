@@ -6,7 +6,8 @@
   "description": "Quantum Vault — threshold cryptography demo: AES-256-GCM + Shamir SSS + SMAUG-T Level 1 KEM + HAETAE Mode 2 signature (real KpqC WASM)",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run check:typescript && tsc --noEmit && vite build",
+    "check:typescript": "node --test tests/tooling.node.mjs",
     "deploy": "gh workflow run deploy-pages.yml --repo systemslibrarian/crypto-lab-quantum-vault-kpqc --ref main",
     "preview": "vite preview",
     "test": "vitest run && node --test tests/*.node.mjs",
@@ -22,7 +23,8 @@
     "@playwright/test": "^1.63.0",
     "eslint": "^10.12.0",
     "playwright": "^1.61.1",
-    "typescript": "^7.0.2",
+    "@typescript/native": "npm:typescript@7.0.2",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "^8.71.1",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"

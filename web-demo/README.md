@@ -155,6 +155,11 @@ general trust principle, not a claim that HAETAE is a FIPS-approved algorithm.
 npm run build   # TypeScript type-check + Vite production build → dist/
 ```
 
+The build uses the native TypeScript 7 compiler. ESLint and other JavaScript-API
+consumers use Microsoft's side-by-side TypeScript 6 wrapper until their peer
+ranges include TypeScript 7; `npm run check:typescript` guards both identities
+and verifies strict compiler rejection controls.
+
 Deployed to GitHub Pages via `.github/workflows/deploy-pages.yml`.
 
 `npm run deploy` requests that workflow on the remote `main` branch using authenticated GitHub CLI access. Both the Rust and web application gates must pass before deployment. It does not publish a local `dist/` directory; the request controls in `npm test` replace only the external GitHub command and never dispatch a workflow.
