@@ -9,8 +9,10 @@ Magic: `QVKP`
 
 A `.qvault` file is a JSON document produced by `qv-core`.  It stores the
 AES-256-GCM ciphertext of the original file together with the threshold key
-shares needed to recover the file key.  Every container is signed so that
-tampering is detected before any decryption is attempted.
+shares needed to recover the file key. Every container is signed and verified
+before decryption. Detecting active replacement requires an independently
+authenticated verification key; trusting a replaceable embedded key alone does
+not establish original-sender authenticity.
 
 ---
 
@@ -168,8 +170,9 @@ plaintext
 * The `nonce` must never be reused with the same file key (guaranteed by
   randomness; the probability of collision is negligible for 96-bit uniform
   nonces).
-* Container integrity is protected end-to-end by the signature; an attacker
-  cannot silently substitute nonce or ciphertext bytes.
+* Under an independently authenticated verification key, the signature rejects
+  changes without a matching signature. A key taken only from the replaceable
+  container does not supply that trust anchor.
 
 ---
 
@@ -205,9 +208,9 @@ writes object fields through an internal `BTreeMap`, so this holds regardless of
 the order they are written in the source.  Any mismatch in these fields causes
 AES-GCM authentication to fail.
 
-The AAD excludes `shares` and `ciphertext`; share substitution is prevented by
-the container signature, which covers every field and is verified before any
-decapsulation.
+The AAD excludes `shares` and `ciphertext`; the container signature covers those
+fields and is checked before decapsulation. Preventing active re-signing with a
+replacement key also requires independent authentication of the verification key.
 
 ---
 
@@ -330,5 +333,9 @@ On import, the web demo:
 - Imported containers are cryptographically verified using the embedded
   HAETAE public key before any KEM or AES operation.
 - The signature binds all container fields including the timestamp.
+- The browser does not independently authenticate that embedded key. Replacing
+  it and re-signing changed public data can pass verification; including the key
+  in signed data does not prevent this. No participant password or original
+  signing key is needed to re-sign, but the encrypted shares remain protected.
 - File import does not automatically unlock the vault — passwords are still
   required to access shares.

@@ -72,7 +72,51 @@ vi.mock('../haetae', () => ({
 }));
 
 // Import AFTER mocks are registered.
-import { sealMessage, openBox } from '../pipeline';
+import { sealMessage, sealMessageWithVisual, openBox } from '../pipeline';
+import * as haetae from '../haetae';
+
+describe('open visualization evidence', () => {
+  it('reports actual authenticated decryption, without copying a supposed original reference', async () => {
+    const sealed = await sealMessageWithVisual('independent seal-side oracle', ['a', 'b', 'c']);
+    const result = await openBox(sealed.box, ['a', 'b', null]);
+    expect(result.success).toBe(true);
+    // An independently retained seal-side key is available ONLY to this test.
+    expect(result.visual.reconstructedKey).toEqual(sealed.visual.key);
+    expect(result.visual).not.toHaveProperty('originalKey');
+    expect(result.visual).toHaveProperty('aesAuthenticated', true);
+    sealed.visual.key.fill(0);
+  });
+
+  it('does not confirm reconstruction when two recovered shares precede AES authentication failure', async () => {
+    const sealed = await sealMessageWithVisual('AES rejection must not turn green', ['a', 'b', 'c']);
+    const changed = { ...sealed.box, ciphertext: sealed.box.ciphertext.slice() };
+    changed.ciphertext[0] ^= 1;
+    // Explicit test seam: accept the signature so REAL AES-GCM rejection is
+    // reached. The browser counterpart uses correctly re-signed shipped WASM.
+    const verify = vi.spyOn(haetae, 'haetaeVerify').mockReturnValue(true);
+    try {
+      const result = await openBox(changed, ['a', 'b', null]);
+      expect(result.success).toBe(false);
+      expect(result.validShareCount).toBe(2);
+      expect(result.visual.signatureValid).toBe(true);
+      expect(result.visual.reconstructedKey).toEqual(sealed.visual.key);
+      expect(result.visual).not.toHaveProperty('originalKey');
+      expect(result.visual).toHaveProperty('aesAuthenticated', false);
+    } finally {
+      verify.mockRestore();
+      sealed.visual.key.fill(0);
+    }
+  });
+
+  it('keeps below-threshold reconstruction unconfirmed', async () => {
+    const box = await sealMessage('insufficient shares', ['a', 'b', 'c']);
+    const result = await openBox(box, ['a', null, null]);
+    expect(result.success).toBe(false);
+    expect(result.validShareCount).toBe(1);
+    expect(result.visual).not.toHaveProperty('originalKey');
+    expect(result.visual).toHaveProperty('aesAuthenticated', false);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Round-trip — successful decryption

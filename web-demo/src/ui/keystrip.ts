@@ -1,21 +1,6 @@
-// Shamir key-strip visualization — makes "any 2 rebuild the exact key, 1 gives
-// unrelated garbage" a thing you SEE, driven entirely by REAL bytes.
-//
-// A "strip" is a row of colored cells, one per byte, hue derived from the byte
-// value. The AES key and its 3 Shamir shares are real Uint8Arrays produced by
-// the genuine seal/open pipeline (see pipeline.ts SealVisual / OpenVisual) — no
-// value here is fabricated. On a below-threshold open the reconstructed strip
-// genuinely differs from the true key because Lagrange interpolation with one
-// share lands on unrelated bytes.
-//
-// Open side (renderReconstructStrip): when >= 2 shares are recovered we have the
-// TRUE original key (Lagrange is exact), so we render it directly ABOVE the
-// rebuilt key and mark every cell that is byte-identical with a green check —
-// the "same colors" claim becomes a seen fact. We also animate the two recovered
-// share strips (tied to Alice/Bob/Carol) sliding down and merging into the key.
-// Below threshold the original is mathematically unknowable from one share, so
-// there is nothing honest to compare against — we show that single share failing
-// to converge onto an unrelated strip, which IS the security guarantee.
+// Shamir strips show real seal-side shares and open-side reconstruction bytes.
+// The open has no independent original reference. Only successful AES-GCM
+// authentication confirms the candidate; two recovered shares alone do not.
 
 import { t } from '../i18n';
 import { sleep } from '../crypto/utils';
@@ -39,33 +24,13 @@ function stripCellsHTML(bytes: Uint8Array): string {
   return cells;
 }
 
-/**
- * Cells for a row that is compared against a reference, cell by cell. Matching
- * cells (byte-identical to `ref`) get a green ring + check glyph; mismatches get
- * a red ring + ✗. The markers are driven purely by the real byte comparison.
- */
-function comparedCellsHTML(bytes: Uint8Array, ref: Uint8Array): string {
-  const n = Math.min(STRIP_CELLS, bytes.length, ref.length);
-  let cells = '';
-  for (let i = 0; i < n; i++) {
-    const match = bytes[i] === ref[i];
-    const cls = match ? 'ks-cell ks-cell-match' : 'ks-cell ks-cell-miss';
-    const mark = match ? '✓' : '✗';
-    cells +=
-      `<span class="${cls}" style="background:${byteToColor(bytes[i])}">` +
-      `<span class="ks-mark" aria-hidden="true">${mark}</span></span>`;
-  }
-  return cells;
-}
-
 /** Build a labeled strip row. `variant` tints the label chip. */
 function stripRowHTML(
   label: string,
   bytes: Uint8Array,
   variant = '',
-  ref?: Uint8Array,
 ): string {
-  const cells = ref ? comparedCellsHTML(bytes, ref) : stripCellsHTML(bytes);
+  const cells = stripCellsHTML(bytes);
   return `
     <div class="ks-row ${variant}">
       <span class="ks-label">${label}</span>
@@ -106,31 +71,15 @@ function keyholderVariant(slot: number): string {
   return ['ks-share-a', 'ks-share-b', 'ks-share-c'][slot] ?? '';
 }
 
-/**
- * Render the open-side reconstruction as a WITNESSED mechanism:
- *
- *   success (>= 2 recovered shares)
- *     · the recovered share strips (tied to the keyholders who unlocked) animate
- *       sliding down and merging into the rebuilt key;
- *     · the TRUE original key is drawn above the rebuilt key with a per-cell green
- *       ✓ on every byte that matches — the "same colors as the original" claim is
- *       now shown, not asserted.
- *
- *   below threshold (1 recovered share)
- *     · the lone share is shown failing to converge onto an unrelated strip;
- *     · no original is drawn because ONE share cannot reveal the key — that
- *       unknowability is precisely the Shamir security guarantee.
- *
- * All bytes are REAL: `reconstructed` and `originalKey` come straight from the
- * open pipeline (originalKey is the exact Lagrange result, non-null only when the
- * open genuinely succeeds); `recoveredShares` are the actual GF(2^8) share rows.
+/** Show actual recovered shares and the candidate, without a copied reference.
+ * `aesAuthenticated` is the observed decryption outcome, not the share count.
  */
 export async function renderReconstructStrip(
   container: HTMLElement,
   reconstructed: Uint8Array,
   enough: boolean,
   recoveredShares: [Uint8Array | null, Uint8Array | null, Uint8Array | null],
-  originalKey: Uint8Array | null,
+  aesAuthenticated: boolean,
 ): Promise<void> {
   // Which keyholder slots actually contributed a recovered share.
   const contributors: number[] = [];
@@ -149,27 +98,15 @@ export async function renderReconstructStrip(
 
   const caption = enough ? t('ksOpenCaptionOk') : t('ksOpenCaptionBad');
 
-  // The rebuilt-key row: on success compare it cell-by-cell against the true
-  // original above it (green ✓ / red ✗ per byte); below threshold there is no
-  // honest original to compare against, so render the wrong bytes plainly.
-  const rebuiltRow =
-    enough && originalKey
-      ? stripRowHTML(t('ksReconKeyLabel'), reconstructed, 'ks-key ks-recon-ok', originalKey)
-      : stripRowHTML(
-          enough ? t('ksReconKeyLabel') : t('ksReconWrongLabel'),
-          reconstructed,
-          enough ? 'ks-key ks-recon-ok' : 'ks-key ks-recon-bad',
-        );
-
-  const originalRow =
-    enough && originalKey
-      ? `${stripRowHTML(t('ksOriginalLabel'), originalKey, 'ks-key ks-original')}
-         <div class="ks-vs" aria-hidden="true">${t('ksCompareTo')}</div>`
-      : '';
-
-  const verdict = enough
+  const confirmed = enough && aesAuthenticated;
+  const rebuiltRow = stripRowHTML(
+    enough ? t('ksReconKeyLabel') : t('ksReconWrongLabel'),
+    reconstructed,
+    confirmed ? 'ks-key ks-recon-ok' : 'ks-key ks-recon-bad',
+  );
+  const verdict = confirmed
     ? `<p class="ks-verdict ks-ok">${t('ksReconOk')}</p>`
-    : `<p class="ks-verdict ks-bad">${t('ksReconBad')}</p>`;
+    : `<p class="ks-verdict ks-bad">${t(enough ? 'ksAuthFailed' : 'ksReconBad')}</p>`;
 
   const belowNote = !enough
     ? `<p class="ks-caption ks-unknowable">${t('ksNoOriginal')}</p>`
@@ -180,10 +117,10 @@ export async function renderReconstructStrip(
       <p class="ks-caption">${caption}</p>
       ${shareRows}
       <div class="ks-split-arrow" aria-hidden="true">↓ ${t('ksLagrange')}</div>
-      ${originalRow}
       ${rebuiltRow}
       ${belowNote}
       ${verdict}
+      <p class="ks-caption ks-evidence-note">${t('ksEvidenceNote')}</p>
     </div>`;
 
   const strip = container.querySelector('.keystrip');
@@ -192,7 +129,7 @@ export async function renderReconstructStrip(
   // Play the merge: the contributing share strips fade/slide toward the rebuilt
   // key. On success they converge (class ks-converge); below threshold the lone
   // share visibly fails to (class ks-diverge). Motion is skipped for users who
-  // prefer reduced motion — the static side-by-side still tells the whole story.
+  // prefer reduced motion — the static candidate and outcome remain visible.
   const reduce = typeof window !== 'undefined'
     && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   if (reduce) return;

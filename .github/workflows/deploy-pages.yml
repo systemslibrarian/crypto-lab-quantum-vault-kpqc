@@ -129,6 +129,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Verify incomplete WASM build inputs fail before compilation
+        run: python3 -B -m unittest discover -s wasm/tests -v
+
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -212,9 +215,46 @@ jobs:
         with:
           path: web-demo/dist
 
+  source:
+    name: Clean SMAUG and HAETAE source reproduction
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Evidence completeness controls
+        run: python3 -B -m unittest discover -s wasm/tests -v
+      - name: Capture immutable public source archives
+        run: |
+          mkdir -p "$RUNNER_TEMP/kpqc-source-inputs"
+          curl --fail --location --retry 2 --proto '=https' --tlsv1.2 \
+            'https://codeload.github.com/hmchoe0528/SMAUG-T_public/tar.gz/2c039df23134a2de3c7aa86a4904c9a4734f9def' \
+            --output "$RUNNER_TEMP/kpqc-source-inputs/smaug.tar.gz"
+          curl --fail --location --retry 2 --proto '=https' --tlsv1.2 \
+            'https://raw.githubusercontent.com/CryptoLabInc/HAETAE/743c31df48183fc8c8a39a4f50a634da1c4af03a/HAETAE.zip' \
+            --output "$RUNNER_TEMP/kpqc-source-inputs/haetae.zip"
+      - name: Capture digest-pinned compiler
+        run: docker pull --platform linux/amd64 emscripten/emsdk@sha256:7b5d14203bb4ef20da6f5b71b90c8f37ec09c2776d342efff3bc989ebf1aa873
+      - name: Clean build and exact four-artifact comparison
+        run: |
+          bash wasm/build.sh --reproduce \
+            --smaug-archive "$RUNNER_TEMP/kpqc-source-inputs/smaug.tar.gz" \
+            --haetae-archive "$RUNNER_TEMP/kpqc-source-inputs/haetae.zip" \
+            --scratch-root "$RUNNER_TEMP" > "$RUNNER_TEMP/kpqc-source-rebuild.json"
+      - name: Retain actual build and error evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kpqc-source-rebuild
+          path: ${{ runner.temp }}/kpqc-source-rebuild.json
+          if-no-files-found: error
+
   deploy:
     name: Deploy to GitHub Pages
-    needs: [test, build]
+    needs: [test, build, source]
     # A pull request is gated, never published. `!= 'pull_request'` and NOT
     # `== 'push'`: the latter also skips workflow_dispatch, which the post-merge
     # dispatch below depends on.
@@ -230,12 +270,12 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-  # Dependabot only. `needs: [test, build]` is the whole safety argument -- a bump can
+  # Dependabot only. `needs: [test, build, source]` is the whole safety argument -- a bump can
   # merge itself only once this lab's entire PR gate went green, so the gate
   # decides rather than the version number. A major that actually breaks the
   # lab fails the gate and the PR stays open for a human.
   dependabot-auto-merge:
-    needs: [test, build]
+    needs: [test, build, source]
     if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:

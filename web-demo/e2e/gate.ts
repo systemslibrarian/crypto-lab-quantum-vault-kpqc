@@ -806,7 +806,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   })
   await expect(panel.locator('.ks-verdict.ks-ok')).toBeVisible()
   await expect(panel.locator('#retrieve-title')).toContainText('decrypted')
-  await scanAt('open with TWO shares — key strip matches the original, secret revealed')
+  await scanAt('open with TWO shares — authenticated decryption confirms reconstruction, secret revealed')
 
   // ── The tamper: a DIFFERENT failure mode, red rather than amber, and it
   //    stops before any share is touched ─────────────────────────────────────

@@ -20,7 +20,7 @@ import {
  * passwords — then with the passwords revealed, then sealing for real; the
  * below-threshold open, where one share turns the SMAUG-T pill amber and the
  * key strip visibly diverges; the successful two-of-three open, where the
- * rebuilt key strip is compared cell by cell against the true original; the
+ * reconstructed key is confirmed by authenticated decryption, without a copied reference; the
  * tamper, which is a different failure mode and stops at a red HAETAE pill
  * before any share is touched; the retrieve form on a demo box; the vault
  * cleared to nine empty boxes and reset back; and the Korean locale with its
