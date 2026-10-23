@@ -4,26 +4,25 @@
 //! Commands:
 //!   qv keygen   [--out-dir <dir>] [--backend dev|kpqc]
 //!   qv encrypt  --in <file> --out <file> --pubkeys <k1,k2,...> --threshold <n> --sign-key <file> [--backend dev|kpqc]
-//!   qv decrypt  --in <file> --out <file> --privkeys <k1,k2,...> --verify-key <file> [--backend dev|kpqc]
+//!   qv decrypt  --in <file> --out <file> --privkeys <index:path,...> --verify-key <file> [--backend dev|kpqc]
 
 use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use clap::{Parser, Subcommand};
-#[cfg(any(feature = "kpqc-native", feature = "kpqc-wasm"))]
+#[cfg(feature = "dev-backend")]
+use qv_core::crypto::backend::dev::{DevKem, DevSignature};
+#[cfg(feature = "kpqc-native")]
 use qv_core::crypto::backend::kpqc::{KpqcKem, KpqcSignature};
 use qv_core::{
     container::QuantumVaultContainer,
-    crypto::{
-        backend::dev::{DevKem, DevSignature},
-        kem::Kem,
-        signature::Signature,
-    },
+    crypto::{kem::Kem, signature::Signature},
     decrypt_file, encrypt_file, DecryptOptions, EncryptOptions,
 };
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+use zeroize::{Zeroize, Zeroizing};
 
 // ---------------------------------------------------------------------------
 // CLI definition
@@ -52,7 +51,7 @@ enum Command {
         #[arg(long, default_value = "qv-key")]
         name: String,
         /// Cryptographic backend to use: `dev` (default, testing only) or
-        /// `kpqc` (SMAUG-T + HAETAE, requires kpqc-native or kpqc-wasm feature).
+        /// `kpqc` (SMAUG-T + HAETAE, requires external source and kpqc-native).
         #[arg(long, default_value = "dev")]
         backend: String,
     },
@@ -87,7 +86,8 @@ enum Command {
         /// Output plaintext file.
         #[arg(long, short)]
         out: PathBuf,
-        /// Comma-separated base64-encoded KEM private keys (threshold or more).
+        /// Comma-separated share-index:key-file pairs (for example, 1:alice.kem.priv,3:carol.kem.priv).
+        /// Key bytes are read from files so they are not exposed in shell history or process arguments.
         #[arg(long)]
         privkeys: String,
         /// Path to base64-encoded signature public key file (for verification).
@@ -109,15 +109,24 @@ enum Command {
 /// current feature configuration.
 fn build_backends(backend: &str) -> Result<(Box<dyn Kem>, Box<dyn Signature>)> {
     match backend {
-        "dev" => Ok((Box::new(DevKem), Box::new(DevSignature))),
+        "dev" => {
+            #[cfg(not(feature = "dev-backend"))]
+            return Err(anyhow!(
+                "The `dev` backend is not available in this build.\n\
+                 Compile with `--features dev-backend` for local testing only."
+            ));
+            #[cfg(feature = "dev-backend")]
+            Ok((Box::new(DevKem), Box::new(DevSignature)))
+        }
         "kpqc" => {
-            #[cfg(not(any(feature = "kpqc-native", feature = "kpqc-wasm")))]
+            #[cfg(not(feature = "kpqc-native"))]
             return Err(anyhow!(
                 "The `kpqc` backend is not available in this build.\n\
-                 Compile with `--features kpqc-native` (requires vendored C source) \
-                 or `--features kpqc-wasm`."
+                 Compile with `--features kpqc-native` after supplying the \
+                 authenticated external C source. The `kpqc-wasm` core feature \
+                 is an unimplemented scaffold, not a CLI backend."
             ));
-            #[cfg(any(feature = "kpqc-native", feature = "kpqc-wasm"))]
+            #[cfg(feature = "kpqc-native")]
             Ok((Box::new(KpqcKem), Box::new(KpqcSignature)))
         }
         other => Err(anyhow!(
@@ -199,6 +208,7 @@ fn cmd_keygen(kem: &dyn Kem, sig: &dyn Signature, out_dir: &Path, name: &str) ->
 
     // KEM keypair
     let (kem_pub, kem_priv) = kem.generate_keypair()?;
+    let kem_priv = Zeroizing::new(kem_priv);
     let kem_pub_path = out_dir.join(format!("{name}.kem.pub"));
     let kem_priv_path = out_dir.join(format!("{name}.kem.priv"));
     write_b64(&kem_pub_path, &kem_pub)?;
@@ -208,6 +218,7 @@ fn cmd_keygen(kem: &dyn Kem, sig: &dyn Signature, out_dir: &Path, name: &str) ->
 
     // Signature keypair
     let (sig_pub, sig_priv) = sig.generate_keypair()?;
+    let sig_priv = Zeroizing::new(sig_priv);
     let sig_pub_path = out_dir.join(format!("{name}.sig.pub"));
     let sig_priv_path = out_dir.join(format!("{name}.sig.priv"));
     write_b64(&sig_pub_path, &sig_pub)?;
@@ -232,8 +243,10 @@ fn cmd_encrypt(
     threshold: u8,
     sign_key_path: &Path,
 ) -> Result<()> {
-    let plaintext = fs::read(in_path)
-        .with_context(|| format!("failed to read input file {}", in_path.display()))?;
+    let plaintext = Zeroizing::new(
+        fs::read(in_path)
+            .with_context(|| format!("failed to read input file {}", in_path.display()))?,
+    );
 
     let recipient_public_keys: Vec<Vec<u8>> = pubkeys_csv
         .split(',')
@@ -285,7 +298,7 @@ fn cmd_decrypt(
     sig: &dyn Signature,
     in_path: &Path,
     out_path: &Path,
-    privkeys_csv: &str,
+    private_key_specs: &str,
     verify_key_path: &Path,
 ) -> Result<()> {
     let container_bytes = fs::read(in_path)
@@ -294,25 +307,9 @@ fn cmd_decrypt(
     let container = QuantumVaultContainer::from_bytes(&container_bytes)
         .with_context(|| format!("failed to parse container {}", in_path.display()))?;
 
-    let recipient_private_keys: Vec<Vec<u8>> = privkeys_csv
-        .split(',')
-        .map(|s| {
-            B64.decode(s.trim())
-                .map_err(|e| anyhow!("invalid base64 privkey: {e}"))
-        })
-        .collect::<Result<_>>()?;
-
-    // Default: assume keys are supplied for the first N shares in container order.
-    // For non-consecutive share subsets, use the library API directly.
-    let share_indices: Vec<u8> = container
-        .shares
-        .iter()
-        .take(recipient_private_keys.len())
-        .map(|s| s.index)
-        .collect();
-
     let signer_public_key = read_b64(verify_key_path)
         .with_context(|| format!("failed to read verify key {}", verify_key_path.display()))?;
+    let (recipient_private_keys, share_indices) = parse_private_key_specs(private_key_specs)?;
 
     let options = DecryptOptions {
         recipient_private_keys,
@@ -320,7 +317,7 @@ fn cmd_decrypt(
         signer_public_key,
     };
 
-    let plaintext = decrypt_file(&container, &options, kem, sig)?;
+    let plaintext = Zeroizing::new(decrypt_file(&container, &options, kem, sig)?);
 
     fs::write(out_path, &plaintext)
         .with_context(|| format!("failed to write plaintext {}", out_path.display()))?;
@@ -333,6 +330,58 @@ fn cmd_decrypt(
     Ok(())
 }
 
+/// Read comma-separated `share-index:path` private-key specifications.
+///
+/// Keeping private key bytes in files avoids placing them in argv, where shell
+/// history and same-host process inspection could disclose them. Any keys read
+/// before a later specification error are cleared before returning.
+fn parse_private_key_specs(specs: &str) -> Result<(Vec<Vec<u8>>, Vec<u8>)> {
+    let mut keys: Vec<Vec<u8>> = Vec::new();
+    let mut indices = Vec::new();
+
+    for spec in specs.split(',') {
+        let parsed = (|| -> Result<(u8, Vec<u8>)> {
+            let (index, path) = spec.trim().split_once(':').ok_or_else(|| {
+                anyhow!("invalid private-key specification {spec:?}; expected share-index:path")
+            })?;
+            let index = index
+                .parse::<u8>()
+                .map_err(|_| anyhow!("invalid share index {index:?}"))?;
+            if index == 0 {
+                return Err(anyhow!("share indices are one-based"));
+            }
+            if indices.contains(&index) {
+                return Err(anyhow!("duplicate share index {index}"));
+            }
+            if path.is_empty() {
+                return Err(anyhow!("private-key path for share {index} is empty"));
+            }
+            let key = read_b64(Path::new(path))
+                .with_context(|| format!("failed to read private key for share {index}"))?;
+            Ok((index, key))
+        })();
+
+        match parsed {
+            Ok((index, key)) => {
+                indices.push(index);
+                keys.push(key);
+            }
+            Err(error) => {
+                keys.zeroize();
+                return Err(error);
+            }
+        }
+    }
+
+    if keys.is_empty() {
+        return Err(anyhow!(
+            "at least one private-key specification is required"
+        ));
+    }
+
+    Ok((keys, indices))
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -340,6 +389,7 @@ fn cmd_decrypt(
 /// Write `bytes` as base64 (standard, padded) to `path` with owner-only
 /// read/write permissions (0o600) to protect private key material (H-006).
 fn write_b64(path: &Path, bytes: &[u8]) -> Result<()> {
+    let encoded = Zeroizing::new(B64.encode(bytes));
     #[cfg(unix)]
     {
         use std::io::Write;
@@ -351,20 +401,21 @@ fn write_b64(path: &Path, bytes: &[u8]) -> Result<()> {
             .mode(0o600)
             .open(path)
             .with_context(|| format!("failed to open {} for writing", path.display()))?;
-        file.write_all(B64.encode(bytes).as_bytes())
+        file.write_all(encoded.as_bytes())
             .with_context(|| format!("failed to write {}", path.display()))
     }
     #[cfg(not(unix))]
     {
-        fs::write(path, B64.encode(bytes))
+        fs::write(path, encoded.as_bytes())
             .with_context(|| format!("failed to write {}", path.display()))
     }
 }
 
 /// Read base64 bytes from `path`.
 fn read_b64(path: &Path) -> Result<Vec<u8>> {
-    let s =
-        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    let s = Zeroizing::new(
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?,
+    );
     B64.decode(s.trim())
         .map_err(|e| anyhow!("failed to decode base64 from {}: {e}", path.display()))
 }

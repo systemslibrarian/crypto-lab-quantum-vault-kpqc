@@ -54,12 +54,12 @@ pub struct QuantumVaultContainer {
     pub version: u8,
     /// Symmetric cipher used to encrypt `ciphertext`.
     pub cipher: CipherSuite,
-    /// KEM algorithm identifier (e.g. `"DevKem"`, `"SMAUG-T-3"`).
+    /// KEM algorithm identifier (e.g. `"dev-kem"`, `"SMAUG-T-3"`).
     ///
     /// Stored in the container so that future readers can validate they are
     /// using the correct algorithm to decapsulate the key shares.
     pub kem_algorithm: String,
-    /// Signature algorithm identifier (e.g. `"DevSignature"`, `"HAETAE-3"`).
+    /// Signature algorithm identifier (e.g. `"dev-sig"`, `"HAETAE-3"`).
     ///
     /// Stored so that future readers can validate the signature with the
     /// correct algorithm.
@@ -68,7 +68,8 @@ pub struct QuantumVaultContainer {
     pub threshold: u8,
     /// Total number of shares that were created.
     pub share_count: u8,
-    /// Creation timestamp (Unix seconds) used for replay and swap resistance.
+    /// Creation timestamp (Unix seconds), authenticated as metadata. The core
+    /// does not enforce a replay window; applications must apply that policy.
     pub created_at: u64,
     /// Random per-container identifier used to derive the outer AEAD nonce.
     pub container_id: Vec<u8>,
@@ -176,7 +177,7 @@ impl QuantumVaultContainer {
 // Tests
 // ---------------------------------------------------------------------------
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dev-backend"))]
 mod tests {
     use super::*;
     use crate::{
@@ -284,8 +285,7 @@ mod tests {
 
     #[test]
     fn rejects_oversized_container() {
-        // 65 MiB — above the 64 MiB cap in from_bytes.
-        let big = vec![0u8; 65 * 1024 * 1024];
+        let big = vec![0u8; MAX_CONTAINER_BYTES + 1];
         assert!(QuantumVaultContainer::from_bytes(&big).is_err());
     }
 

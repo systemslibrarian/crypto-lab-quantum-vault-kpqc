@@ -211,6 +211,15 @@ describe('openBox — threshold failures', () => {
     expect(result.success).toBe(false);
     if (!result.success) expect(result.validShareCount).toBe(0);
   });
+
+  it('bounds visual failure bytes for a large rejected container', async () => {
+    const box = await sealMessage('secret', ['a', 'b', 'c']);
+    box.ciphertext = new Uint8Array(70_000);
+
+    const result = await openBox(box, [null, null, null]);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.gibberish).toHaveLength(256);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -297,6 +306,27 @@ describe('openBox — HAETAE signature verification', () => {
 // ---------------------------------------------------------------------------
 
 describe('sealMessage — returned SealedBox structure', () => {
+  it('zeroizes the HAETAE secret key when signing fails', async () => {
+    const secretKey = new Uint8Array(32).fill(0xa5);
+    const keypair = vi.spyOn(haetae, 'haetaeKeypair').mockReturnValue({
+      publicKey: new Uint8Array(32).fill(0x5a),
+      secretKey,
+    });
+    const sign = vi.spyOn(haetae, 'haetaeSign').mockImplementation(() => {
+      throw new Error('injected signing failure');
+    });
+
+    try {
+      await expect(sealMessage('failure cleanup', ['a', 'b', 'c'])).rejects.toThrow(
+        'injected signing failure',
+      );
+      expect(Array.from(secretKey).every(byte => byte === 0)).toBe(true);
+    } finally {
+      sign.mockRestore();
+      keypair.mockRestore();
+    }
+  });
+
   it('has exactly 3 wrappedShares', async () => {
     const box = await sealMessage('test', ['a', 'b', 'c']);
     expect(box.wrappedShares).toHaveLength(3);

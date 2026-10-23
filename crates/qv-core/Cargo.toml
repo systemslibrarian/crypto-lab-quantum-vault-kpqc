@@ -15,8 +15,8 @@ crate-type = ["cdylib", "rlib"]
 #
 # Default: `dev-backend` only.  Compiles fast, no external libraries required.
 #
-# `dev-backend`    — SHA-256/XOR dev stub (always compiled, never omitted so
-#                    tests and the CLI always have a usable backend).
+# `dev-backend`    — SHA-256/XOR dev stub for tests and local demonstrations.
+#                    The module and convenience APIs are absent when disabled.
 #
 # `kpqc-native`    — Enables SmaugTKemBackend + HaetaeSignatureBackend using
 #                    the reference C libraries compiled via build.rs.
@@ -38,10 +38,10 @@ default = ["dev-backend"]
 dev-backend = []
 kpqc-native = ["dep:cc"]   # activates FFI + build.rs linkage
 kpqc-wasm   = []           # browser KpqC scaffold (stub only for now)
-wasm        = ["dep:wasm-bindgen"]
+wasm        = ["dep:wasm-bindgen", "dev-backend"]
 # Opt-in to allow the dev-backend in release builds (L-002 escape hatch).
 # Never set this in production.
-allow_dev_backend_in_release = []
+allow_dev_backend_in_release = ["dev-backend"]
 
 [dependencies]
 aes-gcm.workspace = true

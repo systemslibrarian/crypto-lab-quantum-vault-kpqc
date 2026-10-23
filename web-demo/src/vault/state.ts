@@ -8,13 +8,18 @@ const EXPECTED = {
   nonce:          12,
   salt:           16,
   kemCiphertext:  672,
+  wrappedShare:   48,  // 32-byte Shamir share + 16-byte AES-GCM tag
   shareNonce:     12,
   publicKey:      672,
+  wrappedSecretKey: 848, // 832-byte SMAUG-T secret key + 16-byte AES-GCM tag
   skNonce:        12,
   sigPublicKey:   992,
   maxSignature:   1474,
   maxCiphertext:  64 * 1024 * 1024, // 64 MiB
 } as const;
+
+const MIN_PBKDF2_ITERATIONS = 100_000;
+const MAX_PBKDF2_ITERATIONS = 1_000_000;
 
 function assertLen(arr: Uint8Array, expected: number, field: string): void {
   if (arr.length !== expected) {
@@ -26,6 +31,37 @@ function assertMaxLen(arr: Uint8Array, max: number, field: string): void {
   if (arr.length === 0 || arr.length > max) {
     throw new Error(`Invalid container: field "${field}" length ${arr.length} is out of range [1, ${max}]`);
   }
+}
+
+function decodeBase64Field(value: unknown, field: string): Uint8Array {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid container: field "${field}" must be base64 text`);
+  }
+  try {
+    return fromBase64(value);
+  } catch {
+    throw new Error(`Invalid container: field "${field}" must be valid base64`);
+  }
+}
+
+function isCanonicalTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
+}
+
+function assertIterations(value: unknown, field: string): number {
+  const iterations = value ?? MIN_PBKDF2_ITERATIONS;
+  if (
+    !Number.isSafeInteger(iterations) ||
+    (iterations as number) < MIN_PBKDF2_ITERATIONS ||
+    (iterations as number) > MAX_PBKDF2_ITERATIONS
+  ) {
+    throw new Error(
+      `Invalid container: field "${field}" must be an integer from ${MIN_PBKDF2_ITERATIONS} to ${MAX_PBKDF2_ITERATIONS}`,
+    );
+  }
+  return iterations as number;
 }
 
 export interface WrappedShareSerialized {
@@ -49,27 +85,50 @@ export interface VaultBox {
 }
 
 export interface VaultState {
-  boxes: Record<string, VaultBox>; // keys: "01" – "12"
+  boxes: Record<string, VaultBox>; // keys: "01" – "09"
   version: number;                 // format version, currently 2
 }
 
 const STORAGE_KEY = 'quantum-vault-data';
+
+/** Validate untrusted parsed state without trusting its TypeScript shape. */
+export function validateVaultState(value: unknown): VaultState | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const candidate = value as Record<string, unknown>;
+  if (
+    candidate.version !== 2 ||
+    typeof candidate.boxes !== 'object' ||
+    candidate.boxes === null ||
+    Array.isArray(candidate.boxes)
+  ) {
+    return null;
+  }
+
+  const entries = Object.entries(candidate.boxes as Record<string, unknown>);
+  if (entries.length > 9) return null;
+
+  const boxes: Record<string, VaultBox> = {};
+  try {
+    for (const [key, rawBox] of entries) {
+      if (!/^0[1-9]$/.test(key)) return null;
+      deserializeSealedBox(rawBox as VaultBox);
+      boxes[key] = rawBox as VaultBox;
+    }
+  } catch {
+    return null;
+  }
+
+  return { boxes, version: 2 };
+}
 
 export function loadVaultState(): VaultState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      'boxes' in parsed &&
-      'version' in parsed &&
-      (parsed as VaultState).version === 2
-    ) {
-      return parsed as VaultState;
-    }
-    return null;
+    return validateVaultState(parsed);
   } catch {
     return null;
   }
@@ -108,33 +167,44 @@ export function serializeSealedBox(box: SealedBox): VaultBox {
 }
 
 export function deserializeSealedBox(vb: VaultBox): SealedBox {
+  if (typeof vb !== 'object' || vb === null) {
+    throw new Error('Invalid container: box must be an object');
+  }
   if (!Array.isArray(vb.wrappedShares) || vb.wrappedShares.length !== 3) {
     throw new Error('Invalid container: wrappedShares must have exactly 3 elements');
   }
 
-  const ciphertext    = fromBase64(vb.ciphertext);
-  const nonce         = fromBase64(vb.nonce);
-  const signature     = fromBase64(vb.signature);
-  const sigPublicKey  = fromBase64(vb.sigPublicKey);
+  const ciphertext    = decodeBase64Field(vb.ciphertext, 'ciphertext');
+  const nonce         = decodeBase64Field(vb.nonce, 'nonce');
+  const signature     = decodeBase64Field(vb.signature, 'signature');
+  const sigPublicKey  = decodeBase64Field(vb.sigPublicKey, 'sigPublicKey');
 
   assertMaxLen(ciphertext,   EXPECTED.maxCiphertext, 'ciphertext');
   assertLen(nonce,           EXPECTED.nonce,         'nonce');
   assertLen(sigPublicKey,    EXPECTED.sigPublicKey,  'sigPublicKey');
   assertMaxLen(signature,    EXPECTED.maxSignature,  'signature');
+  if (!isCanonicalTimestamp(vb.createdAt)) {
+    throw new Error('Invalid container: createdAt must be a canonical ISO timestamp');
+  }
 
   const wrappedShares = vb.wrappedShares.map((ws, i) => {
-    const salt             = fromBase64(ws.salt);
-    const kemCiphertext    = fromBase64(ws.kemCiphertext);
-    const wrappedShare     = fromBase64(ws.wrappedShare);
-    const shareNonce       = fromBase64(ws.shareNonce);
-    const publicKey        = fromBase64(ws.publicKey);
-    const wrappedSecretKey = fromBase64(ws.wrappedSecretKey);
-    const skNonce          = fromBase64(ws.skNonce);
+    if (typeof ws !== 'object' || ws === null || Array.isArray(ws)) {
+      throw new Error(`Invalid container: wrappedShares[${i}] must be an object`);
+    }
+    const salt             = decodeBase64Field(ws.salt, `wrappedShares[${i}].salt`);
+    const kemCiphertext    = decodeBase64Field(ws.kemCiphertext, `wrappedShares[${i}].kemCiphertext`);
+    const wrappedShare     = decodeBase64Field(ws.wrappedShare, `wrappedShares[${i}].wrappedShare`);
+    const shareNonce       = decodeBase64Field(ws.shareNonce, `wrappedShares[${i}].shareNonce`);
+    const publicKey        = decodeBase64Field(ws.publicKey, `wrappedShares[${i}].publicKey`);
+    const wrappedSecretKey = decodeBase64Field(ws.wrappedSecretKey, `wrappedShares[${i}].wrappedSecretKey`);
+    const skNonce          = decodeBase64Field(ws.skNonce, `wrappedShares[${i}].skNonce`);
 
     assertLen(salt,          EXPECTED.salt,          `wrappedShares[${i}].salt`);
     assertLen(kemCiphertext, EXPECTED.kemCiphertext, `wrappedShares[${i}].kemCiphertext`);
+    assertLen(wrappedShare,  EXPECTED.wrappedShare,  `wrappedShares[${i}].wrappedShare`);
     assertLen(shareNonce,    EXPECTED.shareNonce,    `wrappedShares[${i}].shareNonce`);
     assertLen(publicKey,     EXPECTED.publicKey,     `wrappedShares[${i}].publicKey`);
+    assertLen(wrappedSecretKey, EXPECTED.wrappedSecretKey, `wrappedShares[${i}].wrappedSecretKey`);
     assertLen(skNonce,       EXPECTED.skNonce,       `wrappedShares[${i}].skNonce`);
 
     return {
@@ -145,7 +215,7 @@ export function deserializeSealedBox(vb: VaultBox): SealedBox {
       publicKey,
       wrappedSecretKey,
       skNonce,
-      iterations: ws.iterations ?? 100_000,
+      iterations: assertIterations(ws.iterations, `wrappedShares[${i}].iterations`),
     };
   });
 

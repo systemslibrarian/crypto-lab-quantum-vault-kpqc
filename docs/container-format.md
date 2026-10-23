@@ -43,12 +43,12 @@ not establish original-sender authenticity.
 | `magic` | string | Must equal `"QVKP"` |
 | `version` | u8 | Format version; currently `2` |
 | `cipher` | enum | `"Aes256Gcm"` only in v2 |
-| `kem_algorithm` | string | Algorithm used for key encapsulation: `"dev-kem"` (test), `"SMAUG-T-3"` (production) |
-| `sig_algorithm` | string | Algorithm used for the container signature: `"dev-sig"` (test), `"HAETAE-3"` (production) |
+| `kem_algorithm` | string | Algorithm ID: `"dev-kem"` (test) or `"SMAUG-T-3"` (conditional native FFI target; the ID is not a safety attestation) |
+| `sig_algorithm` | string | Algorithm ID: `"dev-sig"` (test) or `"HAETAE-3"` (conditional native FFI target; the ID is not a safety attestation) |
 | `threshold` | u8 | Minimum shares needed to decrypt (≥2) |
 | `share_count` | u8 | Total shares created (≤16) |
-| `created_at` | u64 | Unix timestamp (seconds) when container was created; used for replay detection |
-| `container_id` | `[u8; 16]` | Random 128-bit identifier; binds all derived keys to this container |
+| `created_at` | u64 | Authenticated Unix timestamp metadata; no replay window is enforced by `qv-core` |
+| `container_id` | `[u8; 16]` | Random 128-bit identifier used to derive the outer nonce and authenticated in AAD/signature |
 | `nonce` | `[u8; 12]` | 12-byte AES-GCM nonce |
 | `ciphertext` | `[u8]` | AES-256-GCM output including 16-byte auth tag |
 | `shares` | array | One `EncryptedKeyShare` per recipient |
@@ -75,7 +75,7 @@ not establish original-sender authenticity.
 {
   "index":           1,
   "kem_ciphertext":  [/* KEM ciphertext bytes */],
-  "encrypted_share": [/* share bytes XOR'd with KEM shared secret */]
+  "encrypted_share": [/* derived nonce || AES-GCM ciphertext || tag */]
 }
 ```
 
@@ -83,39 +83,43 @@ not establish original-sender authenticity.
 |-------|-------|
 | `index` | x-coordinate in the Shamir scheme (1-based) |
 | `kem_ciphertext` | Output of `Kem::encapsulate(pubkey)` |
-| `encrypted_share` | AES-256-GCM ciphertext of `share_data` under the KEM shared secret (includes 16-byte auth tag) |
+| `encrypted_share` | 12-byte derived nonce followed by AES-256-GCM ciphertext of `share_data` and its 16-byte tag; the AES key and nonce are independently HKDF-derived from the KEM shared secret |
 
-The share nonce is stored alongside the ciphertext as implemented in
-`qv-core::encrypt::aead_protect`.
+The derived share nonce is prepended to the ciphertext and checked against a
+fresh derivation during unwrap, as implemented in
+`qv-core::encrypt::aead_protect` / `aead_unprotect`.
 
 ---
 
 ## Signature coverage
 
 The signature covers the canonical JSON serialization of the following fields
-in this exact key order:
+as a JSON object. `serde_json::json!` stores object keys in sorted order, so the
+wire order is alphabetical:
 
 ```
-magic, version, cipher, kem_algorithm, sig_algorithm, threshold, share_count, created_at, container_id, nonce, ciphertext, shares
+cipher, ciphertext, container_id, created_at, kem_algorithm, magic, nonce, share_count, shares, sig_algorithm, threshold, version
 ```
 
 The `signature` field itself is excluded.  The signing implementation is in
 `qv-core::encrypt::container_signing_bytes`.
 
 In version 2 the signature is produced by the active backend:
-- **dev-sig** (test): `SHA-256(SHA-256(privkey) || canonical_json)`
-- **HAETAE-3** (production): HAETAE signature over canonical JSON
+- **dev-sig** (test only, publicly forgeable from its verification key): `SHA-256(SHA-256(privkey) || canonical_json)`
+- **HAETAE-3** (conditional native FFI path): HAETAE signature over canonical JSON
 
 ---
 
-## Replay and Swap Resistance
+## Authenticated Metadata and Nonce Derivation
 
-Version 2 containers include two fields for replay/swap resistance:
+Version 2 containers include two authenticated metadata fields:
 
-- **`created_at`**: Unix timestamp (seconds) recording when the container was created. Applications may reject containers outside an acceptable time window.
-- **`container_id`**: Random 128-bit identifier unique to each container. This value is included in HKDF domain separation for share keys, binding decryption to the specific container.
+- **`created_at`**: Unix timestamp (seconds) recording when the container was created. It is authenticated metadata; `qv-core` does not enforce a replay window, so applications must apply any freshness policy.
+- **`container_id`**: Random 128-bit identifier used as the input to derive the outer AES-GCM nonce. It is also authenticated in AAD and the signature, but is not an input to the per-share HKDF.
 
-These fields are covered by both the container signature and the AEAD AAD, preventing substitution attacks.
+These fields are covered by both the container signature and the AEAD AAD.
+That binds the outer ciphertext to their values; it does not implement replay
+detection or authenticate a verification key supplied by the container itself.
 
 ---
 
@@ -124,7 +128,7 @@ These fields are covered by both the container signature and the AEAD AAD, preve
 ```
 plaintext
     │
-    ▼  AES-256-GCM (random 256-bit key, random 96-bit nonce)
+    ▼  AES-256-GCM (random 256-bit key, 96-bit nonce derived from random container_id)
 ciphertext + auth_tag
     │
     │  [key material path]
@@ -167,9 +171,9 @@ plaintext
 
 * The file key is zeroized in memory immediately after Shamir splitting.
 * The KEM shared secret is zeroized after each share is protected.
-* The `nonce` must never be reused with the same file key (guaranteed by
-  randomness; the probability of collision is negligible for 96-bit uniform
-  nonces).
+* The `nonce` must never be reused with the same file key. Version 2 derives it
+  from a fresh random 128-bit `container_id`; uniqueness is probabilistic, not
+  guaranteed.
 * Under an independently authenticated verification key, the signature rejects
   changes without a matching signature. A key taken only from the replaceable
   container does not supply that trust anchor.
@@ -214,55 +218,60 @@ replacement key also requires independent authentication of the verification key
 
 ---
 
-## Size estimates (SMAUG-T-3 / HAETAE-3, n=5 shares)
+## Size bounds
 
-| Plaintext | Container size (approx) | Overhead |
-|-----------|------------------------|---------|
-| 1 KB | 9.8 KB | ×9.8 |
-| 1 MB | 1 057 KB | +0.8% |
-| 100 MB | 100.9 MB | +0.9% |
+The Rust parser accepts at most 8 MiB of serialized JSON and at most 4 MiB of
+ciphertext, including the 16-byte GCM tag. A 100 MiB payload therefore cannot be
+represented by this format. Binary fields are JSON arrays of decimal integers,
+so serialized overhead depends on the byte values as well as the share count;
+there is no stable percentage expansion to quote from binary sizes alone.
 
-Fixed overhead ≈ 8 192 B (5 × 992 B KEM cts + 5 × 32 B shares + 2 349 B sig + JSON).
+The `SMAUG-T-3` / `HAETAE-3` sizes apply only to the conditional native FFI
+target built from separately authenticated sources. The ordinary checkout uses
+the test-only development backend for Rust tests and does not provide a native
+Level-3 production implementation.
 
 ---
 
 ## Parser validation checklist
 
-Parsers MUST enforce these checks **in order** before any cryptographic operation:
+`QuantumVaultContainer::from_bytes` enforces these structural checks before it
+returns a parsed container:
 
-1. `len(data) ≤ 64 MiB` — memory exhaustion guard
-2. Valid UTF-8 JSON
-3. `magic == "QVLT1"`
-4. `version == 1`
-5. `threshold >= 2`
-6. `share_count >= threshold`
-7. `shares.len() == share_count`
-8. `nonce.len() == 12`
-9. All `shares[i].index` unique and non-zero
-10. Signature verification (before any KEM / AES operation)
-11. AES-GCM decrypt with recomputed AAD
+1. `len(data) <= 8 MiB`.
+2. Valid JSON matching the exact schema (`deny_unknown_fields`).
+3. `magic == "QVKP"` and `version == 2`.
+4. KEM/signature identifiers are at most 32 bytes and are registered IDs.
+5. `threshold >= 2`, `threshold <= share_count <= 16`, and
+   `shares.len() == share_count`.
+6. `container_id.len() == 16` and `nonce.len() == 12`.
+7. Ciphertext length is `1..=4 MiB`; signature length is `1..=4096`.
+8. Every share index is unique and in `1..=share_count`.
+9. Each KEM ciphertext is `1..=2048` bytes and each encrypted share is
+   `28..=128` bytes.
+
+The decryption API then validates the supplied key/index pairing and threshold
+and rejects a declared algorithm that does not match the selected backend.
+Signature verification is the first cryptographic operation. Only after it
+succeeds may KEM decapsulation, Shamir reconstruction and AES-GCM decryption run.
 
 ---
 
 ## Versioning policy
 
-Backward-incompatible changes increment `version`.  Old parsers are expected
-to reject unknown versions with a clear error.
-
-Future planned versions:
-
-| Version | Change |
-|---------|--------|
-| 2 | Optional: base64url byte arrays instead of JSON integer arrays |
-| 3 | HAETAE signature over binary-encoded fields (smaller containers) |
+Backward-incompatible changes increment `version`; version 2 is the current
+Rust format. The parser rejects every other version. No later wire format is
+specified by this document, so a future change must allocate a new version and
+document its complete encoding and migration policy rather than relying on the
+obsolete proposals that predated version 2.
 
 ---
 
 ## Web Demo Export Format (`.qvault` files)
 
 The web demo uses a separate JSON format for file export/import, distinct from
-the `QVLT1` format used by `qv-core`. This format uses base64-encoded binary
-fields for browser compatibility and human readability.
+the `QVKP` version-2 format used by `qv-core`. This format uses base64-encoded
+binary fields for browser compatibility and human readability.
 
 ### Version identifier
 
@@ -287,13 +296,13 @@ version: "qvault-v1"
     {
       "label": "Alice",
       "kemCiphertext": "<base64, 672 bytes>",
-      "wrappedSecretKey": "<base64>",
-      "wrappedShare": "<base64>",
+      "wrappedSecretKey": "<base64, 848 bytes>",
+      "wrappedShare": "<base64, 48 bytes>",
       "pbkdf2Salt": "<base64, 16 bytes>",
       "kemPublicKey": "<base64, 672 bytes>",
       "shareNonce": "<base64, 12 bytes>",
       "skNonce": "<base64, 12 bytes>",
-      "iterations": 100000
+      "iterations": 600000
     },
     { "label": "Bob", ... },
     { "label": "Carol", ... }
@@ -317,22 +326,32 @@ version: "qvault-v1"
 | `signaturePublicKey` | base64 | HAETAE public key (992 bytes) |
 | `createdAt` | string | ISO 8601 timestamp |
 
+Newly sealed boxes use 600,000 PBKDF2-HMAC-SHA-256 iterations. Imports accept
+safe integer values from 100,000 through 1,000,000; a missing iteration field in
+a legacy browser container defaults to 100,000.
+
 ### Import validation
 
 On import, the web demo:
 
-1. Parses JSON and validates `version == "qvault-v1"`
-2. Checks algorithm compatibility (rejects unknown algorithms)
-3. Validates participant count (must be exactly 3)
-4. Verifies byte lengths for all fixed-size fields
-5. **Verifies the HAETAE signature before any decryption attempt**
-6. Rejects containers with invalid or missing signatures
+1. Parses JSON and validates `version == "qvault-v1"`.
+2. Requires the exact four supported algorithm identifiers.
+3. Requires exactly three participants in Alice/Bob/Carol order.
+4. Validates the canonical ISO timestamp, PBKDF2 iteration range and every
+   fixed/bounded byte length (including 48-byte wrapped shares and 848-byte
+   wrapped secret keys). Import rejects files over 90 MiB before reading them.
+5. Verifies the HAETAE signature before any KEM or AES operation.
+6. Rejects containers with invalid or missing signatures.
 
 ### Security considerations
 
 - Imported containers are cryptographically verified using the embedded
   HAETAE public key before any KEM or AES operation.
-- The signature binds all container fields including the timestamp.
+- The HAETAE corpus binds the `SealedBox` fields: ciphertext, timestamp, nonce,
+  embedded signature public key and every cryptographic field in each wrapped
+  share, including its PBKDF2 iteration count. It does **not** include the outer
+  `.qvault` version, algorithm object or participant labels; import validates
+  those fields against fixed expected values before verification.
 - The browser does not independently authenticate that embedded key. Replacing
   it and re-signing changed public data can pass verification; including the key
   in signed data does not prevent this. No participant password or original

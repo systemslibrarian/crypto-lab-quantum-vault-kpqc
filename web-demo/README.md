@@ -2,7 +2,11 @@
 
 An interactive browser demo that visualises every layer of the Quantum Vault cryptographic stack using a bank vault of 9 safety deposit boxes (3×3 grid).
 
-> **v5.0 — real KpqC cryptography.** All cryptographic operations run as genuine WebAssembly compiled from the official KpqC C reference implementations. SMAUG-T Level 1 handles key encapsulation; HAETAE Mode 2 handles container signing. No mocks, no HMAC substitutes.
+> **v5.1 — KpqC browser artifacts.** SMAUG-T Level 1 key encapsulation and
+> HAETAE Mode 2 signing run in WebAssembly reproduced from the pinned public
+> reference-source archives recorded in `wasm/PROVENANCE.md`. AES-GCM and PBKDF2
+> use Web Crypto, and Shamir sharing is TypeScript. The active pipeline has no
+> mock KEM/signature or HMAC substitute.
 
 ---
 
@@ -15,7 +19,8 @@ npm run dev
 # open http://localhost:5173
 ```
 
-Requires Node 22.19+, 24, or 26+ (the deployment workflow uses Node 24).
+Requires Node 22.19+, 24, or 26+. CI runs web checks on Node 22, 24 and 26; the
+Linux Chromium job uses Node 24.
 
 ---
 
@@ -43,14 +48,21 @@ npm run test:e2e:install   # one-time: download the Playwright Chromium build
 npm run test:e2e           # run the browser end-to-end suite (Playwright)
 ```
 
-Unit coverage (Vitest):
+Unit coverage (Vitest) includes:
 - `src/crypto/__tests__/utils.test.ts` — base64 codec, byte helpers, text encode/decode
 - `src/crypto/__tests__/shamir.test.ts` — GF(2⁸) Shamir split/reconstruct, threshold behaviour
 - `src/crypto/__tests__/pipeline.test.ts` — full seal/open pipeline with mocked WASM modules
+- `src/crypto/__tests__/keywrap.test.ts` — cleanup on KEM/wrapping failure paths
 - `src/vault/__tests__/file.test.ts` — `.qvault` serialise / validate / tamper-reject
+- `src/vault/__tests__/state.test.ts` — persisted-state bounds and validation
+- `src/__tests__/signature-trust.test.ts` — embedded-key trust-boundary text controls
 
-End-to-end coverage (Playwright, `e2e/vault.spec.ts`) drives a real browser against
-the dev server and exercises the genuine KpqC WASM pipeline — no mocks:
+`tests/*.node.mjs` separately checks toolchain identities, deployment-request
+isolation, active WASM exports/sizes and workflow permissions/control flow.
+
+End-to-end coverage (Playwright, `e2e/*.spec.ts`) builds and serves the production
+bundle, then drives a real Chromium browser through the active KpqC WASM
+pipeline—no mocks:
 - demo boxes seal on load and render (9 boxes, 3 pre-sealed)
 - two correct passwords reconstruct and reveal the secret (any 2-of-3 pair)
 - one correct / two wrong passwords stay below threshold → **ACCESS DENIED**, secret never shown
@@ -91,13 +103,15 @@ web-demo/
     │       └── haetae.d.ts
     ├── vault/
     │   ├── demo.ts         ← generates demo boxes on first visit
+    │   ├── file.ts         ← .qvault import/export validation
     │   └── state.ts        ← localStorage persistence / serialisation
-    └── ui/
-        ├── wall.ts
-        ├── panel.ts
-        ├── pipeline-ui.ts
-        ├── reveal.ts
-        └── styles/vault.css
+    ├── ui/
+    │   ├── wall.ts
+    │   ├── panel.ts
+    │   ├── pipeline-ui.ts
+    │   └── reveal.ts
+    └── styles/
+        └── vault.css
 ```
 
 ---
@@ -113,7 +127,9 @@ AES-256-GCM  →  Shamir split  →  SMAUG-T wrap  →  HAETAE sign
 1. **AES-256-GCM** — encrypt plaintext with a random 256-bit key
 2. **Shamir split** — split the 32-byte AES key into 3 shares, threshold = 2
 3. **SMAUG-T wrap** (×3) — fresh SMAUG-T keypair per participant; encapsulate share; seal SK with PBKDF2(password)
-4. **HAETAE sign** — fresh signing keypair; sign the entire container serialisation
+4. **HAETAE sign** — fresh signing keypair; sign canonical JSON containing the
+   `SealedBox` ciphertext, timestamp, nonce, embedded verification key and every
+   cryptographic wrapped-share field (but not outer export labels/metadata)
 
 ### Open (retrieve)
 
@@ -123,7 +139,8 @@ HAETAE verify  →  SMAUG-T unlock  →  Shamir reconstruct  →  AES-256-GCM
 
 1. **HAETAE verify** — reject invalid signatures under the key included in the container
 2. **SMAUG-T unlock** (for each password) — PBKDF2 → decrypt SK → decapsulate → recover Shamir share
-3. **Shamir reconstruct** — requires ≥ 2 valid shares; fewer → wrong bytes → AES auth fails
+3. **Shamir reconstruct** — two valid shares recover the key; one produces an
+   unauthenticated candidate that AES-GCM normally rejects
 4. **AES-256-GCM** — decrypt ciphertext; wrong key → DOMException
 
 ### Signature trust boundary
@@ -168,18 +185,24 @@ Deployed to GitHub Pages via `.github/workflows/deploy-pages.yml`.
 
 ## WASM Modules
 
-The `.wasm` binaries and Emscripten JS loaders are committed to the repository so that CI/CD does not require a C toolchain. To rebuild from the KpqC C reference sources:
+The `.wasm` binaries and Emscripten JS loaders are committed. The authoritative
+verification path rebuilds from the immutable archives and compares all four
+outputs without replacing the shipped artifacts:
 
 ```bash
-# From the repository root:
-bash wasm/build.sh
-cp wasm/dist/smaug.js  web-demo/src/crypto/wasm/smaug.js
-cp wasm/dist/haetae.js web-demo/src/crypto/wasm/haetae.js
-cp wasm/dist/smaug.wasm  web-demo/public/smaug.wasm
-cp wasm/dist/haetae.wasm web-demo/public/haetae.wasm
+# From the repository root, after separately capturing the exact archives and
+# digest-pinned compiler image named in wasm/PROVENANCE.md:
+bash wasm/build.sh --reproduce \
+  --smaug-archive /absolute/path/smaug.tar.gz \
+  --haetae-archive /absolute/path/haetae.zip \
+  --scratch-root /absolute/path/to/writable-scratch
 ```
 
-See `wasm/build.sh` for required Emscripten version and flags.
+The generic `bash wasm/build.sh` path is a development recipe for separately
+supplied vendor directories; it does not reproduce the committed pair and must
+not be used to overwrite it. See `wasm/PROVENANCE.md` and
+`wasm/reproduction.json` for source identities, archive hashes, compiler digest,
+artifact-specific commands and expected outputs.
 
 ---
 
@@ -197,7 +220,10 @@ To use:
 3. Click **Run Timing Test**
 4. Export results as CSV for further analysis
 
-Low coefficient of variation (< 5%) indicates acceptable constant-time behavior.
+A low coefficient of variation does **not** establish constant-time behavior.
+Interpretation requires raw interleaved samples, environment details, a
+predefined decision rule and a negative control; any detected difference still
+requires analysis before it can be called exploitable.
 
 ---
 

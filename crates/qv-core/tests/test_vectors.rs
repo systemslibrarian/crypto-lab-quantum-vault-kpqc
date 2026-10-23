@@ -25,10 +25,12 @@ use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Key, Nonce,
 };
+#[cfg(feature = "dev-backend")]
 use qv_core::{
     container::QuantumVaultContainer, decrypt_bytes, decrypt_with_threshold, encrypt_bytes,
-    encrypt_with_threshold, reconstruct_secret, KeyShare,
+    encrypt_with_threshold,
 };
+use qv_core::{reconstruct_secret, KeyShare};
 
 // ── AES-256-GCM NIST Test Vectors ────────────────────────────────────────────
 
@@ -126,7 +128,7 @@ fn aes256_gcm_aad_mismatch_fails() {
 
 /// ## Vector SSS-01
 ///
-/// Polynomial: f(x) = 0x42 + 0x53·x  over GF(2⁸) with poly 0x11b
+/// Polynomial: f(x) = 0x42 + 0x53·x  over GF(2⁸) with poly 0x11d
 ///
 /// f(1) = 0x42 XOR gf_mul(0x53, 1) = 0x42 XOR 0x53 = 0x11
 /// f(2) = 0x42 XOR gf_mul(0x53, 2) = 0x42 XOR 0xA6 = 0xE4
@@ -185,20 +187,22 @@ fn shamir_deterministic_multi_byte_sss01_ext() {
     );
 }
 
-/// Supplying only one share of a 2-share scheme must not produce the correct secret.
+/// For the fixed SSS-01 vector, interpolation through its first share alone
+/// returns that share value. This is one candidate secret, not a threshold
+/// reconstruction; under-threshold output is not universally required to differ
+/// from the real secret.
 #[test]
-fn shamir_single_share_of_two_is_not_secret() {
+fn shamir_single_share_of_two_matches_documented_candidate() {
     let shares = vec![KeyShare {
         index: 1,
         data: vec![0x11],
     }];
     let recovered = reconstruct_secret(&shares).unwrap();
-    // With only 1 share of a 2-of-2, the result is the share value itself
-    // (Lagrange at (1, 0x11) with a single point), not 0x42.
-    assert_ne!(
+    // Lagrange at the single point (1, 0x11) returns the constant candidate 0x11.
+    assert_eq!(
         recovered,
-        vec![0x42u8],
-        "single share must not reconstruct the 2-of-2 secret"
+        vec![0x11u8],
+        "single-share interpolation must match the documented SSS-01 candidate"
     );
 }
 
@@ -207,6 +211,7 @@ fn shamir_single_share_of_two_is_not_secret() {
 /// Container produced by encrypt_bytes must survive a to_bytes/from_bytes round-trip
 /// and preserve all structural fields.
 #[test]
+#[cfg(feature = "dev-backend")]
 fn container_serialise_deserialise_identity() {
     let (ct_bytes, _keys, _sig_pub) = encrypt_bytes(b"container format vector").unwrap();
 
@@ -227,6 +232,7 @@ fn container_serialise_deserialise_identity() {
 
 /// The container's `magic` field must equal the defined constant.
 #[test]
+#[cfg(feature = "dev-backend")]
 fn container_magic_field_is_qvkp() {
     let (ct_bytes, _, _) = encrypt_bytes(b"magic check").unwrap();
     let c = QuantumVaultContainer::from_bytes(&ct_bytes).unwrap();
@@ -239,6 +245,7 @@ fn container_magic_field_is_qvkp() {
 /// Two calls to encrypt_bytes with identical plaintext must produce different
 /// ciphertexts (random nonce ensures this with overwhelming probability).
 #[test]
+#[cfg(feature = "dev-backend")]
 fn pipeline_nonce_freshness() {
     let plain = b"nonce freshness test vector";
     let (ct1, _, _) = encrypt_bytes(plain).unwrap();
@@ -251,6 +258,7 @@ fn pipeline_nonce_freshness() {
 
 /// Round-trip for the minimum threshold (2-of-2).
 #[test]
+#[cfg(feature = "dev-backend")]
 fn pipeline_2_of_2_roundtrip() {
     let plain = b"2-of-2 pipeline test";
     let (ct, keys, sig_pub) = encrypt_with_threshold(plain, 2, 2).unwrap();
@@ -260,6 +268,7 @@ fn pipeline_2_of_2_roundtrip() {
 
 /// Round-trip for a 3-of-5 scheme using the minimum 3 keys.
 #[test]
+#[cfg(feature = "dev-backend")]
 fn pipeline_3_of_5_minimum_keys() {
     let plain = b"3-of-5 minimum subset test vector";
     let (ct, keys, sig_pub) = encrypt_with_threshold(plain, 5, 3).unwrap();
@@ -271,6 +280,7 @@ fn pipeline_3_of_5_minimum_keys() {
 
 /// Round-trip with the full binary range (0x00 through 0xFF).
 #[test]
+#[cfg(feature = "dev-backend")]
 fn pipeline_full_byte_range() {
     let plain: Vec<u8> = (0u8..=255).collect();
     let (ct, keys, sig_pub) = encrypt_bytes(&plain).unwrap();
@@ -280,6 +290,7 @@ fn pipeline_full_byte_range() {
 
 /// Decryption with a modified signature byte must fail.
 #[test]
+#[cfg(feature = "dev-backend")]
 fn pipeline_signature_tamper_detected() {
     let (ct_bytes, keys, sig_pub) = encrypt_bytes(b"tamper me").unwrap();
     let mut c = QuantumVaultContainer::from_bytes(&ct_bytes).unwrap();
@@ -294,6 +305,7 @@ fn pipeline_signature_tamper_detected() {
 
 /// Decryption with a modified ciphertext byte must fail.
 #[test]
+#[cfg(feature = "dev-backend")]
 fn pipeline_ciphertext_tamper_detected() {
     let (ct_bytes, keys, sig_pub) = encrypt_bytes(b"tamper the ct").unwrap();
     let mut c = QuantumVaultContainer::from_bytes(&ct_bytes).unwrap();
@@ -315,6 +327,7 @@ fn pipeline_ciphertext_tamper_detected() {
 /// ```
 #[test]
 #[ignore]
+#[cfg(feature = "dev-backend")]
 fn generate_test_vectors() {
     // AES-256-GCM: empty PT, all-zero key/nonce
     let key = Key::<Aes256Gcm>::from_slice(&[0u8; 32]);

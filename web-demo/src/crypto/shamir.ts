@@ -5,9 +5,8 @@
 // (0x11B = AES polynomial is irreducible but 2 has order 51 there, not 255.)
 //
 // Critical property: reconstructing with fewer than `threshold` shares produces
-// mathematically unrelated output (wrong bytes), NOT an error. This is the
-// fundamental security property of Shamir SSS and is what drives the gibberish
-// reveal on retrieval failure. Each such byte is uniform over GF(256) and so
+// an unauthenticated candidate, NOT an error. Conditioned on the observed shares,
+// each true secret byte remains uniform over GF(256), so the candidate
 // coincides with the true byte with probability 1/256 — for the 32-byte key this
 // demo splits, an accidentally correct reconstruction has probability 256^-32.
 // That residual chance is not a defect: it is what "every candidate secret is
@@ -42,7 +41,7 @@ function gfDiv(a: number, b: number): number {
   return EXP[((LOG[a] - LOG[b]) % 255 + 255) % 255];
 }
 
-function evaluatePolynomial(coefficients: number[], x: number): number {
+function evaluatePolynomial(coefficients: Uint8Array, x: number): number {
   // Horner's method over GF(256)
   let result = 0;
   for (let i = coefficients.length - 1; i >= 0; i--) {
@@ -64,7 +63,13 @@ export function splitSecret(
   if (secret.length === 0) {
     throw new Error('Secret must not be empty');
   }
-  if (threshold < 2 || threshold > totalShares) {
+  if (
+    !Number.isInteger(threshold) ||
+    !Number.isInteger(totalShares) ||
+    threshold < 2 ||
+    threshold > totalShares ||
+    totalShares > 255
+  ) {
     throw new Error('Invalid Shamir threshold parameters');
   }
 
@@ -73,57 +78,64 @@ export function splitSecret(
     data: new Uint8Array(secret.length),
   }));
 
-  // Reuse a single buffer for random coefficients so we can wipe it once done
-  // rather than creating a fresh allocation (and GC-visible ghost) each iteration.
-  const rand = new Uint8Array(threshold - 1);
+  // Reuse one typed buffer for the secret byte and random coefficients. An
+  // ordinary number[] per byte would leave GC-managed copies that cannot be
+  // wiped. The finally block also covers RNG or evaluation failures.
+  const coefficients = new Uint8Array(threshold);
+  let complete = false;
+  try {
+    for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
+      // Polynomial: f(x) = secret[i] + c1*x + c2*x^2 + ... (over GF(256))
+      coefficients[0] = secret[byteIdx];
+      crypto.getRandomValues(coefficients.subarray(1));
 
-  for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
-    // Polynomial: f(x) = secret[i] + c1*x + c2*x^2 + ... (over GF(256))
-    const coefficients: number[] = [secret[byteIdx]];
-    crypto.getRandomValues(rand);
-
-    // EVERY non-constant coefficient — the leading one a_{threshold-1} included —
-    // is uniform over the full field, 0 included, exactly as in Shamir's 1979
-    // construction. Constraining any of them to be nonzero leaks: fix any
-    // threshold-1 shares, and for each candidate secret there is exactly one
-    // coefficient vector consistent with them; its leading coefficient varies
-    // non-degenerately with the candidate, so barring 0 makes exactly one
-    // candidate per secret byte unreachable. That is a 1/256 leak in precisely
-    // the "a single share reveals NOTHING" claim — and at the shipped 2-of-3
-    // setting the single non-constant coefficient IS the leading one, so the
-    // constraint applied to every byte of every real key.
-    //
-    // The degree may therefore drop below threshold-1 (probability 1/256). That
-    // is harmless: `threshold` points still determine a unique polynomial of
-    // degree <= threshold-1, so reconstruction is unaffected; and a holder of
-    // threshold-1 shares cannot distinguish a degenerate polynomial from a
-    // full-degree one, so nothing is given away.
-    for (let i = 0; i < threshold - 1; i++) {
-      coefficients.push(rand[i]);
+      // EVERY non-constant coefficient — the leading one a_{threshold-1} included —
+      // is uniform over the full field, 0 included, exactly as in Shamir's 1979
+      // construction. Constraining any of them to be nonzero leaks: fix any
+      // threshold-1 shares, and for each candidate secret there is exactly one
+      // coefficient vector consistent with them; its leading coefficient varies
+      // non-degenerately with the candidate, so barring 0 makes exactly one
+      // candidate per secret byte unreachable. That is a 1/256 leak in precisely
+      // the "a single share reveals NOTHING" claim — and at the shipped 2-of-3
+      // setting the single non-constant coefficient IS the leading one, so the
+      // constraint applied to every byte of every real key.
+      //
+      // The degree may therefore drop below threshold-1 (probability 1/256). That
+      // is harmless: `threshold` points still determine a unique polynomial of
+      // degree <= threshold-1, so reconstruction is unaffected; and a holder of
+      // threshold-1 shares cannot distinguish a degenerate polynomial from a
+      // full-degree one, so nothing is given away.
+      for (let s = 0; s < totalShares; s++) {
+        shares[s].data[byteIdx] = evaluatePolynomial(coefficients, shares[s].index);
+      }
     }
-    for (let s = 0; s < totalShares; s++) {
-      shares[s].data[byteIdx] = evaluatePolynomial(coefficients, shares[s].index);
+    complete = true;
+  } finally {
+    // Coefficients plus any one share reveal the secret, so clear every exit.
+    coefficients.fill(0);
+    if (!complete) {
+      for (const share of shares) share.data.fill(0);
     }
   }
-
-  // Wipe the coefficient buffer — polynomial coefficients are as sensitive as
-  // share data since knowing them plus any one share reveals each secret byte.
-  rand.fill(0);
 
   return shares;
 }
 
-function lagrangeInterpolate(points: { x: number; y: number }[]): number {
-  // Evaluate the unique polynomial through `points` at x = 0
+function lagrangeInterpolateByte(shares: Share[], byteIdx: number): number {
+  // Evaluate the unique polynomial through `shares` at x = 0 without creating
+  // GC-managed copies of each sensitive share byte.
   let secret = 0;
-  for (let i = 0; i < points.length; i++) {
+  for (let i = 0; i < shares.length; i++) {
     let basis = 1; // Lagrange basis polynomial L_i(0)
-    for (let j = 0; j < points.length; j++) {
+    for (let j = 0; j < shares.length; j++) {
       if (i === j) continue;
       // L_i(0) *= (0 ^ x_j) / (x_i ^ x_j)   (XOR = subtraction in GF(256))
-      basis = gfMul(basis, gfDiv(points[j].x, points[i].x ^ points[j].x));
+      basis = gfMul(
+        basis,
+        gfDiv(shares[j].index, shares[i].index ^ shares[j].index),
+      );
     }
-    secret ^= gfMul(points[i].y, basis);
+    secret ^= gfMul(shares[i].data[byteIdx], basis);
   }
   return secret;
 }
@@ -131,10 +143,24 @@ function lagrangeInterpolate(points: { x: number; y: number }[]): number {
 export function reconstructSecret(shares: Share[]): Uint8Array {
   if (shares.length === 0) throw new Error('No shares provided');
   const length = shares[0].data.length;
+  const indices = new Set<number>();
+  for (const share of shares) {
+    if (
+      !Number.isInteger(share.index) ||
+      share.index < 1 ||
+      share.index > 255 ||
+      indices.has(share.index)
+    ) {
+      throw new Error('Share indices must be unique integers from 1 to 255');
+    }
+    if (share.data.length !== length) {
+      throw new Error('Share payloads must have equal lengths');
+    }
+    indices.add(share.index);
+  }
   const result = new Uint8Array(length);
   for (let byteIdx = 0; byteIdx < length; byteIdx++) {
-    const points = shares.map(s => ({ x: s.index, y: s.data[byteIdx] }));
-    result[byteIdx] = lagrangeInterpolate(points);
+    result[byteIdx] = lagrangeInterpolateByte(shares, byteIdx);
   }
   return result;
 }

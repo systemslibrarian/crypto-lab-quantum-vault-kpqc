@@ -45,8 +45,8 @@ AAD with an all-zero 256-bit key and 96-bit IV.
 
 ## 2. GF(2⁸) Arithmetic Vectors
 
-The Galois field uses irreducible polynomial $p(x) = x^8 + x^4 + x^3 + x + 1$
-(0x11b).
+The Galois field uses primitive polynomial
+$p(x) = x^8 + x^4 + x^3 + x^2 + 1$ (`0x11d`).
 
 ### GF-01 — Multiplication identity
 
@@ -74,11 +74,11 @@ These can be independently verified using the Euclidean algorithm over GF(2)[x].
 
 ### GF-03 — Known multiplication result
 
-From the Galois field arithmetic used in AES (FIPS 197, §4):
+In the field defined above:
 
 ```
 gf_mul(0x53, 0x02) = 0xA6    (left shift: 01010011 → 10100110, no reduction)
-gf_mul(0xD4, 0x02) = 0xB3    (left shift with reduction: ...)
+gf_mul(0xD4, 0x02) = 0xB5    (left shift 0xA8 XOR carry byte 0x1D)
 ```
 
 Derivation of `gf_mul(0x53, 0x02)`:  
@@ -112,10 +112,14 @@ Verify manually:
 The test in `test_vectors.rs` verifies this reconstruction using the public
 `reconstruct_secret` API.
 
-### SSS-02 — Too-few-shares produces non-secret output
+### SSS-02 — Too-few-shares leaves the secret undetermined
 
-Given shares from a 3-of-3 split, only 2 of 3 shares MUST NOT reconstruct
-the secret with probability negligible in the field size.
+Given fewer than the threshold number of shares, every candidate secret remains
+equally likely in the ideal scheme. Interpolating only the observed points still
+returns a byte string, but it is only one candidate; it is not an authenticated
+reconstruction. That candidate can equal the real value by chance (probability
+`1/256` for one byte and `256^-32` for an independently split 32-byte key), so a
+valid test must not assert that under-threshold output is *always* different.
 
 ---
 
@@ -156,22 +160,31 @@ probability.
 
 ### AES vectors
 
-The NIST CAVP tool (available at csrc.nist.gov) can regenerate AES-GCM test
-vectors. Alternatively, OpenSSL:
+Compare against the NIST CAVP response files or use an independent AES-GCM API.
+For example, Node's Web Crypto implementation returns ciphertext followed by the
+tag and therefore prints the expected 16-byte value for the empty message:
 
 ```bash
-# AES-01: empty message, all-zero key and IV
-echo -n "" | openssl enc -aes-256-gcm \
-  -K 0000000000000000000000000000000000000000000000000000000000000000 \
-  -iv 000000000000000000000000 -nosalt -nopad 2>/dev/null | xxd
+node --input-type=module -e '
+  const key = await crypto.subtle.importKey(
+    "raw", new Uint8Array(32), "AES-GCM", false, ["encrypt"]);
+  const out = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: new Uint8Array(12), tagLength: 128 },
+    key, new Uint8Array());
+  console.log(Buffer.from(out).toString("hex"));
+'
+# 530f8afbc74536b9a963b4f1c4cb738b
 ```
+
+`openssl enc` is not an alternative for this check: current OpenSSL releases do
+not expose AEAD modes such as GCM through the `enc` command.
 
 ### Shamir vectors
 
 The Sage mathematics system can verify GF(256) arithmetic:
 
 ```python
-F.<x> = GF(2^8, modulus=x^8+x^4+x^3+x+1)
+F.<x> = GF(2^8, modulus=x^8+x^4+x^3+x^2+1)
 a = F.fetch_int(0x53)
 b = F.fetch_int(0x02)
 print(hex((a*b).integer_representation()))   # should print 0xa6

@@ -106,6 +106,12 @@ pub const HKDF_LABEL_SHARE_KEY: &[u8] = b"qvault-share-key";
 /// HKDF info label for deriving share encryption nonces.
 pub const HKDF_LABEL_SHARE_NONCE: &[u8] = b"qvault-share-nonce";
 
+const _: () = {
+    assert!(MAX_CONTAINER_BYTES >= MAX_CIPHERTEXT_BYTES);
+    assert!(MAX_ENCRYPTED_SHARE_BYTES > AES_KEY_BYTES + AES_GCM_TAG_BYTES);
+    assert!(MIN_THRESHOLD >= 2);
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -118,9 +124,6 @@ mod tests {
     fn constants_are_sane() {
         assert_eq!(MAGIC, "QVKP");
         assert_eq!(CONTAINER_VERSION, 2);
-        assert!(MAX_CONTAINER_BYTES >= MAX_CIPHERTEXT_BYTES);
-        assert!(MAX_ENCRYPTED_SHARE_BYTES > AES_KEY_BYTES + AES_GCM_TAG_BYTES);
-        assert!(MIN_THRESHOLD >= 2);
     }
 
     #[test]

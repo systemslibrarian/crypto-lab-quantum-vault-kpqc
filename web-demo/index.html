@@ -321,9 +321,9 @@
           <li class="pd-step pd-step-3 pd-step-kpqc">
             <span class="pd-num">3</span>
             <span class="pd-text"
-                  data-en="Each piece is sealed to one keyholder with a quantum-safe lock (SMAUG-T)."
-                  data-ko="각 조각이 양자내성 잠금(SMAUG-T)으로 한 명의 키홀더에게 봉인됩니다.">
-              Each piece is sealed to one keyholder with a quantum-safe lock (SMAUG-T).
+                  data-en="Each piece is sealed to one keyholder with SMAUG-T, a final KpqC competition KEM still in standardization."
+                  data-ko="각 조각은 아직 표준화 중인 KpqC 최종 경연 KEM인 SMAUG-T로 한 명의 키홀더에게 봉인됩니다.">
+              Each piece is sealed to one keyholder with SMAUG-T, a final KpqC competition KEM still in standardization.
             </span>
           </li>
           <li class="pd-arrow" aria-hidden="true">↓</li>
@@ -343,7 +343,7 @@
           The embedded signature key is not authenticated. Someone can replace the key and re-sign public container data; this does not unlock encrypted shares. Trust requires a key authenticated outside the container.
         </p>
 
-        <!-- INSIDE STEP 3 — the SMAUG-T "quantum-safe lock" is really TWO nested
+        <!-- INSIDE STEP 3 — the SMAUG-T wrapping path has TWO sequential
              layers. This mini-diagram separates what YOUR PASSWORD does (unlock the
              keyholder's post-quantum secret key via PBKDF2) from what the KEM does
              (decapsulate to recover the wrapping key that unlocks the share). The
@@ -351,14 +351,14 @@
              shown, not just named. -->
         <div class="step3-zoom" role="group" aria-labelledby="step3-zoom-title">
           <p class="step3-zoom-title" id="step3-zoom-title"
-             data-en="Inside step 3: two nested locks, not one"
-             data-ko="3단계 속: 하나가 아니라 두 겹의 잠금">
-            Inside step 3: two nested locks, not one
+             data-en="Inside step 3: a two-step recovery path"
+             data-ko="3단계 속: 두 단계 복구 경로">
+            Inside step 3: a two-step recovery path
           </p>
           <p class="step3-zoom-sub"
-             data-en="“A quantum-safe lock” is shorthand for two separate wrappings. The password and the KEM protect different things — collapsing them hides where the post-quantum guarantee actually lives."
-             data-ko="“양자내성 잠금”은 사실 두 겹의 감싸기를 줄인 말입니다. 비밀번호와 KEM은 서로 다른 것을 보호합니다.">
-            “A quantum-safe lock” is shorthand for two separate wrappings. The password and the KEM protect different things — collapsing them hides where the post-quantum guarantee actually lives.
+             data-en="The password and KEM protect different links in the recovery path. They are not additive barriers: defeating either one can expose the share."
+             data-ko="비밀번호와 KEM은 복구 경로의 서로 다른 연결을 보호합니다. 두 장벽의 강도가 더해지는 것은 아니며, 하나라도 깨지면 조각이 노출될 수 있습니다.">
+            The password and KEM protect different links in the recovery path. They are not additive barriers: defeating either one can expose the share.
           </p>
           <ol class="layer-diagram" role="list">
             <li class="layer-node layer-pw">
@@ -380,16 +380,16 @@
               <span class="layer-badge"
                     data-en="Layer 2 — the post-quantum KEM" data-ko="2층 — 양자내성 KEM">Layer 2 — the post-quantum KEM</span>
               <span class="layer-body"
-                    data-en="At seal time SMAUG-T ENCAPSULATED a random 32-byte shared secret against the keyholder’s public key. On open, DECAPSULATE with the secret key recovers that same shared secret — the wrapping key that finally unlocks the Shamir share. THIS is the layer a quantum attacker can’t break — as long as Module-LWE/LWR stays hard against quantum algorithms. Nobody has proved it does."
-                    data-ko="봉인 시 SMAUG-T가 키홀더의 공개 키에 대해 무작위 32바이트 공유 비밀을 캡슐화(encapsulate)했습니다. 열 때 비밀 키로 디캡슐화(decapsulate)하면 같은 공유 비밀 — 샤미르 조각을 여는 감싸기 키 — 를 되찾습니다. 이 층이 양자 공격자가 깰 수 없는 부분입니다 — 단, Module-LWE/LWR이 양자 알고리즘에도 계속 어렵다는 전제에서입니다. 이는 아직 증명되지 않았습니다.">
-                At seal time SMAUG-T <strong>encapsulated</strong> a random 32-byte shared secret against the keyholder’s public key. On open, <strong>decapsulate</strong> with the secret key recovers that same shared secret — the wrapping key that finally unlocks the Shamir share. THIS is the layer a quantum attacker can’t break — as long as Module-LWE/LWR stays hard against quantum algorithms. Nobody has proved it does.
+                    data-en="At seal time SMAUG-T ENCAPSULATED a random 32-byte shared secret against the keyholder’s public key. On open, DECAPSULATE with the secret key recovers that wrapping key. The public record is designed not to reveal it under SMAUG-T’s stated assumptions; this demo does not prove those assumptions or the implementation."
+                    data-ko="봉인 시 SMAUG-T가 키홀더의 공개 키에 대해 무작위 32바이트 공유 비밀을 캡슐화했습니다. 열 때 비밀 키로 디캡슐화하면 조각을 푸는 감싸기 키를 되찾습니다. 공개 데이터만으로 그 키를 알아내기 어렵도록 설계되었지만, 이 데모는 그 가정이나 구현을 증명하지 않습니다.">
+                At seal time SMAUG-T <strong>encapsulated</strong> a random 32-byte shared secret against the keyholder’s public key. On open, <strong>decapsulate</strong> with the secret key recovers that wrapping key. The public record is designed not to reveal it under SMAUG-T’s stated assumptions; this demo does not prove those assumptions or the implementation.
               </span>
             </li>
           </ol>
           <p class="step3-zoom-foot"
-             data-en="So: crack the password and you still face the KEM; break the KEM (needs a quantum computer that doesn’t exist) and you still face the password. The share only appears when BOTH are peeled."
-             data-ko="즉, 비밀번호를 깨도 여전히 KEM이 남고, KEM을 깨도(존재하지 않는 양자 컴퓨터 필요) 여전히 비밀번호가 남습니다. 두 겹을 모두 벗겨야 조각이 나옵니다.">
-            So: crack the password and you still face the KEM; break the KEM (needs a quantum computer that doesn’t exist) and you still face the password. The share only appears when BOTH are peeled.
+             data-en="Normal recovery uses the password to obtain the SMAUG-T secret key, then decapsulates. An attacker who guesses the password can follow that route; one who breaks the KEM can derive the wrapping key without the password. The weaker route sets the protection level."
+             data-ko="정상 복구는 비밀번호로 SMAUG-T 비밀 키를 얻은 뒤 디캡슐화합니다. 공격자가 비밀번호를 맞히면 그 경로를 따를 수 있고, KEM을 깨면 비밀번호 없이 감싸기 키를 얻을 수 있습니다. 더 약한 경로가 보호 수준을 결정합니다.">
+            Normal recovery uses the password to obtain the SMAUG-T secret key, then decapsulates. An attacker who guesses the password can follow that route; one who breaks the KEM can derive the wrapping key without the password. The weaker route sets the protection level.
           </p>
         </div>
 
@@ -399,9 +399,9 @@
              "nearest point" search is intractable even for a quantum computer. -->
         <div class="lattice-viz" role="group" aria-labelledby="lattice-title">
           <p class="lattice-title" id="lattice-title"
-             data-en="Why can’t a quantum computer break layer 2?"
-             data-ko="왜 양자 컴퓨터가 2층을 못 깨나요?">
-            Why can’t a quantum computer break layer 2?
+             data-en="Why is layer 2 considered a post-quantum candidate?"
+             data-ko="왜 2층을 포스트퀀텀 후보라고 하나요?">
+            Why is layer 2 considered a post-quantum candidate?
           </p>
           <div class="lattice-figure">
             <svg viewBox="0 0 200 140" class="lattice-svg" role="img"
@@ -421,9 +421,9 @@
               <circle cx="105" cy="66" r="4" fill="#C60C30"/>
             </svg>
             <p class="lattice-caption"
-               data-en="In 2-D, picking the lattice dot nearest the red target is trivial — you just look. SMAUG-T’s lattice has hundreds of dimensions, where “find the nearest point” (the Module-LWE problem) has no known efficient solution, classical OR quantum. That gap is the whole security guarantee."
-               data-ko="2차원에서는 빨간 목표에 가장 가까운 격자 점을 고르기가 아주 쉽습니다 — 눈으로 보면 됩니다. SMAUG-T의 격자는 수백 차원이며, 거기서 “가장 가까운 점 찾기”(Module-LWE 문제)는 고전이든 양자든 효율적인 해법이 알려져 있지 않습니다. 이 격차가 곧 보안 보증입니다.">
-              In 2-D, picking the lattice dot nearest the red target is trivial — you just look. SMAUG-T’s lattice has hundreds of dimensions, where “find the nearest point” (the Module-LWE problem) has no known efficient solution, classical OR quantum. That gap is the whole security guarantee.
+               data-en="The 2-D picture is only an analogy. SMAUG-T relies on structured high-dimensional lattice assumptions for which no efficient classical or quantum attack is currently known. That is evidence for a security design, not a proof or guarantee."
+               data-ko="이 2차원 그림은 비유일 뿐입니다. SMAUG-T는 현재 효율적인 고전 또는 양자 공격이 알려지지 않은 구조화된 고차원 격자 가정에 의존합니다. 이는 보안 설계의 근거이지 증명이나 보장은 아닙니다.">
+              The 2-D picture is only an analogy. SMAUG-T relies on structured high-dimensional lattice assumptions for which no efficient classical or quantum attack is currently known. That is evidence for a security design, not a proof or guarantee.
             </p>
           </div>
         </div>
@@ -437,9 +437,9 @@
           </p>
           <details class="gloss-item">
             <summary><span data-en="What is a KEM?" data-ko="KEM이란?">What is a KEM?</span></summary>
-            <p data-en="KEM = Key Encapsulation Mechanism: a way for two parties to agree on a shared secret key using public-key crypto. Analogy: a self-locking mailbox — anyone can drop in a secret using your public slot, but only your private key opens it. SMAUG-T is a KEM a quantum computer can't crack later."
-               data-ko="KEM(키 캡슐화 메커니즘)은 공개키 암호로 공유 비밀 키에 합의하는 방법입니다. 비유: 자물쇠가 달린 우편함 — 누구나 공개 투입구로 비밀을 넣을 수 있지만 개인 키로만 엽니다. SMAUG-T는 나중에 양자 컴퓨터도 못 깨는 KEM입니다.">
-              KEM = Key Encapsulation Mechanism: a way for two parties to agree on a shared secret key using public-key crypto. Analogy: a self-locking mailbox — anyone can drop in a secret using your public slot, but only your private key opens it. SMAUG-T is a KEM a quantum computer can't crack later.
+            <p data-en="KEM = Key Encapsulation Mechanism: public-key crypto that produces a shared secret for an encapsulator and the matching private-key holder. SMAUG-T is designed against known quantum attacks, but remains a standardization candidate rather than a published standard or guarantee."
+               data-ko="KEM(키 캡슐화 메커니즘)은 캡슐화한 쪽과 일치하는 비밀 키 보유자에게 공유 비밀을 만드는 공개키 암호입니다. SMAUG-T는 알려진 양자 공격에 대응하도록 설계되었지만, 보장이나 공표된 표준이 아니라 아직 표준화 후보입니다.">
+              KEM = Key Encapsulation Mechanism: public-key crypto that produces a shared secret for an encapsulator and the matching private-key holder. SMAUG-T is designed against known quantum attacks, but remains a standardization candidate rather than a published standard or guarantee.
             </p>
           </details>
           <details class="gloss-item">
@@ -451,9 +451,9 @@
           </details>
           <details class="gloss-item">
             <summary><span data-en="What does “lattice-based” mean?" data-ko="“격자 기반”이란?">What does “lattice-based” mean?</span></summary>
-            <p data-en="Lattice-based crypto builds its security on the hardness of finding short vectors in a high-dimensional grid of points (a lattice) — a problem no known quantum algorithm solves efficiently. Analogy: finding the nearest lamppost in a vast, tilted 3-D city grid is easy in 2-D but brutal in hundreds of dimensions. That hardness is what makes SMAUG-T and HAETAE post-quantum."
-               data-ko="격자 기반 암호는 고차원 점 격자에서 짧은 벡터를 찾는 어려움에 안전성을 둡니다 — 알려진 양자 알고리즘으로도 효율적으로 풀 수 없습니다. 이 어려움이 SMAUG-T와 HAETAE를 양자내성으로 만듭니다.">
-              Lattice-based crypto builds its security on the hardness of finding short vectors in a high-dimensional grid of points (a lattice) — a problem no known quantum algorithm solves efficiently. Analogy: finding the nearest lamppost in a vast, tilted 3-D city grid is easy in 2-D but brutal in hundreds of dimensions. That hardness is what makes SMAUG-T and HAETAE post-quantum.
+            <p data-en="Lattice-based crypto relies on mathematical problems over high-dimensional lattices for which no efficient classical or quantum attack is known. The grid picture is a rough analogy; each scheme needs its own assumptions, parameters and implementation review."
+               data-ko="격자 기반 암호는 효율적인 고전 또는 양자 공격이 알려지지 않은 고차원 격자 수학 문제에 의존합니다. 격자 그림은 단순한 비유이며, 각 방식의 가정·매개변수·구현을 따로 검토해야 합니다.">
+              Lattice-based crypto relies on mathematical problems over high-dimensional lattices for which no efficient classical or quantum attack is known. The grid picture is a rough analogy; each scheme needs its own assumptions, parameters and implementation review.
             </p>
           </details>
           <details class="gloss-item">
@@ -469,9 +469,9 @@
              the SMAUG-T step it motivates (not buried in a footer). -->
         <div class="pq-compare" id="pq-compare">
           <p class="pq-lead"
-             data-en="Why quantum-safe? Step 3 uses SMAUG-T instead of classical RSA/ECDH. Toggle to see why:"
-             data-ko="왜 양자내성인가? 3단계는 기존 RSA/ECDH 대신 SMAUG-T를 씁니다. 전환해 이유를 보세요:">
-            Why quantum-safe? Step 3 uses SMAUG-T instead of classical RSA/ECDH. Toggle to see why:
+             data-en="Why study a post-quantum KEM? Step 3 uses SMAUG-T instead of classical RSA/ECDH. Toggle to compare the assumptions:"
+             data-ko="왜 포스트퀀텀 KEM을 학습할까요? 3단계는 기존 RSA/ECDH 대신 SMAUG-T를 씁니다. 가정을 비교해 보세요:">
+            Why study a post-quantum KEM? Step 3 uses SMAUG-T instead of classical RSA/ECDH. Toggle to compare the assumptions:
           </p>
           <div class="pq-toggle" role="group" aria-label="Classical versus post-quantum comparison">
             <button class="pq-btn" id="pq-btn-classical" type="button" aria-pressed="false"
@@ -489,9 +489,9 @@
             A quantum computer running Shor's algorithm factors RSA and breaks ECDH. An attacker who copies this sealed box today — “harvest now, decrypt later” — retroactively unwraps every share once such a machine exists. The box you sealed years ago pops open.
           </p>
           <p class="pq-body pq-body-post" id="pq-body-post"
-             data-en="SMAUG-T's security rests on the Module-LWE lattice problem, for which no efficient quantum algorithm is known. The same harvested box stays sealed even against a future quantum attacker — that is exactly what the post-quantum KEM buys you here."
-             data-ko="SMAUG-T의 안전성은 효율적인 양자 알고리즘이 알려지지 않은 Module-LWE 격자 문제에 기반합니다. 수집된 상자는 미래의 양자 공격자에게도 봉인된 채로 남습니다 — 바로 이것이 양자내성 KEM이 주는 이점입니다.">
-            SMAUG-T's security rests on the Module-LWE lattice problem, for which no efficient quantum algorithm is known. The same harvested box stays sealed even against a future quantum attacker — that is exactly what the post-quantum KEM buys you here.
+             data-en="SMAUG-T relies on structured lattice assumptions for which no efficient quantum attack is currently known. If those assumptions, parameters and this implementation hold, a harvested box is intended to resist that attack class; the demo does not turn that intent into a guarantee."
+             data-ko="SMAUG-T는 현재 효율적인 양자 공격이 알려지지 않은 구조화된 격자 가정에 의존합니다. 그 가정·매개변수·구현이 유지된다면 수집된 상자가 해당 공격에 견디도록 설계되었지만, 이 데모가 이를 보장하지는 않습니다.">
+            SMAUG-T relies on structured lattice assumptions for which no efficient quantum attack is currently known. If those assumptions, parameters and this implementation hold, a harvested box is intended to resist that attack class; the demo does not turn that intent into a guarantee.
           </p>
         </div>
       </section>
@@ -572,9 +572,9 @@
           Parameter sets in this build:
         </p>
         <p class="kpqc-panel-note"
-           data-en="This browser demo runs SMAUG-T Level 1 and HAETAE Mode 2 — the lowest parameter set in each family, chosen for smaller keys and a faster load. They map to NIST PQC category 1 and category 2, so the pair is bounded by category 1, roughly the effort of an exhaustive key search on AES-128. The Rust CLI in this repository runs the higher SMAUG-T Level 3 / HAETAE Mode 3 (category 3, roughly AES-192)."
-           data-ko="이 브라우저 데모는 SMAUG-T Level 1과 HAETAE Mode 2를 사용합니다 — 각 계열에서 가장 낮은 파라미터 세트이며, 키 크기를 줄이고 로딩을 빠르게 하려고 선택했습니다. 각각 NIST PQC 카테고리 1과 카테고리 2에 해당하므로, 둘을 합친 안전 여유는 카테고리 1 — 대략 AES-128 전수 키 탐색 수준 — 으로 제한됩니다. 이 저장소의 Rust CLI는 더 높은 SMAUG-T Level 3 / HAETAE Mode 3 (카테고리 3, 대략 AES-192)를 사용합니다.">
-          This browser demo runs SMAUG-T Level 1 and HAETAE Mode 2 — the lowest parameter set in each family, chosen for smaller keys and a faster load. They map to NIST PQC category 1 and category 2, so the pair is bounded by category 1, roughly the effort of an exhaustive key search on AES-128. The Rust CLI in this repository runs the higher SMAUG-T Level 3 / HAETAE Mode 3 (category 3, roughly AES-192).
+           data-en="This browser demo runs SMAUG-T Level 1 and HAETAE Mode 2 — the lowest parameter set in each family, chosen for smaller keys and a faster load. Their stated targets are NIST PQC categories 1 and 2, so the pair is bounded by category 1. The Rust crates define a separate Level 3 / Mode 3 native FFI path, but it works only after authenticated external C sources are supplied; this checkout does not by itself demonstrate a working Level 3 CLI."
+           data-ko="이 브라우저 데모는 더 작은 키와 빠른 로딩을 위해 SMAUG-T Level 1과 HAETAE Mode 2를 사용합니다. 명시된 목표는 각각 NIST PQC 카테고리 1과 2이므로 조합은 카테고리 1로 제한됩니다. Rust 크레이트에는 별도의 Level 3 / Mode 3 네이티브 FFI 경로가 정의되어 있지만, 인증된 외부 C 소스를 제공해야 동작하며 이 체크아웃만으로 작동하는 Level 3 CLI를 입증하지는 않습니다.">
+          This browser demo runs SMAUG-T Level 1 and HAETAE Mode 2 — the lowest parameter set in each family, chosen for smaller keys and a faster load. Their stated targets are NIST PQC categories 1 and 2, so the pair is bounded by category 1. The Rust crates define a separate Level 3 / Mode 3 native FFI path, but it works only after authenticated external C sources are supplied; this checkout does not by itself demonstrate a working Level 3 CLI.
         </p>
         <p class="kpqc-panel-attribution"
            data-en="The implementations are derived from reference code produced by Korean cryptography researchers as part of the KpqC competition."
@@ -621,9 +621,9 @@
           </div>
           <div class="decision-card">
             <span class="decision-if"
-                  data-en="Quantum-safe key exchange →"
-                  data-ko="양자 안전 키 교환 →">Quantum-safe key exchange →</span>
-            <strong class="decision-use">SMAUG-T KEM / ML-KEM</strong>
+                  data-en="Published post-quantum KEM →"
+                  data-ko="공표된 포스트퀀텀 KEM →">Published post-quantum KEM →</span>
+            <strong class="decision-use">ML-KEM</strong>
             <span class="decision-not"
                   data-en="Not raw RSA, not static DH"
                   data-ko="RSA 직접 암호화, 정적 DH 금지">Not raw RSA, not static DH</span>
@@ -656,9 +656,9 @@
                 data-en="Nonce reuse (AES-GCM)"
                 data-ko="논스 재사용 (AES-GCM)">Nonce reuse (AES-GCM)</h3>
             <p class="failure-result"
-               data-en="Attacker recovers XOR of plaintexts + the authentication key. Total break."
-               data-ko="공격자가 평문의 XOR과 인증 키를 복구합니다. 완전한 보안 붕괴.">
-              Attacker recovers XOR of plaintexts + the authentication key. Total break.
+               data-en="Repeated keystream leaks plaintext relations and enables practical forgery attacks. Confidentiality and integrity both fail."
+               data-ko="키스트림이 반복되어 평문 간의 관계가 노출되고 실용적인 위조 공격이 가능해집니다. 기밀성과 무결성이 모두 무너집니다.">
+              Repeated keystream leaks plaintext relations and enables practical forgery attacks. Confidentiality and integrity both fail.
             </p>
           </div>
           <div class="failure-card">
@@ -666,9 +666,9 @@
                 data-en="Too few Shamir shares"
                 data-ko="샤미르 공유 부족">Too few Shamir shares</h3>
             <p class="failure-result"
-               data-en="Reconstruction produces random garbage. No partial leak — information-theoretically secure."
-               data-ko="복원 시 임의의 쓰레기가 나옵니다. 부분 정보 유출 없음 — 정보 이론적으로 안전.">
-              Reconstruction produces random garbage. No partial leak — information-theoretically secure.
+               data-en="Interpolation returns an unauthenticated candidate, while every possible secret remains equally likely in the ideal scheme. AES-GCM rejects an incorrect candidate."
+               data-ko="보간은 인증되지 않은 후보를 반환하지만 이상적인 방식에서는 가능한 모든 비밀이 똑같이 가능성이 있습니다. 잘못된 후보는 AES-GCM이 거부합니다.">
+              Interpolation returns an unauthenticated candidate, while every possible secret remains equally likely in the ideal scheme. AES-GCM rejects an incorrect candidate.
             </p>
           </div>
           <div class="failure-card">
@@ -705,13 +705,13 @@
               data-ko="교육 목적 전용 — 프로덕션 데이터 보호에 사용하지 마세요.">
             Educational only — do not use for production data protection.
           </li>
-          <li data-en="Not audited — C reference implementations have not undergone formal security audit."
-              data-ko="감사되지 않음 — C 참조 구현은 공식 보안 감사를 거치지 않았습니다.">
-            Not audited — C reference implementations have not undergone formal security audit.
+          <li data-en="No independent production attestation — competition analysis and this repository review are not a formal audit of the deployed composition."
+              data-ko="독립적인 프로덕션 보증 없음 — 경연 분석과 이 저장소 검토는 배포된 구성에 대한 공식 감사가 아닙니다.">
+            No independent production attestation — competition analysis and this repository review are not a formal audit of the deployed composition.
           </li>
-          <li data-en="Browser WASM timing is not constant-time. Side-channel resistance is not guaranteed."
-              data-ko="브라우저 WASM 타이밍은 상수 시간이 아닙니다. 부채널 저항은 보장되지 않습니다.">
-            Browser WASM timing is not constant-time. Side-channel resistance is not guaranteed.
+          <li data-en="Browser WASM has not been established as constant-time. Side-channel resistance is not guaranteed."
+              data-ko="브라우저 WASM이 상수 시간으로 동작한다는 것이 입증되지 않았습니다. 부채널 저항은 보장되지 않습니다.">
+            Browser WASM has not been established as constant-time. Side-channel resistance is not guaranteed.
           </li>
         </ul>
       </section>

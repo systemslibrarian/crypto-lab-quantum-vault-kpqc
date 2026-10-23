@@ -1,5 +1,22 @@
 # Audit Verification & Remediation Report
 
+> Historical record, not a current security attestation. The 2026-10-23 review
+> found additional issues after this report: `DevSignature` is publicly
+> forgeable from its verification key by design, the development backend was
+> still compiled when its feature was disabled, several error paths retained
+> secret material, the native SMAUG-T build used the wrong configuration macro
+> and FFI symbol names, and the browser's embedded HAETAE key does not
+> authenticate an original sender. Those boundaries are now enforced, tested,
+> or documented in code,
+> `docs/security-audit-checklist.md`, and the WASM evidence reviews. Statements
+> below such as “not possible,” “all addressed,” and fixed test counts describe
+> the March snapshot only. In particular, the March conclusion that rejecting
+> zero Shamir coefficients was cryptographically irrelevant was wrong: excluding
+> zero rules out one candidate secret per byte. The current implementation draws
+> every coefficient uniformly over the full field. Current `QVKP` v2 fields,
+> 8 MiB serialized / 4 MiB ciphertext limits and test-runner totals supersede
+> the historical format, limits and counts below.
+
 **Date:** March 15, 2026  
 **Auditor:** GitHub Copilot (Senior Rust Cryptographic Engineer)  
 **Input Audit:** `gemini-results.md` (Gemini AI adversarial audit)

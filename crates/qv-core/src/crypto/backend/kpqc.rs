@@ -5,7 +5,7 @@
 //! | Feature flag     | What is compiled                                         |
 //! |------------------|----------------------------------------------------------|
 //! | `kpqc-native`    | Real FFI calls to compiled C libraries (requires `build.rs` + vendored source) |
-//! | `kpqc-wasm`      | Browser-side WASM stub (placeholder — pure-Rust port TBD) |
+//! | `kpqc-wasm`      | Error-only scaffold (placeholder — not a browser or CLI backend) |
 //! | *(neither)*      | No-op stubs that return `NotAvailable` errors with hints |
 //!
 //! ## Algorithms
@@ -17,10 +17,9 @@
 //!
 //! ## Vendoring the C reference implementations
 //!
-//! The SMAUG-T and HAETAE reference implementations are available from the
-//! KpqC competition at <https://kpqc.or.kr/competition.html>.  There is no
-//! official public GitHub mirror.  Download the submission packages, extract
-//! them, and place the source trees at:
+//! Authenticate the SMAUG-T and HAETAE source archives independently before
+//! use. The browser reproduction manifest records one reviewed public capture;
+//! extract the native source trees at:
 //!
 //! ```text
 //! vendor/smaug-t/   ← extracted SMAUG-T reference implementation
@@ -207,8 +206,9 @@ mod stub {
     fn not_available(algo: &str) -> anyhow::Error {
         anyhow::anyhow!(
             "{algo} is not available in this build. \
-             Compile with `--features kpqc-native` (requires vendored C source) \
-             or `--features kpqc-wasm` for the browser backend."
+             Compile with `--features kpqc-native` after supplying the \
+             authenticated external C source. The browser demo uses a separate \
+             TypeScript/Emscripten integration; `kpqc-wasm` is only a scaffold."
         )
     }
 }

@@ -8,11 +8,14 @@
 //! # Quick start
 //!
 //! ```no_run
+//! # #[cfg(feature = "dev-backend")]
+//! # {
 //! use qv_core::{encrypt_bytes, decrypt_bytes};
 //!
 //! let (ct, keys, sig_pub) = encrypt_bytes(b"hello world").unwrap();
 //! let plain  = decrypt_bytes(&ct, &keys, &sig_pub).unwrap();
 //! assert_eq!(plain, b"hello world");
+//! # }
 //! ```
 
 pub mod algorithm;
@@ -40,8 +43,11 @@ pub use encrypt::generate_nonce;
 pub use error::{QvError, QvResult};
 pub use shamir::{reconstruct_secret, split_secret, Share as KeyShare};
 
+#[cfg(feature = "dev-backend")]
 use crypto::backend::dev::{DevKem, DevSignature};
+#[cfg(feature = "dev-backend")]
 use crypto::kem::Kem as _;
+#[cfg(feature = "dev-backend")]
 use crypto::signature::Signature as _;
 use std::fmt;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -63,7 +69,7 @@ pub type EncryptResult = (Vec<u8>, Vec<Vec<u8>>, Vec<u8>);
 ))]
 compile_error!(
     "dev-backend is active in a release build. \
-     Compile with --features kpqc-native for a production build, or add \
+     Compile with --no-default-features and an implemented backend, or add \
      feature `allow_dev_backend_in_release` to acknowledge the insecurity."
 );
 
@@ -180,6 +186,7 @@ pub fn reconstruct_key(shares: &[KeyShare]) -> QvResult<Vec<u8>> {
 /// Key material is produced by the development stub (SHA-256/XOR).  Do **not**
 /// use this to protect real data.
 #[must_use = "encryption result contains keys required for decryption"]
+#[cfg(feature = "dev-backend")]
 pub fn encrypt_bytes(plaintext: &[u8]) -> QvResult<EncryptResult> {
     encrypt_with_threshold(plaintext, 2, 2)
 }
@@ -188,6 +195,7 @@ pub fn encrypt_bytes(plaintext: &[u8]) -> QvResult<EncryptResult> {
 ///
 /// `kem_privkeys` must be the slice returned by the matching `encrypt_bytes` call.
 #[must_use = "decryption result contains the recovered plaintext"]
+#[cfg(feature = "dev-backend")]
 pub fn decrypt_bytes(
     container_json: &[u8],
     kem_privkeys: &[Vec<u8>],
@@ -205,6 +213,7 @@ pub fn decrypt_bytes(
 /// decryption.
 ///
 /// # ⚠ Dev backend only
+#[cfg(feature = "dev-backend")]
 pub fn encrypt_with_threshold(
     plaintext: &[u8],
     share_count: u8,
@@ -243,6 +252,7 @@ pub fn encrypt_with_threshold(
 /// Supply at least `threshold` private keys from the list returned during encryption.
 /// Keys must correspond to the first N encrypted shares in the container
 /// (i.e. pass keys in the same order they were generated).
+#[cfg(feature = "dev-backend")]
 pub fn decrypt_with_threshold(
     container_json: &[u8],
     kem_privkeys: &[Vec<u8>],
@@ -271,7 +281,7 @@ pub fn decrypt_with_threshold(
 // Integration tests for the high-level API
 // ---------------------------------------------------------------------------
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dev-backend"))]
 mod tests {
     use super::*;
 

@@ -8,25 +8,30 @@ bridge, and browser-rendered demo UI.
 
 ## 1. System Overview
 
-There are two independent build paths that share the vendor C sources:
+There are two independent KpqC build paths. Their C sources are external inputs,
+not committed vendor directories in this checkout:
 
-- **Web demo** — C reference implementations compiled directly to WebAssembly
-  via Emscripten; TypeScript calls the WASM exports from a Vite + vanilla-TS
-  browser app.
-- **Rust CLI** — C reference implementations linked into `qv-core` via the
-  `cc` crate; the binary is `qv-cli`.
+- **Web demo** — committed C-derived WebAssembly artifacts called from a Vite +
+  vanilla-TS browser app. `wasm/reproduction.json` pins the authenticated source,
+  historical wrappers, exact compiler image, and artifact-specific commands that
+  reproduce those bytes. The generic development recipe in `wasm/build.sh` is
+  not the command that produced both active artifacts.
+- **Rust CLI** — C reference implementations linked into `qv-core` via the `cc`
+  crate only when the external Level 3 source trees are supplied and
+  `kpqc-native` is selected. The default CLI feature is an explicitly insecure,
+  release-blocked development backend.
 
 ```mermaid
 flowchart TD
-    subgraph C_SMAUG["vendor C: SMAUG-T 1.1.1\nreference_implementation/src/*.c"]
+    subgraph C_SMAUG["external authenticated SMAUG-T source pin"]
     end
-    subgraph C_HAETAE["vendor C: HAETAE 1.1.2\nreference_implementation/src/*.c"]
+    subgraph C_HAETAE["external authenticated HAETAE source pin"]
     end
 
-    subgraph WASM_BUILD["wasm/ — Emscripten (emcc -O1 + CT hardening)"]
+    subgraph WASM_BUILD["wasm/ — exact artifact-specific Emscripten reproduction"]
         RB["randombytes_wasm.c\n→ crypto.getRandomValues"]
         SE["smaug_exports.c\nkeypair / encapsulate / decapsulate / secure_zeroize"]
-        HE["haetae_exports.c\nkeypair / sign / verify / secure_zeroize"]
+        HE["historical HAETAE wrapper\nkeypair / sign / verify\n(no zeroize export in active WASM)"]
         DIST["wasm/dist/\nsmaug.{js,wasm}  haetae.{js,wasm}"]
     end
 
@@ -84,12 +89,12 @@ sequenceDiagram
         KW->>SMAUG: smaugKeypair() → {pk, sk}
         KW->>SMAUG: smaugEncapsulate(pk) → {kemCT, sharedSecret}
         KW->>WebCrypto: AES-GCM(sharedSecret) encrypt share → wrappedShare
-        KW->>WebCrypto: PBKDF2(password, salt, 100k) → passwordKey
+        KW->>WebCrypto: PBKDF2(password, salt, stored iterations; 600k new) → passwordKey
         KW->>WebCrypto: AES-GCM(passwordKey) encrypt sk → wrappedSK
     end
 
     PL->>HAETAE: haetaeKeypair() → {sigPK, sigSK}
-    PL->>HAETAE: haetaeSign(containerBytes, sigSK) → signature
+    PL->>HAETAE: haetaeSign(canonical SealedBox JSON, sigSK) → signature
     PL-->>UI: SealedBox {ciphertext, nonce, wrappedShares[3], signature, sigPK}
 
     UI->>PL: openBox(box, [pw1, pw2, null])
@@ -139,12 +144,14 @@ type OpenResult =
 ### Note on omitted AAD in AES-GCM calls
 
 `aes.ts` and `keywrap.ts` call `SubtleCrypto.encrypt / decrypt` without
-Additional Authenticated Data. This is intentional: the HAETAE signature in
-`pipeline.ts` covers `buildContainerData(ciphertext, nonce, wrappedShares)` —
-the concatenation of every byte of every field — so any substitution or
-cross-container transplant is caught before decryption. Inner AES-GCM calls
-(share wrap, SK wrap) are protected by the outer HAETAE verify; they do not
-need independent AAD.
+Additional Authenticated Data. The HAETAE signature in `pipeline.ts` instead
+covers canonical JSON containing the ciphertext, timestamp, nonce, embedded
+verification key and every cryptographic wrapped-share field. Under that
+selected key, a transplant without a matching signature is rejected before
+decryption. The key is embedded and unpinned, however, so wholesale replacement
+and re-signing is outside this check's authenticity boundary. Inner AES-GCM
+calls (share wrap and secret-key wrap) authenticate their ciphertexts but do not
+bind separate contextual AAD.
 
 ---
 
@@ -157,9 +164,9 @@ The public functions in that module are **safe Rust** wrappers; the `unsafe` key
 
 | Function | C symbol | Pointer invariants |
 |----------|----------|--------------------|
-| `smaug_t_keypair()` | `cryptolab_smaugt_mode3_keypair` | `pk` points to `≥ SMAUG_T_PK_BYTES` (1088) initialised allocation; `sk` to `≥ SMAUG_T_SK_BYTES` (1312). Both must remain valid for the duration of the call. Rust allocates both on the stack as `vec![0u8; N]` before the call. |
-| `smaug_t_enc(pk)` | `cryptolab_smaugt_mode3_enc` | `pk` must be exactly `SMAUG_T_PK_BYTES` (checked before the call). `ct` and `ss` are freshly allocated output buffers. |
-| `smaug_t_dec(sk, ct)` | `cryptolab_smaugt_mode3_dec` | Both `sk` and `ct` are validated for exact byte lengths before the call. The C function reads them as `const` pointers; no aliasing with the output `ss`. |
+| `smaug_t_keypair()` | `cryptolab_smaug3_crypto_kem_keypair` | `pk` points to `≥ SMAUG_T_PK_BYTES` (1088) initialised allocation; `sk` to `≥ SMAUG_T_SK_BYTES` (1312). Both must remain valid for the duration of the void C call. Rust `Vec` buffers are heap allocations (their handles are stack locals), created separately before the call. |
+| `smaug_t_enc(pk)` | `cryptolab_smaug3_crypto_kem_enc` | `pk` must be exactly `SMAUG_T_PK_BYTES` (checked before the call). `ct` and `ss` are freshly allocated output buffers. |
+| `smaug_t_dec(sk, ct)` | `cryptolab_smaug3_crypto_kem_dec` | Both `sk` and `ct` are validated for exact byte lengths before the call. The C function reads them as `const` pointers; no aliasing with the output `ss`. |
 
 ### HAETAE boundaries
 
@@ -171,22 +178,22 @@ The public functions in that module are **safe Rust** wrappers; the `unsafe` key
 
 ### randombytes shim
 
-`crates/qv-core/randombytes_shim.c` replaces the NIST KAT DRBG `randombytes.c`
-that ships with both C reference implementations. The vendor file is excluded
-from the `cc::Build` file list in `build.rs` and replaced by the shim, which
-sources entropy from:
+`crates/qv-core/randombytes_shim.c` replaces the upstream platform-specific
+`randombytes.c` files with one reviewed adapter. The vendor files are excluded
+from the `cc::Build` inputs in `build.rs`; SMAUG-T's separate OpenSSL-backed
+KAT/seed-expander `rng.c` is also excluded. The shim sources entropy from:
 
 - **Linux:** `getrandom(buf, len, 0)` (syscall, no fd required)
 - **macOS / BSD:** `arc4random_buf(buf, len)`
 - **Fallback:** reads from `/dev/urandom`; calls `abort()` on read failure
 
-This ensures no KAT DRBG entropy ever enters a production binary.
+This ensures no KAT DRBG entropy enters a binary built through this native path.
 
 ---
 
 ## 5. Container Format (AAD-Protected)
 
-See [docs/container-format.md](container-format.md) for the full binary layout.
+See [docs/container-format.md](container-format.md) for the full JSON layout.
 
 The AES-256-GCM Additional Authenticated Data (AAD) covers nine fields — the
 algorithm identifiers, the policy parameters, the container identity and the
@@ -216,10 +223,10 @@ macro. The AAD is the resulting compact UTF-8 JSON bytes from
 `serde_json::to_vec` — no whitespace, no trailing newline.
 
 The AAD deliberately **excludes** the `shares` array and the `ciphertext`.
-Share-to-recipient binding is enforced one layer up by the HAETAE signature,
-which covers every field including `shares` and is verified *before* any
-decapsulation, so share substitution cannot succeed without also forging the
-signature.
+Share-to-recipient binding is enforced one layer up by the signature, which
+covers every field including `shares` and is verified *before* any
+decapsulation. Under the independently supplied Rust verification key, share
+substitution therefore requires a matching signature.
 
 This AAD belongs to the Rust `qv-core` container path only. The browser demo
 under `web-demo/` calls `crypto.subtle.encrypt` with no `additionalData`
@@ -231,11 +238,15 @@ AAD to keep byte-identical across the WASM boundary.
 
 ## 6. Security Level Parameters
 
-The Rust `qv-core` CLI uses **Level 3** (NIST equivalent ~AES-192) via the
-`mode3` C symbols.  The **web demo** uses **SMAUG-T Level 1** and **HAETAE
-Mode 2** (NIST equivalent ~AES-128) for smaller key / ciphertext sizes.
+The Rust crates define a **Level 3 / Mode 3** native FFI path via `mode3` C
+symbols. It is available only after authenticated external source trees are
+supplied. CI downloads pinned public captures and exercises primitive native
+round trips and tamper rejection; it does not retain the source trees or test an
+end-to-end native CLI. The checked-in `kpqc-wasm` core feature is an error-only
+scaffold. The **web demo** independently ships **SMAUG-T Level 1** and **HAETAE
+Mode 2** artifacts.
 
-| Parameter | Rust CLI (Level 3) | Web Demo (Level 1 / Mode 2) |
+| Parameter | Conditional native FFI target (Level 3 / Mode 3) | Web Demo (Level 1 / Mode 2) |
 |-----------|-------------------|----------------------------|
 | SMAUG-T public key | 1088 B | 672 B |
 | SMAUG-T secret key | 1312 B | 832 B |

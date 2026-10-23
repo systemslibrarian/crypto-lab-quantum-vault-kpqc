@@ -16,7 +16,7 @@
 //!
 //! # Parameter sizes
 //!
-//! All sizes are for security Level 3 (SMAUGT_MODE3 / HAETAE_MODE3).
+//! All sizes are for security Level 3 (`SMAUG_MODE=3` / `HAETAE_MODE3`).
 //! They are derived directly from the reference-implementation headers:
 //!
 //! | Constant                  | Value | Source                                  |
@@ -32,9 +32,10 @@
 #![allow(non_snake_case, non_upper_case_globals)]
 
 use anyhow::{anyhow, Result};
+use zeroize::Zeroizing;
 
 // ---------------------------------------------------------------------------
-// Parameter sizes — SMAUG-T Level 3 (SMAUGT_MODE3)
+// Parameter sizes — SMAUG-T Level 3 (SMAUG_MODE=3)
 // Derived from vendor/smaug-t/SMAUG-T-1.1.1/reference_implementation/include/params.h
 // K=3, LOG_Q=11, LOG_P=9, LOG_P_PRIME=4, N=256
 //   PK  = PKSEED(32) + K*LOG_Q*N/8 = 32 + 3*352 = 1088
@@ -65,26 +66,32 @@ pub const HAETAE_SIG_BYTES: usize = 2349;
 // ---------------------------------------------------------------------------
 // Raw extern "C" declarations
 //
-// Symbol names are constructed by the reference implementation's namespace
-// macro: SMAUGT_CONFIG_NAMESPACE_PREFIX_MODE = cryptolab_smaugt_mode3_
-// and HAETAE_CONFIG_NAMESPACE_PREFIX_MODE = cryptolab_haetae_mode3_
-// These come from config.h when compiled with the mode3 defines.
+// Symbol names are constructed by the reference implementations' namespace
+// macros: SMAUG_MODE=3 yields cryptolab_smaug3_* and
+// HAETAE_CONFIG_MODE=HAETAE_MODE3 yields cryptolab_haetae_mode3_*.
 // ---------------------------------------------------------------------------
 
 extern "C" {
-    // ── SMAUG-T (cryptolab_smaugt_mode3_ prefix) ─────────────────────────
+    // ── SMAUG-T (cryptolab_smaug3_ prefix) ───────────────────────────────
 
-    /// `pk` >= SMAUG_T_PK_BYTES; `sk` >= SMAUG_T_SK_BYTES. Returns 0 on success.
-    fn cryptolab_smaugt_mode3_keypair(pk: *mut u8, sk: *mut u8) -> std::os::raw::c_int;
+    /// `pk` >= SMAUG_T_PK_BYTES; `sk` >= SMAUG_T_SK_BYTES.
+    fn cryptolab_smaug3_crypto_kem_keypair(pk: *mut u8, sk: *mut u8);
 
     /// `ct` >= SMAUG_T_CT_BYTES; `ss` >= SMAUG_T_SS_BYTES; `pk` = SMAUG_T_PK_BYTES.
     /// Returns 0 on success.
-    fn cryptolab_smaugt_mode3_enc(ct: *mut u8, ss: *mut u8, pk: *const u8) -> std::os::raw::c_int;
+    fn cryptolab_smaug3_crypto_kem_enc(
+        ct: *mut u8,
+        ss: *mut u8,
+        pk: *const u8,
+    ) -> std::os::raw::c_int;
 
     /// `ss` >= SMAUG_T_SS_BYTES; `ct` = SMAUG_T_CT_BYTES; `sk` = SMAUG_T_SK_BYTES.
     /// Returns 0 on success.
-    fn cryptolab_smaugt_mode3_dec(ss: *mut u8, ct: *const u8, sk: *const u8)
-        -> std::os::raw::c_int;
+    fn cryptolab_smaug3_crypto_kem_dec(
+        ss: *mut u8,
+        ct: *const u8,
+        sk: *const u8,
+    ) -> std::os::raw::c_int;
 
     // ── HAETAE (cryptolab_haetae_mode3_ prefix) ───────────────────────────
 
@@ -128,8 +135,8 @@ extern "C" {
 // convert Rust panics triggered by unexpected FFI return values into errors.
 // However, `catch_unwind` CANNOT intercept C-level crashes (segfault, abort,
 // illegal instruction, or memory corruption in the underlying C libraries).
-// For truly hostile inputs, the process may terminate without cleanup. A
-// production deployment should consider:
+// For truly hostile inputs, the process may terminate without cleanup. Any
+// deployment with hostile inputs should consider:
 //   1. Running the C binaries in isolated sub-processes, OR
 //   2. Compiling the C reference implementations to WASM and sandboxing via
 //      a runtime like Wasmtime.
@@ -140,17 +147,12 @@ extern "C" {
 /// Generate a SMAUG-T Level-3 keypair. Returns `(public_key, secret_key)`.
 pub fn smaug_t_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
     let mut pk = vec![0u8; SMAUG_T_PK_BYTES];
-    let mut sk = vec![0u8; SMAUG_T_SK_BYTES];
-    let rc = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
-        cryptolab_smaugt_mode3_keypair(pk.as_mut_ptr(), sk.as_mut_ptr())
+    let mut sk = Zeroizing::new(vec![0u8; SMAUG_T_SK_BYTES]);
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+        cryptolab_smaug3_crypto_kem_keypair(pk.as_mut_ptr(), sk.as_mut_ptr())
     }))
     .map_err(|_| anyhow!("SMAUG-T keygen panicked at FFI boundary"))?;
-    if rc != 0 {
-        return Err(anyhow!(
-            "cryptolab_smaugt_mode3_keypair failed with code {rc}"
-        ));
-    }
-    Ok((pk, sk))
+    Ok((pk, sk.to_vec()))
 }
 
 /// Encapsulate using a SMAUG-T Level-3 public key.
@@ -163,15 +165,17 @@ pub fn smaug_t_enc(pk: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
         ));
     }
     let mut ct = vec![0u8; SMAUG_T_CT_BYTES];
-    let mut ss = vec![0u8; SMAUG_T_SS_BYTES];
+    let mut ss = Zeroizing::new(vec![0u8; SMAUG_T_SS_BYTES]);
     let rc = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
-        cryptolab_smaugt_mode3_enc(ct.as_mut_ptr(), ss.as_mut_ptr(), pk.as_ptr())
+        cryptolab_smaug3_crypto_kem_enc(ct.as_mut_ptr(), ss.as_mut_ptr(), pk.as_ptr())
     }))
     .map_err(|_| anyhow!("SMAUG-T encapsulate panicked at FFI boundary"))?;
     if rc != 0 {
-        return Err(anyhow!("cryptolab_smaugt_mode3_enc failed with code {rc}"));
+        return Err(anyhow!(
+            "cryptolab_smaug3_crypto_kem_enc failed with code {rc}"
+        ));
     }
-    Ok((ct, ss))
+    Ok((ct, ss.to_vec()))
 }
 
 /// Decapsulate using a SMAUG-T Level-3 secret key + ciphertext.
@@ -189,15 +193,17 @@ pub fn smaug_t_dec(sk: &[u8], ct: &[u8]) -> Result<Vec<u8>> {
             ct.len()
         ));
     }
-    let mut ss = vec![0u8; SMAUG_T_SS_BYTES];
+    let mut ss = Zeroizing::new(vec![0u8; SMAUG_T_SS_BYTES]);
     let rc = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
-        cryptolab_smaugt_mode3_dec(ss.as_mut_ptr(), ct.as_ptr(), sk.as_ptr())
+        cryptolab_smaug3_crypto_kem_dec(ss.as_mut_ptr(), ct.as_ptr(), sk.as_ptr())
     }))
     .map_err(|_| anyhow!("SMAUG-T decapsulate panicked at FFI boundary"))?;
     if rc != 0 {
-        return Err(anyhow!("cryptolab_smaugt_mode3_dec failed with code {rc}"));
+        return Err(anyhow!(
+            "cryptolab_smaug3_crypto_kem_dec failed with code {rc}"
+        ));
     }
-    Ok(ss)
+    Ok(ss.to_vec())
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +213,7 @@ pub fn smaug_t_dec(sk: &[u8], ct: &[u8]) -> Result<Vec<u8>> {
 /// Generate a HAETAE Level-3 keypair. Returns `(public_key, secret_key)`.
 pub fn haetae_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
     let mut pk = vec![0u8; HAETAE_PK_BYTES];
-    let mut sk = vec![0u8; HAETAE_SK_BYTES];
+    let mut sk = Zeroizing::new(vec![0u8; HAETAE_SK_BYTES]);
     let rc = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
         cryptolab_haetae_mode3_keypair(pk.as_mut_ptr(), sk.as_mut_ptr())
     }))
@@ -217,7 +223,7 @@ pub fn haetae_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
             "cryptolab_haetae_mode3_keypair failed with code {rc}"
         ));
     }
-    Ok((pk, sk))
+    Ok((pk, sk.to_vec()))
 }
 
 /// Sign `message` with a HAETAE Level-3 secret key.
@@ -267,6 +273,12 @@ pub fn haetae_verify(pk: &[u8], message: &[u8], signature: &[u8]) -> Result<bool
         return Err(anyhow!(
             "HAETAE public key must be {HAETAE_PK_BYTES} bytes, got {}",
             pk.len()
+        ));
+    }
+    if signature.is_empty() || signature.len() > HAETAE_SIG_BYTES {
+        return Err(anyhow!(
+            "HAETAE signature length must be in 1..={HAETAE_SIG_BYTES}, got {}",
+            signature.len()
         ));
     }
     let rc = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {

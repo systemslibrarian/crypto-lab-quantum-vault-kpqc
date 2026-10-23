@@ -22,7 +22,7 @@ use rand::{rngs::OsRng, RngCore};
 use sha2::Sha256;
 use std::time::{SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Generate a fresh random 96-bit (12-byte) AES-GCM nonce.
 ///
@@ -99,10 +99,11 @@ pub fn encrypt_file(
     }
 
     // 1. Random 256-bit file key.
-    let mut file_key = vec![0u8; 32];
-    OsRng.fill_bytes(&mut file_key);
+    let mut file_key = Zeroizing::new(vec![0u8; 32]);
+    OsRng.fill_bytes(file_key.as_mut_slice());
 
-    // 2. Replay-resistant metadata and deterministic outer AEAD nonce.
+    // 2. Authenticated timestamp metadata and deterministic outer AEAD nonce.
+    // Replay-window enforcement belongs to the calling application.
     let container_id = derive_container_id();
     let nonce_bytes = derive_container_nonce(&container_id)?;
     let created_at = SystemTime::now()
@@ -146,8 +147,9 @@ pub fn encrypt_file(
         let (kem_ct, mut ss) = kem
             .encapsulate(pubkey)
             .map_err(|_| QvError::EncryptionFailed)?;
-        let protected = aead_protect(&share.data, &ss)?;
+        let protected_result = aead_protect(&share.data, &ss);
         ss.zeroize();
+        let protected = protected_result?;
         if protected.len() > MAX_ENCRYPTED_SHARE_BYTES {
             return Err(QvError::EncryptionFailed);
         }
@@ -261,18 +263,16 @@ pub(crate) fn container_signing_bytes(c: &QuantumVaultContainer) -> QvResult<Vec
 /// The derived nonce is prepended so callers store only a single opaque blob.
 ///
 /// SECURITY INVARIANT: Derived key material is zeroized immediately after use
-/// to minimize the window during which secrets exist on the stack.
+/// to minimize the window during which secrets exist in process memory.
 pub(crate) fn aead_protect(data: &[u8], ikm: &[u8]) -> QvResult<Vec<u8>> {
-    let mut key = derive_share_key(ikm)?;
+    let key = Zeroizing::new(derive_share_key(ikm)?);
     let nonce_bytes = derive_share_nonce(ikm)?;
-    let aes_key = Key::<Aes256Gcm>::from_slice(&key);
+    let aes_key = Key::<Aes256Gcm>::from_slice(&key[..]);
     let cipher = Aes256Gcm::new(aes_key);
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ct = cipher
         .encrypt(nonce, data)
-        .map_err(|_| QvError::EncryptionFailed);
-    key.zeroize(); // Zeroize derived key immediately after cipher initialization
-    let ct = ct?;
+        .map_err(|_| QvError::EncryptionFailed)?;
     let mut result = Vec::with_capacity(12 + ct.len());
     result.extend_from_slice(&nonce_bytes);
     result.extend_from_slice(&ct);
@@ -284,7 +284,7 @@ pub(crate) fn aead_protect(data: &[u8], ikm: &[u8]) -> QvResult<Vec<u8>> {
 /// pinpointing corruption to this specific share without consulting the outer AES-GCM tag.
 ///
 /// SECURITY INVARIANT: Derived key material is zeroized immediately after use
-/// to minimize the window during which secrets exist on the stack.
+/// to minimize the window during which secrets exist in process memory.
 pub(crate) fn aead_unprotect(data: &[u8], ikm: &[u8]) -> QvResult<Vec<u8>> {
     if data.len() < 12 {
         return Err(QvError::DecryptionFailed);
@@ -294,19 +294,19 @@ pub(crate) fn aead_unprotect(data: &[u8], ikm: &[u8]) -> QvResult<Vec<u8>> {
         return Err(QvError::DecryptionFailed);
     }
     let nonce = Nonce::from_slice(&derived_nonce);
-    let mut key = derive_share_key(ikm)?;
-    let aes_key = Key::<Aes256Gcm>::from_slice(&key);
+    let key = Zeroizing::new(derive_share_key(ikm)?);
+    let aes_key = Key::<Aes256Gcm>::from_slice(&key[..]);
     let cipher = Aes256Gcm::new(aes_key);
-    let result = cipher.decrypt(nonce, &data[12..]);
-    key.zeroize(); // Zeroize derived key immediately after cipher initialization
-    result.map_err(|_| QvError::DecryptionFailed)
+    cipher
+        .decrypt(nonce, &data[12..])
+        .map_err(|_| QvError::DecryptionFailed)
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dev-backend"))]
 mod tests {
     use super::*;
     use crate::{

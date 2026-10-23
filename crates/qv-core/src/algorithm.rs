@@ -34,15 +34,15 @@ use std::fmt;
 ///
 /// | ID | Description | Security Level |
 /// |----|-------------|----------------|
-/// | `SMAUG-T-3` | SMAUG-T Level 3 — KpqC Round 2, selected 2025 | AES-192 equivalent |
+/// | `SMAUG-T-3` | SMAUG-T Level 3 — final KpqC competition algorithm | Category 3 target |
 /// | `dev-kem` | Development-only stub KEM | **NONE - TESTING ONLY** |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum KemAlgorithm {
     /// SMAUG-T Level 3 — lattice-based KEM from KpqC Round 2 (selected 2025).
     ///
-    /// This is the production KEM. It provides IND-CCA2 security against
-    /// quantum adversaries at approximately AES-192 equivalent security.
+    /// This is the non-development KEM identifier. The algorithm targets
+    /// category 3; an identifier alone is not a production-safety attestation.
     SmaugT3,
 
     /// Development-only stub KEM for testing.
@@ -100,16 +100,15 @@ impl KemAlgorithm {
         }
     }
 
-    /// Returns whether this algorithm is safe for production use.
+    /// Returns whether this registry entry alone establishes production safety.
     ///
-    /// Development algorithms return `false`.
+    /// Always `false`: an algorithm ID cannot attest to implementation
+    /// hardening, source provenance, key management, operational controls, or
+    /// publication as a standard. Callers must perform their own reviewed
+    /// deployment assessment instead of treating registry membership as one.
     #[must_use]
     pub const fn is_production_safe(&self) -> bool {
-        match self {
-            Self::SmaugT3 => true,
-            #[cfg(feature = "dev-backend")]
-            Self::DevKem => false,
-        }
+        false
     }
 
     /// Returns all supported KEM algorithm IDs.
@@ -148,15 +147,15 @@ impl fmt::Display for KemAlgorithm {
 ///
 /// | ID | Description | Security Level |
 /// |----|-------------|----------------|
-/// | `HAETAE-3` | HAETAE Level 3 — KpqC Round 2, selected 2025 | AES-192 equivalent |
+/// | `HAETAE-3` | HAETAE Level 3 — final KpqC competition algorithm | Category 3 target |
 /// | `dev-sig` | Development-only stub signature | **NONE - TESTING ONLY** |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum SignatureAlgorithm {
     /// HAETAE Level 3 — lattice-based signature from KpqC Round 2 (selected 2025).
     ///
-    /// This is the production signature scheme. It provides EUF-CMA security
-    /// against quantum adversaries at approximately AES-192 equivalent security.
+    /// This is the non-development signature identifier. The algorithm targets
+    /// category 3; an identifier alone is not a production-safety attestation.
     Haetae3,
 
     /// Development-only stub signature for testing.
@@ -214,16 +213,14 @@ impl SignatureAlgorithm {
         }
     }
 
-    /// Returns whether this algorithm is safe for production use.
+    /// Returns whether this registry entry alone establishes production safety.
     ///
-    /// Development algorithms return `false`.
+    /// Always `false`: an algorithm ID cannot attest to implementation
+    /// hardening, source provenance, authenticated key distribution,
+    /// operational controls, or publication as a standard.
     #[must_use]
     pub const fn is_production_safe(&self) -> bool {
-        match self {
-            Self::Haetae3 => true,
-            #[cfg(feature = "dev-backend")]
-            Self::DevSig => false,
-        }
+        false
     }
 
     /// Returns all supported signature algorithm IDs.
@@ -367,7 +364,7 @@ mod tests {
         let alg = KemAlgorithm::SmaugT3;
         assert_eq!(alg.as_str(), "SMAUG-T-3");
         assert_eq!(KemAlgorithm::from_id("SMAUG-T-3"), Some(alg));
-        assert!(alg.is_production_safe());
+        assert!(!alg.is_production_safe());
     }
 
     #[cfg(feature = "dev-backend")]
@@ -401,7 +398,7 @@ mod tests {
         let alg = SignatureAlgorithm::Haetae3;
         assert_eq!(alg.as_str(), "HAETAE-3");
         assert_eq!(SignatureAlgorithm::from_id("HAETAE-3"), Some(alg));
-        assert!(alg.is_production_safe());
+        assert!(!alg.is_production_safe());
     }
 
     #[cfg(feature = "dev-backend")]

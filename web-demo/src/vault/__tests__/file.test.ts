@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
   serializeToQvault,
   deserializeFromQvault,
+  importQvault,
   QvaultImportError,
 } from '../../vault/file';
 import type { SealedBox } from '../../crypto/pipeline';
@@ -17,7 +18,7 @@ function createMockSealedBox(): SealedBox {
       {
         salt: new Uint8Array(16).fill(1), // 16 bytes
         kemCiphertext: new Uint8Array(672).fill(1), // 672 bytes
-        wrappedShare: new Uint8Array(32).fill(1),
+        wrappedShare: new Uint8Array(48).fill(1),
         shareNonce: new Uint8Array(12).fill(1), // 12 bytes
         publicKey: new Uint8Array(672).fill(1), // 672 bytes
         wrappedSecretKey: new Uint8Array(848).fill(1), // SK size + tag
@@ -27,7 +28,7 @@ function createMockSealedBox(): SealedBox {
       {
         salt: new Uint8Array(16).fill(2),
         kemCiphertext: new Uint8Array(672).fill(2),
-        wrappedShare: new Uint8Array(32).fill(2),
+        wrappedShare: new Uint8Array(48).fill(2),
         shareNonce: new Uint8Array(12).fill(2),
         publicKey: new Uint8Array(672).fill(2),
         wrappedSecretKey: new Uint8Array(848).fill(2),
@@ -37,7 +38,7 @@ function createMockSealedBox(): SealedBox {
       {
         salt: new Uint8Array(16).fill(3),
         kemCiphertext: new Uint8Array(672).fill(3),
-        wrappedShare: new Uint8Array(32).fill(3),
+        wrappedShare: new Uint8Array(48).fill(3),
         shareNonce: new Uint8Array(12).fill(3),
         publicKey: new Uint8Array(672).fill(3),
         wrappedSecretKey: new Uint8Array(848).fill(3),
@@ -154,12 +155,69 @@ describe('deserializeFromQvault', () => {
     expect(() => deserializeFromQvault(JSON.stringify(parsed))).toThrow('Invalid participant count');
   });
 
+  it('rejects missing, renamed, or reordered participant labels', () => {
+    const missing = JSON.parse(serializeToQvault(createMockSealedBox()));
+    delete missing.participants[0].label;
+    expect(() => deserializeFromQvault(JSON.stringify(missing))).toThrow(
+      'missing label',
+    );
+
+    const renamed = JSON.parse(serializeToQvault(createMockSealedBox()));
+    renamed.participants[1].label = 'Mallory';
+    expect(() => deserializeFromQvault(JSON.stringify(renamed))).toThrow(
+      'expected Bob',
+    );
+
+    const reordered = JSON.parse(serializeToQvault(createMockSealedBox()));
+    [reordered.participants[0], reordered.participants[1]] =
+      [reordered.participants[1], reordered.participants[0]];
+    expect(() => deserializeFromQvault(JSON.stringify(reordered))).toThrow(
+      'expected Alice',
+    );
+  });
+
   it('rejects unsupported algorithm', () => {
     const box = createMockSealedBox();
     const json = serializeToQvault(box);
     const parsed = JSON.parse(json);
     parsed.algorithm.kem = 'kyber-1024';
     expect(() => deserializeFromQvault(JSON.stringify(parsed))).toThrow('Unsupported algorithm');
+  });
+
+  it('rejects missing or incomplete algorithm metadata', () => {
+    const missing = JSON.parse(serializeToQvault(createMockSealedBox()));
+    delete missing.algorithm;
+    expect(() => deserializeFromQvault(JSON.stringify(missing))).toThrow(
+      'missing algorithm',
+    );
+
+    const incomplete = JSON.parse(serializeToQvault(createMockSealedBox()));
+    delete incomplete.algorithm.kdf;
+    expect(() => deserializeFromQvault(JSON.stringify(incomplete))).toThrow(
+      'Unsupported algorithm',
+    );
+
+    const extra = JSON.parse(serializeToQvault(createMockSealedBox()));
+    extra.algorithm.unreviewed = 'attacker-controlled';
+    expect(() => deserializeFromQvault(JSON.stringify(extra))).toThrow(
+      'Unsupported algorithm metadata fields',
+    );
+  });
+
+  it('rejects a non-timestamp createdAt value', () => {
+    const parsed = JSON.parse(serializeToQvault(createMockSealedBox()));
+    parsed.createdAt = { attackerControlled: true };
+    expect(() => deserializeFromQvault(JSON.stringify(parsed))).toThrow(
+      'expected a canonical ISO timestamp',
+    );
+  });
+
+  it('rejects a non-canonical creation timestamp', () => {
+    const parsed = JSON.parse(serializeToQvault(createMockSealedBox()));
+    parsed.createdAt = 'March 15, 2026';
+    expect(() => deserializeFromQvault(JSON.stringify(parsed))).toThrow(
+      'expected a canonical ISO timestamp',
+    );
   });
 
   it('rejects corrupted base64 data', () => {
@@ -189,6 +247,46 @@ describe('deserializeFromQvault', () => {
     });
     const restored = deserializeFromQvault(JSON.stringify(parsed));
     expect(restored.wrappedShares[0].iterations).toBe(100_000);
+  });
+
+  it('rejects unsafe or denial-of-service PBKDF2 iteration counts', () => {
+    const parsed = JSON.parse(serializeToQvault(createMockSealedBox()));
+    for (const iterations of [0, 99_999, 1_000_001, 600_000.5, '600000']) {
+      parsed.participants[0].iterations = iterations;
+      expect(() => deserializeFromQvault(JSON.stringify(parsed))).toThrow(
+        'PBKDF2 iterations must be an integer',
+      );
+    }
+  });
+
+  it('rejects oversized wrapped secrets and wrong-sized wrapped shares', () => {
+    const parsed = JSON.parse(serializeToQvault(createMockSealedBox()));
+    parsed.participants[0].wrappedSecretKey = btoa('x'.repeat(849));
+    expect(() => deserializeFromQvault(JSON.stringify(parsed))).toThrow(
+      'wrappedSecretKey',
+    );
+
+    const second = JSON.parse(serializeToQvault(createMockSealedBox()));
+    second.participants[0].wrappedShare = btoa('x'.repeat(47));
+    expect(() => deserializeFromQvault(JSON.stringify(second))).toThrow(
+      'wrappedShare',
+    );
+  });
+});
+
+describe('file import bounds', () => {
+  it('rejects an oversized file before reading its text', async () => {
+    let read = false;
+    const oversized = {
+      size: 90 * 1024 * 1024 + 1,
+      text: async () => {
+        read = true;
+        return '{}';
+      },
+    } as File;
+
+    await expect(importQvault(oversized)).rejects.toThrow('Import file exceeds');
+    expect(read).toBe(false);
   });
 });
 

@@ -12,7 +12,10 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
-qv_core = { package = "qv-core", path = "..", features = ["dev-backend", "wasm"] }
+# Fuzzing deliberately exercises the insecure development primitives in an
+# optimized build, so acknowledge that exception explicitly. Production builds
+# must not enable this feature.
+qv_core = { package = "qv-core", path = "..", features = ["wasm", "allow_dev_backend_in_release"] }
 serde_json = "1.0"
 
 # Prevent LTO stripping of fuzz entry points.
