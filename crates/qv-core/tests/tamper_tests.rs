@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#![cfg(feature = "dev-backend")]
 //! Tamper-resistance tests.
 //!
 //! Prove that **any** single-field mutation of a valid encrypted container causes
@@ -18,7 +19,7 @@ use qv_core::{
         kem::Kem,
         signature::Signature,
     },
-    decrypt_file, encrypt_file, DecryptOptions, EncryptOptions,
+    decrypt_file, encrypt_file, DecryptOptions, EncryptOptions, QvError,
 };
 
 // ---------------------------------------------------------------------------
@@ -160,6 +161,30 @@ fn tamper_sig_algorithm_id_should_fail() {
     assert!(
         decrypt_file(&container, &dec_opts, &kem, &sig).is_err(),
         "mutated sig_algorithm should cause decryption failure"
+    );
+}
+
+#[test]
+fn container_kem_id_must_match_selected_backend() {
+    let (mut container, dec_opts) = make_valid_container();
+    container.kem_algorithm = "SMAUG-T-3".to_string();
+
+    let result = decrypt_file(&container, &dec_opts, &DevKem, &DevSignature);
+    assert_eq!(
+        result,
+        Err(QvError::UnsupportedAlgorithm("KEM backend mismatch"))
+    );
+}
+
+#[test]
+fn container_signature_id_must_match_selected_backend() {
+    let (mut container, dec_opts) = make_valid_container();
+    container.sig_algorithm = "HAETAE-3".to_string();
+
+    let result = decrypt_file(&container, &dec_opts, &DevKem, &DevSignature);
+    assert_eq!(
+        result,
+        Err(QvError::UnsupportedAlgorithm("signature backend mismatch"))
     );
 }
 

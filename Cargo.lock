@@ -851,6 +851,7 @@ dependencies = [
  "qv-core",
  "serde_json",
  "tempfile",
+ "zeroize",
 ]
 
 [[package]]

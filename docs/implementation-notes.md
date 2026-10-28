@@ -1,7 +1,7 @@
 # Quantum Vault — Implementation Notes
 
-**Version:** 1.0  
-**Date:** 2026-03  
+**Version:** 1.1
+**Date:** 2026-10-23
 **Applies to:** Web demo v5.1 (real KpqC WASM)
 
 ---
@@ -33,10 +33,11 @@ emsdk 5.0.3 (emcc and em++ must be on PATH)
 source ~/emsdk/emsdk_env.sh
 ```
 
-The vendor C sources live under `wasm/vendor/`; they are not modified.  All
-browser-incompatible platform code (`randombytes.c`) is replaced by a single
-shim (`wasm/src/randombytes_wasm.c`) that is substituted at compile time by
-listing it after the vendor sources.
+The vendor C sources are external inputs and are not committed under
+`wasm/vendor/` in this checkout. The exact active-artifact source archives and
+historical wrappers are pinned in `wasm/reproduction.json`. The examples below
+show the separate development recipe, where browser-incompatible platform code
+is replaced by `wasm/src/randombytes_wasm.c`.
 
 ### 1.2 SMAUG-T Level 1
 
@@ -61,11 +62,11 @@ emcc \
   -o wasm/dist/smaug.js
 ```
 
-**Constant-time hardening flags:**
-- `-O1`: Mild optimization; avoids aggressive transforms that break constant-time properties
-- `-fno-tree-vectorize -fno-slp-vectorize`: Disable auto-vectorization which can introduce data-dependent SIMD lane masking
+**Timing-hardening flags in this development recipe:**
+- `-O1`: Reduces some aggressive transformations; it does not establish constant-time execution
+- `-fno-tree-vectorize -fno-slp-vectorize`: Disable two forms of auto-vectorization as defense in depth
 - `-DNDEBUG`: Disable assert() calls in reference implementations
-- `-s INITIAL_MEMORY=4194304`: Pre-allocate 4 MiB heap to eliminate `_malloc` timing jitter
+- `-s INITIAL_MEMORY=4194304`: Pre-allocate a 4 MiB heap; this does not eliminate allocator or host timing jitter
 
 `-DSMAUG_MODE=1` selects the Level 1 (128-bit PQC) parameter set.  The
 reference implementation's preprocessor guards gate the key-size constants on
@@ -209,36 +210,44 @@ smaugMod._free(sk);
 `_malloc` / `_free` are Emscripten's wrappers around the WASM heap allocator.
 The TypeScript wrappers free their temporary allocations after copying output
 into JavaScript arrays. SMAUG explicitly calls its secure-zeroize export for
-secret buffers. The active HAETAE wrapper calls `_free` without explicit
-zeroization, and its shipped WASM has no `haetae_secure_zeroize` export.
-Freeing memory alone does not establish erasure; JavaScript array copies also
-have a separate lifetime. The historical claim that both paths zeroize their
-secret buffers does not describe the deployed HAETAE implementation.
+secret buffers. The active shipped HAETAE WASM has no
+`haetae_secure_zeroize` export, so the TypeScript wrapper overwrites secret
+allocations through `HEAPU8.fill()` before freeing them. That fallback is
+better than freeing alone but is best-effort: unlike a volatile C routine, the
+repository cannot prove a JavaScript engine will preserve the write as an
+erasure boundary. JavaScript array copies have a separate lifetime and are
+also cleared by their callers after use.
 
-`INITIAL_MEMORY=4194304` (4 MiB) pre-allocates the WASM heap to avoid timing
-jitter from dynamic memory growth.  `ALLOW_MEMORY_GROWTH=1` remains enabled as
-a fallback but should never trigger in practice.
+The current development recipe's `INITIAL_MEMORY=4194304` pre-allocates a 4 MiB
+heap and still enables memory growth. The active artifacts use the distinct
+initial-memory values recorded in `wasm/reproduction.json` (16 MiB for SMAUG-T
+and 32 MiB for HAETAE); pre-allocation reduces one source of allocator noise but
+does not establish constant-time behavior.
 
 ---
 
 ## 5. Module Loading
 
-Both WASM modules are loaded lazily on first use via async initialiser functions:
+Application startup calls `initCrypto()`, which initializes both WASM modules in
+parallel before the vault is loaded or rendered. Each wrapper retains its module
+instance for subsequent synchronous crypto calls:
 
 ```typescript
-// web-demo/src/crypto/smaug.ts
-let _mod: SmaugModule | null = null;
+// web-demo/src/crypto/smaug.ts (abridged)
+let smaugModule: SmaugModule | null = null;
 
-async function getSmaugModule(): Promise<SmaugModule> {
-  if (!_mod) _mod = await createSmaugModule();
-  return _mod;
+export async function initSmaug(): Promise<void> {
+  const createModule = (await import('./wasm/smaug.js')).default;
+  // Fetch `${import.meta.env.BASE_URL}/smaug.wasm`, then instantiate it.
+  smaugModule = await createModule({ wasmBinary });
 }
 ```
 
-`createSmaugModule()` is the Emscripten factory function (`EXPORT_NAME`).  It
-fetches the `.wasm` binary from `<origin>/smaug.wasm`, compiles it, and
-resolves the returned Promise.  On subsequent calls the cached `_mod` is returned
-without re-fetching.
+The SMAUG wrapper explicitly fetches `${BASE_URL}/smaug.wasm` with `no-store`
+and supplies those bytes to the Emscripten factory. The HAETAE factory resolves
+`${BASE_URL}/haetae.wasm` through `locateFile()` and the browser's ordinary fetch
+path. Neither artifact is fetched on each vault operation; the initialized
+module objects remain cached in their wrappers.
 
 `MODULARIZE=1` wraps the entire Emscripten runtime in a factory function rather
 than polluting the global scope — necessary in a bundled ES-module environment.
@@ -254,7 +263,9 @@ than polluting the global scope — necessary in a bundled ES-module environment
 ### 6.1 Level 1 / Mode 2 for the Web Demo
 
 The web demo uses Level 1 (SMAUG-T) and Mode 2 (HAETAE) — the lowest parameter
-set of each algorithm.  The Rust CLI uses Level 3 / Mode 3.
+set of each algorithm. The Rust crates define a separate Level 3 / Mode 3 FFI
+path, but it runs only when authenticated external C sources are supplied;
+the checked-in `kpqc-wasm` feature is an error-only scaffold.
 
 | Artifact | Level 1 / Mode 2 | Level 3 / Mode 3 |
 |----------|-----------------|-----------------|
@@ -271,15 +282,16 @@ Mode 2 reduces per-box storage by roughly 3 × (400 B PK + 480 B SK + 320 B CT)
 ≈ 3.6 KB per box.  In a `localStorage`-backed app this is not critical, but
 keeping the WASM binary smaller also reduces initial load time.
 
-The two builds do **not** target the same strength, and the difference is the
-point of the trade-off above.  SMAUG-T Level 1 targets NIST PQC category 1
+The parameter sets do **not** target the same strength. SMAUG-T Level 1 targets NIST PQC category 1
 (comparable to an exhaustive key search on AES-128) and SMAUG-T Level 3 targets
 category 3 (comparable to AES-192).  HAETAE Mode 2 targets category 2 and Mode 3
 targets category 3.  A composite is only as strong as its weakest component, so
-the web demo's post-quantum margin is category 1 (≈ AES-128, set by SMAUG-T
-Level 1) while the Rust CLI's is category 3 (≈ AES-192).  AES-256-GCM is used
-unchanged in both builds; Grover's algorithm reduces it to roughly a 2¹²⁸
-search either way.
+the web demo's stated post-quantum target is category 1 (set by SMAUG-T Level
+1). A separately supplied and successfully built native Level 3 / Mode 3 path
+would target category 3. CI compiles authenticated, pinned public source
+captures and checks the native primitive round trips and tamper rejection; it
+does not perform a full upstream implementation audit or an end-to-end native
+CLI exercise. AES-256-GCM is configured in both designs.
 
 ### 6.2 GF(2⁸) Polynomial 0x11d
 
@@ -315,18 +327,27 @@ stored containers offline; see the offline-brute-force row in
 to still be there on your next visit); a production deployment would persist to
 an encrypted backend instead.
 
-**No HSM or secure enclave:** All key material exists in the JavaScript heap
-during crypto operations.  A compromised browser extension or malicious script
-on the same origin could read it.  The demo assumes a trusted browser context.
+**No HSM or secure enclave:** Key material exists within the browser process
+across JavaScript typed arrays, WASM linear memory and the browser's Web Crypto
+implementation during operations. A compromised browser extension or malicious
+same-origin script may be able to reach relevant inputs or outputs. The demo
+assumes a trusted browser context, and best-effort overwrites are not a browser-
+process erasure guarantee.
 
-**PBKDF2 iteration count:** 600 000 iterations of SHA-256 is used for new deposits,
-following current OWASP Password Storage guidance (2023) for PBKDF2-HMAC-SHA256;
-NIST SP 800-132 (2010) only sets a floor of 1 000 iterations.  Legacy v2 containers
-with 100 000 iterations are still supported for backward compatibility.  The
-iteration count is stored per-share, allowing gradual migration.
+**PBKDF2 iteration count:** 600 000 iterations of SHA-256 is used for new
+deposits. This matches the
+[OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+recommendation for PBKDF2-HMAC-SHA256 as checked on 2026-10-23.
+[NIST SP 800-132](https://csrc.nist.gov/pubs/sp/800/132/final) (2010)
+recommends at least 1 000 iterations and selecting as many as user-acceptable
+performance permits. Legacy v2 containers with 100 000 iterations are still
+supported for backward compatibility. The iteration count is stored per-share,
+allowing gradual migration.
 
-**WASM binary size:** `smaug.wasm` (~180 KB) and `haetae.wasm` (~220 KB) are
-fetched on first use.  They are cached by the browser after the first load.
+**WASM binary size:** The committed `smaug.wasm` is 22,345 bytes and
+`haetae.wasm` is 42,683 bytes. They are fetched during application startup;
+SMAUG uses an explicit `no-store` request while HAETAE follows the browser's
+ordinary hosting/cache policy.
 
 **No streaming decrypt:** The entire ciphertext is held in memory.  The current
 design is appropriate for short secrets (message strings); it is not suitable

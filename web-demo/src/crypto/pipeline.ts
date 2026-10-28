@@ -50,7 +50,7 @@ export interface SealOutcome {
 // open, used only to drive the on-screen Shamir key-strip animation. These are
 // genuine outputs (the actual reconstructed key, the actual per-slot unwrap
 // outcome), never fabricated: on a below-threshold open the `reconstructedKey`
-// is the mathematically-wrong Lagrange result, exactly as the reveal shows.
+// is the underdetermined Lagrange candidate, exactly as the reveal shows.
 export interface OpenVisual {
   /** Which of the 3 password slots yielded a valid Shamir share (real unwrap outcome). */
   shareStatus: [boolean, boolean, boolean];
@@ -71,6 +71,15 @@ export interface OpenVisual {
 export type OpenResult =
   | { success: true; message: string; validShareCount: number; visual: OpenVisual }
   | { success: false; gibberish: Uint8Array; validShareCount: number; visual: OpenVisual };
+
+// Failure text is a short visual effect, not plaintext or cryptographic evidence.
+// Keep it below getRandomValues()'s 65,536-byte per-call browser limit even when
+// an imported container carries a large ciphertext.
+function randomFailureDisplay(ciphertextLength: number): Uint8Array {
+  const plaintextLength = Math.max(0, ciphertextLength - 16);
+  const displayLength = Math.max(8, Math.min(256, plaintextLength));
+  return crypto.getRandomValues(new Uint8Array(displayLength));
+}
 
 // -- Container data corpus for signing --
 //
@@ -121,44 +130,78 @@ async function sealMessageCore(
   // Step 1 — AES-256-GCM: encrypt the plaintext message
   const key = await generateAesKey();
   const rawKey = await exportRawKey(key);
-  const plaintext = encode(message);
-  const { ciphertext, nonce } = await aesEncrypt(plaintext, key);
+  let keySnapshot: Uint8Array | null = null;
+  let shareSnapshots: [Uint8Array, Uint8Array, Uint8Array] | null = null;
+  let shares: Share[] = [];
+  let visualDelivered = false;
+  try {
+    const plaintext = encode(message);
+    let ciphertext: Uint8Array;
+    let nonce: Uint8Array;
+    try {
+      ({ ciphertext, nonce } = await aesEncrypt(plaintext, key));
+    } finally {
+      plaintext.fill(0);
+    }
 
-  // Snapshot the real key for the split animation before it is zeroized below.
-  const keySnapshot = rawKey.slice();
+    // Snapshot the real key for the split animation before it is zeroized below.
+    keySnapshot = rawKey.slice();
 
-  // Step 2 — Shamir split: split the 32-byte AES key into 3 shares, threshold 2
-  const shares: Share[] = splitSecret(rawKey, 2, 3);
-  rawKey.fill(0);
+    // Step 2 — Shamir split: split the 32-byte AES key into 3 shares, threshold 2
+    shares = splitSecret(rawKey, 2, 3);
+    // Snapshot the 3 real shares for the split animation before zeroization.
+    shareSnapshots = [
+      shares[0].data.slice(),
+      shares[1].data.slice(),
+      shares[2].data.slice(),
+    ];
 
-  // Snapshot the 3 real shares for the split animation before zeroization.
-  const shareSnapshots: [Uint8Array, Uint8Array, Uint8Array] = [
-    shares[0].data.slice(),
-    shares[1].data.slice(),
-    shares[2].data.slice(),
-  ];
+    // Step 3 — SMAUG-T wrap: for each participant —
+    //   fresh SMAUG-T keypair → encapsulate → AES-GCM wrap share;
+    //   PBKDF2(password) → AES-GCM encrypt SMAUG-T secret key
+    // Wait for every concurrent operation to settle so no rejected branch can
+    // return while a sibling is still reading a share that cleanup has wiped.
+    const wrapResults = await Promise.allSettled(
+      shares.map(async (share, i) => {
+        try {
+          return await wrapShare(share.data, passwords[i]);
+        } finally {
+          share.data.fill(0);
+        }
+      }),
+    );
+    const wrappedShares: WrappedShare[] = [];
+    for (const result of wrapResults) {
+      if (result.status === 'rejected') throw result.reason;
+      wrappedShares.push(result.value);
+    }
 
-  // Step 3 — SMAUG-T wrap: for each participant —
-  //   fresh SMAUG-T keypair → encapsulate → AES-GCM wrap share;
-  //   PBKDF2(password) → AES-GCM encrypt SMAUG-T secret key
-  const wrappedShares = await Promise.all(
-    shares.map((share, i) => wrapShare(share.data, passwords[i])),
-  );
-  // Zeroize Shamir share data — sensitive key material, no longer needed.
-  for (const share of shares) share.data.fill(0);
+    // Step 4 — HAETAE sign: sign the full container including sigPublicKey + createdAt
+    // Generate keypair first so sigPublicKey can be included in the signed corpus.
+    const createdAt = new Date().toISOString();
+    const { publicKey: sigPublicKey, secretKey: sigSecretKey } = haetaeKeypair();
+    let signature: Uint8Array;
+    try {
+      const containerData = buildContainerData(ciphertext, nonce, wrappedShares, sigPublicKey, createdAt);
+      signature = haetaeSign(containerData, sigSecretKey);
+    } finally {
+      sigSecretKey.fill(0);
+    }
 
-  // Step 4 — HAETAE sign: sign the full container including sigPublicKey + createdAt
-  // Generate keypair first so sigPublicKey can be included in the signed corpus.
-  const createdAt = new Date().toISOString();
-  const { publicKey: sigPublicKey, secretKey: sigSecretKey } = haetaeKeypair();
-  const containerData = buildContainerData(ciphertext, nonce, wrappedShares, sigPublicKey, createdAt);
-  const signature = haetaeSign(containerData, sigSecretKey);
-  sigSecretKey.fill(0);
-
-  return {
-    box: { ciphertext, nonce, wrappedShares, signature, sigPublicKey, createdAt },
-    visual: { key: keySnapshot, shares: shareSnapshots },
-  };
+    visualDelivered = true;
+    return {
+      box: { ciphertext, nonce, wrappedShares, signature, sigPublicKey, createdAt },
+      visual: { key: keySnapshot, shares: shareSnapshots },
+    };
+  } finally {
+    rawKey.fill(0);
+    for (const share of shares) share.data.fill(0);
+    // On failure there is no caller to own and clear the visualization copies.
+    if (!visualDelivered) {
+      keySnapshot?.fill(0);
+      for (const snapshot of shareSnapshots ?? []) snapshot.fill(0);
+    }
+  }
 }
 
 // -- Seal: encrypt message, split key, wrap shares, sign container --
@@ -191,7 +234,7 @@ export async function openBox(
   const containerData = buildContainerData(box.ciphertext, box.nonce, box.wrappedShares, box.sigPublicKey, box.createdAt);
   const valid = haetaeVerify(box.signature, containerData, box.sigPublicKey);
   if (!valid) {
-    const garbage = crypto.getRandomValues(new Uint8Array(Math.max(8, box.ciphertext.length - 16)));
+    const garbage = randomFailureDisplay(box.ciphertext.length);
     return {
       success: false,
       gibberish: garbage,
@@ -233,9 +276,7 @@ export async function openBox(
   }
 
   if (validShares.length === 0) {
-    const garbage = crypto.getRandomValues(
-      new Uint8Array(Math.max(8, box.ciphertext.length - 16)),
-    );
+    const garbage = randomFailureDisplay(box.ciphertext.length);
     return {
       success: false,
       gibberish: garbage,
@@ -245,7 +286,16 @@ export async function openBox(
   }
 
   // Step 3 — Shamir reconstruct: correct only if validShares.length >= threshold (2)
-  const reconstructedKey = reconstructSecret(validShares);
+  let reconstructedKey: Uint8Array;
+  try {
+    reconstructedKey = reconstructSecret(validShares);
+  } catch (error) {
+    // No result object exists to transfer ownership of the visualization
+    // snapshots, so clear both working and display copies before propagating.
+    for (const share of validShares) share.data.fill(0);
+    for (const snapshot of recoveredShares) snapshot?.fill(0);
+    throw error;
+  }
   // Snapshot the *real* Lagrange output for the on-screen key-strip animation
   // BEFORE zeroization. This is a candidate, not an independently observed
   // original. Successful AES-GCM decryption is the check used by the display.
@@ -258,18 +308,22 @@ export async function openBox(
     const cryptoKey = await importRawKey(reconstructedKey);
     const plaintext = await aesDecrypt(box.ciphertext, box.nonce, cryptoKey);
     reconstructedKey.fill(0);
+    let message: string;
+    try {
+      message = decode(plaintext);
+    } finally {
+      plaintext.fill(0);
+    }
     return {
       success: true,
-      message: decode(plaintext),
+      message,
       validShareCount,
       visual: { shareStatus, signatureValid: true, reconstructedKey: keySnapshot, recoveredShares, aesAuthenticated: true },
     };
   } catch {
     reconstructedKey.fill(0);
     // Use random bytes for the failure animation — never derive from share material.
-    const gibberish = crypto.getRandomValues(
-      new Uint8Array(Math.max(8, box.ciphertext.length - 16)),
-    );
+    const gibberish = randomFailureDisplay(box.ciphertext.length);
     return {
       success: false,
       gibberish,

@@ -11,18 +11,16 @@
 //! # Locating the source trees
 //!
 //! The build script checks:
-//! 1. Environment variables `SMAUG_T_SRC` and `HAETAE_SRC` (absolute paths).
+//! 1. Environment variables `SMAUG_T_SRC` and `HAETAE_SRC` (absolute paths to
+//!    parents containing exactly one extracted versioned source directory).
 //! 2. `vendor/smaug-t/` and `vendor/haetae/` relative to the workspace root
 //!    (`CARGO_MANIFEST_DIR/../..`).
 //!
 //! ## How to obtain the reference implementations
 //!
-//! The SMAUG-T and HAETAE reference implementations are distributed through
-//! the KpqC competition: <https://kpqc.or.kr/competition.html>
-//!
-//! There is no official public GitHub mirror.  Download the submission
-//! packages from the KpqC website, extract them, and place the source trees
-//! at:
+//! Authenticate the source archives independently before use. The browser
+//! reproduction manifest pins one reviewed public capture of each source tree;
+//! the native build accepts extracted trees through the paths below.
 //!
 //! ```text
 //! vendor/smaug-t/   ← extracted SMAUG-T reference implementation
@@ -36,19 +34,16 @@
 //! cargo build --features kpqc-native
 //! ```
 //!
-//! # Security level selection
+//! # Fixed parameter set
 //!
-//! The default security level is Level 3 (128-bit post-quantum / 192-bit
-//! classical for SMAUG-T; Level 3 for HAETAE).  Override via env vars:
-//!   `SMAUG_T_LEVEL=1|3|5`
-//!   `HAETAE_LEVEL=2|3|5`
+//! This FFI is fixed to SMAUG-T Level 3 and HAETAE Mode 3. The Rust buffer
+//! sizes and exported symbol names are specific to those parameters, so this
+//! build intentionally exposes no environment override for the security level.
 
 fn main() {
     // Re-run this script if these env vars change.
     println!("cargo:rerun-if-env-changed=SMAUG_T_SRC");
     println!("cargo:rerun-if-env-changed=HAETAE_SRC");
-    println!("cargo:rerun-if-env-changed=SMAUG_T_LEVEL");
-    println!("cargo:rerun-if-env-changed=HAETAE_LEVEL");
 
     #[cfg(feature = "kpqc-native")]
     compile_kpqc_native();
@@ -73,11 +68,6 @@ fn compile_kpqc_native() {
         .map(PathBuf::from)
         .unwrap_or_else(|_| workspace_root.join("vendor/smaug-t"));
 
-    let smaug_level: u8 = env::var("SMAUG_T_LEVEL")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3);
-
     if !smaug_src.exists() {
         eprintln!();
         eprintln!("╔══════════════════════════════════════════════════════════╗");
@@ -92,17 +82,12 @@ fn compile_kpqc_native() {
         std::process::exit(1);
     }
 
-    compile_smaug_t(&smaug_src, smaug_level);
+    compile_smaug_t(&smaug_src);
 
     // ── HAETAE ───────────────────────────────────────────────────────────────
     let haetae_src = env::var("HAETAE_SRC")
         .map(PathBuf::from)
         .unwrap_or_else(|_| workspace_root.join("vendor/haetae"));
-
-    let haetae_level: u8 = env::var("HAETAE_LEVEL")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3);
 
     if !haetae_src.exists() {
         eprintln!();
@@ -118,7 +103,7 @@ fn compile_kpqc_native() {
         std::process::exit(1);
     }
 
-    compile_haetae(&haetae_src, haetae_level);
+    compile_haetae(&haetae_src);
 }
 
 /// Walk `base` one level deep to find the single extracted source directory
@@ -144,7 +129,8 @@ fn find_versioned_subdir(base: &std::path::Path) -> std::path::PathBuf {
         1 => dirs.remove(0).path(),
         _ => panic!(
             "expected exactly one versioned sub-directory under {}, found {}; \
-             set SMAUG_T_SRC / HAETAE_SRC to the exact versioned path",
+             set SMAUG_T_SRC / HAETAE_SRC to a parent containing exactly one \
+             extracted directory with reference_implementation/",
             base.display(),
             dirs.len()
         ),
@@ -166,9 +152,7 @@ fn find_versioned_subdir(base: &std::path::Path) -> std::path::PathBuf {
 /// `randombytes.c` is excluded and replaced by `randombytes_shim.c` in the
 /// crate root, which sources OS entropy instead of the NIST KAT DRBG.
 #[cfg(feature = "kpqc-native")]
-fn compile_smaug_t(src: &std::path::Path, _level: u8) {
-    use std::ffi::OsStr;
-
+fn compile_smaug_t(src: &std::path::Path) {
     let versioned = find_versioned_subdir(src);
     let ref_dir = versioned.join("reference_implementation");
     let src_dir = ref_dir.join("src");
@@ -183,24 +167,33 @@ fn compile_smaug_t(src: &std::path::Path, _level: u8) {
         std::process::exit(1);
     }
 
-    // Collect .c files, excluding randombytes.c (replaced by our OS-entropy shim).
-    let c_files: Vec<_> = std::fs::read_dir(&src_dir)
-        .expect("could not read SMAUG-T src dir")
-        .flatten()
-        .filter(|e| {
-            let p = e.path();
-            p.extension().is_some_and(|ext| ext == "c")
-                && p.file_name() != Some(OsStr::new("randombytes.c"))
-        })
-        .map(|e| e.path())
-        .collect();
-
-    if c_files.is_empty() {
-        eprintln!(
-            "build.rs: no .c files found in {} — check SMAUG-T source layout",
-            src_dir.display()
-        );
-        std::process::exit(1);
+    // Compile the reviewed library inputs explicitly. In particular, omit both
+    // randombytes.c and rng.c: the former is replaced by our OS-entropy shim;
+    // the latter is a KAT/seed-expander DRBG that depends on OpenSSL and also
+    // defines a conflicting randombytes symbol.
+    let c_files: Vec<_> = [
+        "cbd.c",
+        "ciphertext.c",
+        "dg.c",
+        "fips202.c",
+        "hash.c",
+        "hwt.c",
+        "indcpa.c",
+        "io.c",
+        "kem.c",
+        "key.c",
+        "pack.c",
+        "poly.c",
+        "toomcook.c",
+        "verify.c",
+    ]
+    .into_iter()
+    .map(|name| src_dir.join(name))
+    .collect();
+    for file in &c_files {
+        if !file.is_file() {
+            panic!("required SMAUG-T source is missing: {}", file.display());
+        }
     }
 
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -209,8 +202,10 @@ fn compile_smaug_t(src: &std::path::Path, _level: u8) {
     let mut build = cc::Build::new();
     build
         .include(&inc_dir)
-        // Select SMAUGT_MODE3 (enum value 1) — level-3 security.
-        .define("SMAUGT_CONFIG_MODE", Some("SMAUGT_MODE3"))
+        // The reviewed SMAUG-T source selects its parameter set with the
+        // numeric SMAUG_MODE macro and namespaces this build as
+        // cryptolab_smaug3_*. Keep this synchronized with kpqc_ffi.rs.
+        .define("SMAUG_MODE", Some("3"))
         .flag_if_supported("-O2")
         .flag_if_supported("-std=c99")
         .flag_if_supported("-Wall");
@@ -245,7 +240,7 @@ fn compile_smaug_t(src: &std::path::Path, _level: u8) {
 /// `randombytes.c` is excluded and replaced by `randombytes_shim.c` in the
 /// crate root, which sources OS entropy instead of the NIST KAT DRBG.
 #[cfg(feature = "kpqc-native")]
-fn compile_haetae(src: &std::path::Path, _level: u8) {
+fn compile_haetae(src: &std::path::Path) {
     use std::ffi::OsStr;
 
     let versioned = find_versioned_subdir(src);

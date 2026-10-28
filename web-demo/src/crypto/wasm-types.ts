@@ -71,8 +71,12 @@ export interface HaetaeModule extends EmscriptenModuleBase {
     msgLen: number,
     pkPtr: number
   ): number;
-  /** Securely zero memory (cannot be optimized away). */
-  _haetae_secure_zeroize(ptr: number, size: number): void;
+  /**
+   * Securely zero memory when the binary exports it. The currently shipped
+   * historical HAETAE artifact predates this export, so callers must retain a
+   * best-effort typed-array fallback and must not claim guaranteed erasure.
+   */
+  _haetae_secure_zeroize?(ptr: number, size: number): void;
 }
 
 /**

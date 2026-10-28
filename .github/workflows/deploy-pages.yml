@@ -1,50 +1,29 @@
 name: Deploy web demo to GitHub Pages
 
-# One workflow, one gate. This lab used to split them: ci.yml ran the Rust
-# workspace suite and the web-demo tests on pull_request and carried the
-# Dependabot auto-merge, while this file ran the deploy on push to main -- and
-# only this file ran "Verify WASM binary integrity". So a bump could merge after
-# clearing ci.yml and then fail the deploy's heavier gate on main, where no pull
-# request was watching. Now `deploy` and `dependabot-auto-merge` both need the
-# SAME jobs: the Rust suite (`test`, moved here verbatim from ci.yml) and the
-# web-demo build (`build`, which already ran tests, build and the browser suite,
-# and now also runs ci.yml's ESLint step). ci.yml is deleted rather than kept
-# beside it: a second copy of a gate is how the two drift apart.
-#
-# The push trigger no longer carries a `paths:` filter. ci.yml ran the Rust
-# suite on every push to main; keeping the filter here would have stopped that
-# for any push outside web-demo/.
 on:
   push:
     branches: [main]
-  # The gate has to judge pull requests too, or auto-merge has nothing to wait on.
   pull_request:
     branches: [main]
-  # Allow triggering manually from the Actions tab, and required by the
-  # post-merge dispatch at the bottom of this file.
   workflow_dispatch:
 
-# Grant the GITHUB_TOKEN the permissions required for Pages deployment
+# Tests and builds receive no publishing token. The two publishing jobs below
+# opt into Pages/OIDC only after every unprivileged gate has passed.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  # Keyed by ref, NOT a bare `pages`. Now that pull_request is a trigger and
-  # cancel-in-progress is on, a bare group would let a PR run cancel a live main
-  # deploy.
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede stale PR checks, but never cancel a main deployment midway.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   test:
-    name: Build and test
+    name: Rust build, tests, fuzz smoke, and audits
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v7
 
@@ -63,10 +42,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Build (default features)
+      - name: Build (default development feature)
         run: cargo build --workspace
 
-      - name: Run tests (default features)
+      - name: Run tests (default development feature)
         run: cargo test --workspace
 
       - name: Run tamper, corpus, nonce, zeroize, and differential tests
@@ -75,8 +54,22 @@ jobs:
       - name: Run tests (wasm feature on qv-core)
         run: cargo test -p qv-core --features wasm
 
+      - name: Prove the development backend is absent when disabled
+        run: |
+          cargo test -p qv-core --no-default-features
+          cargo check -p qv-core --release --no-default-features
+          cargo check -p qv-cli --release --no-default-features
+
+      - name: Prove an unacknowledged development release is rejected
+        run: |
+          if cargo check -p qv-core --release; then
+            echo "::error::default release unexpectedly included the development backend"
+            exit 1
+          fi
+          cargo check -p qv-core --release --no-default-features --features allow_dev_backend_in_release
+
       - name: Clippy (default features)
-        run: cargo clippy --workspace -- -W clippy::all
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -86,30 +79,18 @@ jobs:
           rustup install nightly --no-self-update
           cargo +nightly install cargo-fuzz --locked 2>/dev/null || true
 
-      - name: Fuzz container parser (short smoke run)
+      - name: Fuzz security boundaries (short smoke runs)
         working-directory: crates/qv-core
         run: |
-          cargo +nightly fuzz run fuzz_container_parse -- -max_total_time=30 -max_len=4096
-
-      - name: Fuzz decrypt pipeline (short smoke run)
-        working-directory: crates/qv-core
-        run: |
-          cargo +nightly fuzz run fuzz_decrypt_pipeline -- -max_total_time=30 -max_len=4096
-
-      - name: Fuzz KEM handshake (short smoke run)
-        working-directory: crates/qv-core
-        run: |
-          cargo +nightly fuzz run fuzz_kem_handshake -- -max_total_time=30 -max_len=4096
-
-      - name: Fuzz signature verify (short smoke run)
-        working-directory: crates/qv-core
-        run: |
-          cargo +nightly fuzz run fuzz_signature_verify -- -max_total_time=30 -max_len=4096
-
-      - name: Fuzz WASM API boundary (short smoke run)
-        working-directory: crates/qv-core
-        run: |
-          cargo +nightly fuzz run fuzz_wasm_api -- -max_total_time=30 -max_len=4096
+          for target in \
+            fuzz_container_parse \
+            fuzz_decrypt_pipeline \
+            fuzz_kem_handshake \
+            fuzz_signature_verify \
+            fuzz_wasm_api
+          do
+            cargo +nightly fuzz run "$target" -- -max_total_time=30 -max_len=4096
+          done
 
       - name: Security audit
         run: |
@@ -121,13 +102,15 @@ jobs:
           cargo install cargo-deny --locked
           cargo deny check advisories bans sources
 
-  build:
-    name: Build Vite static bundle
+  web:
+    name: Web checks (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, 26]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
 
       - name: Verify incomplete WASM build inputs fail before compilation
         run: python3 -B -m unittest discover -s wasm/tests -v
@@ -135,70 +118,59 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
-          cache: 'npm'
+          node-version: ${{ matrix.node }}
+          cache: npm
           cache-dependency-path: web-demo/package-lock.json
 
-      - name: Verify WASM binary integrity
+      - name: Verify committed WASM checksums
         working-directory: web-demo
         run: |
-          # NOTE: This step is a *consistency check* — it verifies that the
-          # committed .wasm files match the committed .wasm.sha256 hashes.
-          # It does NOT prove the WASM was built from the source in this repo.
-          # A full reproducibility guarantee requires rebuilding from source
-          # using Emscripten (see wasm/build.sh) and comparing outputs.
-          # Any change to the .wasm files must be accompanied by a matching
-          # update to the .wasm.sha256 files in the same PR and reviewed.
-          SMAUG_EXPECTED=$(cat public/smaug.wasm.sha256 | tr -d '[:space:]')
-          HAETAE_EXPECTED=$(cat public/haetae.wasm.sha256 | tr -d '[:space:]')
-          SMAUG_ACTUAL=$(sha256sum public/smaug.wasm | awk '{print $1}')
-          HAETAE_ACTUAL=$(sha256sum public/haetae.wasm | awk '{print $1}')
-          if [ "$SMAUG_ACTUAL" != "$SMAUG_EXPECTED" ]; then
-            echo "ERROR: smaug.wasm SHA-256 mismatch"
-            echo "  expected: $SMAUG_EXPECTED"
-            echo "  actual:   $SMAUG_ACTUAL"
-            exit 1
-          fi
-          if [ "$HAETAE_ACTUAL" != "$HAETAE_EXPECTED" ]; then
-            echo "ERROR: haetae.wasm SHA-256 mismatch"
-            echo "  expected: $HAETAE_EXPECTED"
-            echo "  actual:   $HAETAE_ACTUAL"
-            exit 1
-          fi
-          echo "WASM integrity verified."
+          SMAUG_EXPECTED=$(tr -d '[:space:]' < public/smaug.wasm.sha256)
+          HAETAE_EXPECTED=$(tr -d '[:space:]' < public/haetae.wasm.sha256)
+          test "$(sha256sum public/smaug.wasm | awk '{print $1}')" = "$SMAUG_EXPECTED"
+          test "$(sha256sum public/haetae.wasm | awk '{print $1}')" = "$HAETAE_EXPECTED"
 
       - name: Install dependencies
         working-directory: web-demo
         run: npm ci
 
-      - name: Run tests
+      - name: Unit and control tests
         working-directory: web-demo
-        run: npm run test
+        run: npm test
 
-      # From ci.yml's test-web-demo job, folded in when that file was removed.
-      - name: Lint (ESLint)
+      - name: Lint
         working-directory: web-demo
-        run: npm run lint
+        run: npm run lint -- --max-warnings=0
 
-      - name: Build Vite bundle
+      - name: Build production bundle
         working-directory: web-demo
         run: npm run build
-        # base path '/crypto-lab-quantum-vault-kpqc/' is set permanently in vite.config.ts
+
+  browser:
+    name: Production-browser behavior
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web-demo/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web-demo
+        run: npm ci
 
       - name: Install Playwright browser
         working-directory: web-demo
         run: npx playwright install --with-deps chromium
 
-      # The whole browser suite: e2e/vault.spec.ts (the real seal/open pipeline,
-      # both failure modes and the tamper) plus e2e/a11y.spec.ts (WCAG A/AA in
-      # both themes at 1280px and 380px). Running only test:a11y here meant the
-      # functional suite never blocked a deploy — a broken seal could ship so
-      # long as the broken page was accessible.
       - name: Browser pipeline and accessibility gate
         working-directory: web-demo
-        run: npm run test:e2e
+        run: npm run test:e2e -- --retries=0
 
-      # From ci.yml's e2e-web-demo job, which ran this same `npm run test:e2e`.
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v7
@@ -207,27 +179,31 @@ jobs:
           path: web-demo/playwright-report/
           retention-days: 7
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+      - name: Retain the tested site for a main publish only
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
         with:
-          path: web-demo/dist
+          name: site-dist
+          path: web-demo/dist/
+          if-no-files-found: error
+          retention-days: 1
 
   source:
-    name: Clean SMAUG and HAETAE source reproduction
+    name: Source reproduction and native KpqC smoke tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
       - name: Evidence completeness controls
         run: python3 -B -m unittest discover -s wasm/tests -v
-      - name: Capture immutable public source archives
+
+      - name: Install Rust toolchain for the native source gate
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Capture and authenticate immutable public source archives
         run: |
           mkdir -p "$RUNNER_TEMP/kpqc-source-inputs"
           curl --fail --location --retry 2 --proto '=https' --tlsv1.2 \
@@ -236,14 +212,43 @@ jobs:
           curl --fail --location --retry 2 --proto '=https' --tlsv1.2 \
             'https://raw.githubusercontent.com/CryptoLabInc/HAETAE/743c31df48183fc8c8a39a4f50a634da1c4af03a/HAETAE.zip' \
             --output "$RUNNER_TEMP/kpqc-source-inputs/haetae.zip"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          manifest = json.loads(Path("wasm/reproduction.json").read_text())
+          root = Path(os.environ["RUNNER_TEMP"]) / "kpqc-source-inputs"
+          for source, archive in (("smaug", "smaug.tar.gz"), ("haetae", "haetae.zip")):
+              actual = hashlib.sha256((root / archive).read_bytes()).hexdigest()
+              expected = manifest["sources"][source]["sha256"]
+              if actual != expected:
+                  raise SystemExit(f"{source} archive SHA-256 mismatch: {actual} != {expected}")
+          PY
+
+      - name: Compile and exercise the fixed Level 3 / Mode 3 native FFI
+        run: |
+          mkdir -p "$RUNNER_TEMP/native-smaug" "$RUNNER_TEMP/native-haetae"
+          tar -xzf "$RUNNER_TEMP/kpqc-source-inputs/smaug.tar.gz" \
+            -C "$RUNNER_TEMP/native-smaug"
+          unzip -q "$RUNNER_TEMP/kpqc-source-inputs/haetae.zip" \
+            -d "$RUNNER_TEMP/native-haetae"
+          SMAUG_T_SRC="$RUNNER_TEMP/native-smaug" \
+          HAETAE_SRC="$RUNNER_TEMP/native-haetae" \
+            cargo test -p qv-core --no-default-features --features kpqc-native \
+              --test differential_tests
+
       - name: Capture digest-pinned compiler
         run: docker pull --platform linux/amd64 emscripten/emsdk@sha256:7b5d14203bb4ef20da6f5b71b90c8f37ec09c2776d342efff3bc989ebf1aa873
+
       - name: Clean build and exact four-artifact comparison
         run: |
           bash wasm/build.sh --reproduce \
             --smaug-archive "$RUNNER_TEMP/kpqc-source-inputs/smaug.tar.gz" \
             --haetae-archive "$RUNNER_TEMP/kpqc-source-inputs/haetae.zip" \
             --scratch-root "$RUNNER_TEMP" > "$RUNNER_TEMP/kpqc-source-rebuild.json"
+
       - name: Retain actual build and error evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -252,69 +257,85 @@ jobs:
           path: ${{ runner.temp }}/kpqc-source-rebuild.json
           if-no-files-found: error
 
+  pages-artifact:
+    name: Prepare Pages artifact
+    if: github.event_name != 'pull_request'
+    needs: [test, web, browser, source]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+    steps:
+      # This privileged job does not check out or execute repository code.
+      - name: Download the tested production bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: site-dist
+          path: site-dist
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site-dist
+
   deploy:
     name: Deploy to GitHub Pages
-    needs: [test, build, source]
-    # A pull request is gated, never published. `!= 'pull_request'` and NOT
-    # `== 'push'`: the latter also skips workflow_dispatch, which the post-merge
-    # dispatch below depends on.
     if: github.event_name != 'pull_request'
+    needs: pages-artifact
     runs-on: ubuntu-latest
-
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
 
-  # Dependabot only. `needs: [test, build, source]` is the whole safety argument -- a bump can
-  # merge itself only once this lab's entire PR gate went green, so the gate
-  # decides rather than the version number. A major that actually breaks the
-  # lab fails the gate and the PR stays open for a human.
   dependabot-auto-merge:
-    needs: [test, build, source]
+    name: Auto-merge gated non-major dependency updates
     if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    needs: [test, web, browser, source]
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
-      # actions: write is required by the deploy dispatch below. Without it
-      # `gh workflow run` returns HTTP 403 "Resource not accessible by
-      # integration", the merged bump never deploys, and a `|| echo` fallback
-      # hides it.
       actions: write
     steps:
       - id: meta
         uses: dependabot/fetch-metadata@v3
 
-      - name: Merge any bump whose gate went green
-        # Retry: a sibling PR merging first moves main underneath us and GitHub
-        # rejects with "Base branch was modified". That is benign, so try again
-        # rather than failing the run over a race.
-        run: |
-          merged=""
-          for attempt in 1 2 3; do
-            if gh pr merge --squash --delete-branch "$PR_URL"; then
-              merged=1
-              break
-            fi
-            echo "merge attempt $attempt failed; base branch may have moved - retrying"
-            sleep 15
-          done
-          if [ -z "$merged" ]; then
-            echo "::warning::gate passed but the merge did not land after 3 attempts;"
-            echo "::warning::leaving this PR open - Dependabot will rebase and retry."
-            exit 0
-          fi
-          # A merge made with GITHUB_TOKEN raises no push event -- GitHub suppresses
-          # them so workflows cannot retrigger themselves -- so deploy would never run
-          # and the site would keep serving the previous build. Ask for it explicitly;
-          # a workflow_dispatch through the API is not suppressed. The dispatched run
-          # is the same gate-then-deploy pipeline, so a bad merge still ships nothing.
-          gh workflow run deploy-pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+      - name: Leave major updates for human review
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        run: echo "Major dependency updates are intentionally not auto-merged."
+
+      - name: Merge a gated patch or minor update and request its deployment
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          merged=
+          for attempt in 1 2 3; do
+            if gh pr merge --squash --delete-branch "$PR_URL"; then
+              state=$(gh pr view "$PR_URL" --json state --jq .state)
+              if [ "$state" = "MERGED" ]; then
+                merged=1
+                break
+              fi
+            fi
+            echo "merge attempt $attempt did not land; retrying after base refresh"
+            sleep 15
+          done
+          if [ -z "$merged" ]; then
+            echo "::error::gate passed but the dependency PR did not merge"
+            exit 1
+          fi
+          gh workflow run deploy-pages.yml --repo "$GITHUB_REPOSITORY" --ref main

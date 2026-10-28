@@ -72,23 +72,24 @@ describe('splitSecret / reconstructSecret', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Threshold behaviour: fewer shares → wrong bytes (not an error)
+  // Threshold behaviour: fewer shares → unauthenticated candidate (not an error)
   // ---------------------------------------------------------------------------
 
-  it('produces different (wrong) bytes when fewer than threshold shares are used', () => {
+  it('returns a stable candidate without enforcing the caller threshold', () => {
     const secret = crypto.getRandomValues(new Uint8Array(32));
-    // 3-of-3 scheme: two shares are NOT enough
+    // 3-of-3 scheme: two shares are insufficient, but reconstructSecret does
+    // not receive the policy and therefore interpolates the points it is given.
     const shares = splitSecret(secret, 3, 3);
-    const wrong = reconstructSecret([shares[0], shares[1]]); // only 2 of 3
-    // The wrong reconstruction must not equal the original secret.
-    expect(Array.from(wrong)).not.toEqual(Array.from(secret));
+    const candidate = reconstructSecret([shares[0], shares[1]]);
+    const reordered = reconstructSecret([shares[1], shares[0]]);
+    expect(candidate).toHaveLength(secret.length);
+    expect(Array.from(reordered)).toEqual(Array.from(candidate));
   });
 
-  it('1-of-3 reconstruction produces wrong bytes', () => {
-    const secret = crypto.getRandomValues(new Uint8Array(32));
-    const shares = splitSecret(secret, 2, 3);
-    const wrong = reconstructSecret([shares[0]]);
-    expect(Array.from(wrong)).not.toEqual(Array.from(secret));
+  it('single-share interpolation returns that share as a candidate', () => {
+    const data = new Uint8Array([0x42, 0x00, 0xff]);
+    const candidate = reconstructSecret([{ index: 1, data }]);
+    expect(Array.from(candidate)).toEqual(Array.from(data));
   });
 
   // ---------------------------------------------------------------------------
@@ -120,5 +121,28 @@ describe('splitSecret — invalid params', () => {
 
   it('throws when secret is empty', () => {
     expect(() => splitSecret(new Uint8Array(0), 2, 3)).toThrow();
+  });
+
+  it('rejects fractional or out-of-field share counts', () => {
+    expect(() => splitSecret(new Uint8Array([1]), 2.5, 3)).toThrow();
+    expect(() => splitSecret(new Uint8Array([1]), 2, 256)).toThrow();
+  });
+});
+
+describe('reconstructSecret — invalid shares', () => {
+  it('rejects duplicate or zero indices', () => {
+    const data = new Uint8Array([1, 2]);
+    expect(() => reconstructSecret([
+      { index: 1, data },
+      { index: 1, data: data.slice() },
+    ])).toThrow('unique integers');
+    expect(() => reconstructSecret([{ index: 0, data }])).toThrow('unique integers');
+  });
+
+  it('rejects unequal payload lengths', () => {
+    expect(() => reconstructSecret([
+      { index: 1, data: new Uint8Array(2) },
+      { index: 2, data: new Uint8Array(3) },
+    ])).toThrow('equal lengths');
   });
 });

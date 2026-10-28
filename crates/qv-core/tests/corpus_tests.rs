@@ -9,7 +9,7 @@
 //!
 //! | File | Injected fault |
 //! |------|---------------|
-//! | `invalid_magic.bin` | `magic` field ≠ `"QVLT1"` |
+//! | `invalid_magic.bin` | `magic` field ≠ current `"QVKP"` |
 //! | `truncated_container.bin` | JSON cut short mid-field |
 //! | `duplicate_fields.bin` | Repeated header field (serde rejects as `duplicate field`) |
 //! | `oversized_metadata.bin` | `threshold` = 1 (below minimum of 2) |
@@ -31,7 +31,7 @@
 //! Corpus files are committed to the repository so `cargo test` works offline
 //! without needing to run the generator first.
 
-use qv_core::container::QuantumVaultContainer;
+use qv_core::container::{QuantumVaultContainer, MAX_CONTAINER_BYTES};
 
 // ---------------------------------------------------------------------------
 // Corpus contents — defined once here so the loader test and generator share
@@ -44,9 +44,7 @@ fn deeply_nested_json_bytes(depth: usize) -> Vec<u8> {
         data.extend_from_slice(br#"{"nested":"#);
     }
     data.extend_from_slice(br#""not-a-container""#);
-    for _ in 0..depth {
-        data.push(b'}');
-    }
+    data.resize(data.len() + depth, b'}');
     data
 }
 
@@ -134,7 +132,7 @@ fn malformed_containers_all_fail() {
     for entry in entries {
         let path = entry.path();
         // Skip directories and non-.bin files.
-        if !path.extension().map_or(false, |e| e == "bin") {
+        if !path.extension().is_some_and(|e| e == "bin") {
             continue;
         }
         let data = std::fs::read(&path)
@@ -175,7 +173,6 @@ fn corpus_definitions_all_fail() {
 /// parsing or allocation-heavy structural work occurs.
 #[test]
 fn oversized_input_is_rejected_before_json_parse() {
-    const MAX_CONTAINER_BYTES: usize = 64 * 1024 * 1024;
     let oversized = vec![b'x'; MAX_CONTAINER_BYTES + 1];
     let err = QuantumVaultContainer::from_bytes(&oversized).unwrap_err();
     let message = err.to_string();

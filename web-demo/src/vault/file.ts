@@ -7,7 +7,8 @@
 import { toBase64, fromBase64, encode } from '../crypto/utils';
 import { haetaeVerify } from '../crypto/haetae';
 import type { SealedBox, WrappedShare } from '../crypto/pipeline';
-import type { VaultBox, VaultState, WrappedShareSerialized } from './state';
+import { deserializeSealedBox } from './state';
+import type { VaultBox, VaultState } from './state';
 
 // Version identifier for the file format
 const QVAULT_VERSION = 'qvault-v1';
@@ -25,13 +26,22 @@ const EXPECTED = {
   nonce: 12,
   salt: 16,
   kemCiphertext: 672,
+  wrappedShare: 48, // 32-byte Shamir share + 16-byte AES-GCM tag
   shareNonce: 12,
   publicKey: 672,
+  wrappedSecretKey: 848, // 832-byte SMAUG-T secret key + 16-byte AES-GCM tag
   skNonce: 12,
   sigPublicKey: 992,
   maxSignature: 1474,
   maxCiphertext: 64 * 1024 * 1024, // 64 MiB
 } as const;
+
+const MIN_PBKDF2_ITERATIONS = 100_000;
+const MAX_PBKDF2_ITERATIONS = 1_000_000;
+// A maximum-size 64 MiB ciphertext expands to about 85.4 MiB as base64. Leave
+// bounded room for JSON and the fixed KpqC fields, but reject unbounded files
+// before File.text() allocates and parses them.
+const MAX_IMPORT_FILE_BYTES = 90 * 1024 * 1024;
 
 /**
  * File format for .qvault files.
@@ -122,7 +132,13 @@ function assertField(obj: Record<string, unknown>, field: string): void {
   }
 }
 
-function decodeBase64Field(value: string, field: string): Uint8Array {
+function decodeBase64Field(value: unknown, field: string): Uint8Array {
+  if (typeof value !== 'string') {
+    throw new QvaultImportError(
+      `Corrupted data in ${field}`,
+      'CORRUPTED_DATA',
+    );
+  }
   try {
     return fromBase64(value);
   } catch {
@@ -146,6 +162,36 @@ function assertMaxLen(arr: Uint8Array, max: number, field: string): void {
   if (arr.length === 0 || arr.length > max) {
     throw new QvaultImportError(
       `Corrupted data in ${field}: length ${arr.length} out of range [1, ${max}]`,
+      'CORRUPTED_DATA',
+    );
+  }
+}
+
+function parseIterations(value: unknown, field: string): number {
+  const iterations = value ?? MIN_PBKDF2_ITERATIONS;
+  if (
+    !Number.isSafeInteger(iterations) ||
+    (iterations as number) < MIN_PBKDF2_ITERATIONS ||
+    (iterations as number) > MAX_PBKDF2_ITERATIONS
+  ) {
+    throw new QvaultImportError(
+      `Corrupted data in ${field}: PBKDF2 iterations must be an integer from ${MIN_PBKDF2_ITERATIONS} to ${MAX_PBKDF2_ITERATIONS}`,
+      'CORRUPTED_DATA',
+    );
+  }
+  return iterations as number;
+}
+
+function isCanonicalTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
+}
+
+function assertImportFileSize(file: File): void {
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    throw new QvaultImportError(
+      `Import file exceeds the ${MAX_IMPORT_FILE_BYTES}-byte limit`,
       'CORRUPTED_DATA',
     );
   }
@@ -186,6 +232,7 @@ export function deserializeFromQvault(json: string): SealedBox {
   assertField(obj, 'signature');
   assertField(obj, 'signaturePublicKey');
   assertField(obj, 'createdAt');
+  assertField(obj, 'algorithm');
 
   // 4. Check participants array
   if (!Array.isArray(obj.participants) || obj.participants.length !== 3) {
@@ -195,29 +242,44 @@ export function deserializeFromQvault(json: string): SealedBox {
     );
   }
 
-  // 5. Check algorithm fields if present
-  if (obj.algorithm && typeof obj.algorithm === 'object') {
-    const alg = obj.algorithm as Record<string, unknown>;
-    if (alg.kem && alg.kem !== ALGORITHMS.kem) {
+  // 5. Require the complete algorithm suite instead of silently accepting an
+  // ambiguous or partially labelled container.
+  if (typeof obj.algorithm !== 'object' || obj.algorithm === null || Array.isArray(obj.algorithm)) {
+    throw new QvaultImportError('Corrupted data in algorithm', 'CORRUPTED_DATA');
+  }
+  const alg = obj.algorithm as Record<string, unknown>;
+  const expectedAlgorithmNames = Object.keys(ALGORITHMS);
+  if (
+    Object.keys(alg).length !== expectedAlgorithmNames.length ||
+    Object.keys(alg).some(name => !(name in ALGORITHMS))
+  ) {
+    throw new QvaultImportError(
+      'Unsupported algorithm metadata fields',
+      'UNSUPPORTED_ALGORITHM',
+    );
+  }
+  for (const [name, expected] of Object.entries(ALGORITHMS)) {
+    if (alg[name] !== expected) {
       throw new QvaultImportError(
-        `Unsupported algorithm: kem=${alg.kem}`,
-        'UNSUPPORTED_ALGORITHM',
-      );
-    }
-    if (alg.sig && alg.sig !== ALGORITHMS.sig) {
-      throw new QvaultImportError(
-        `Unsupported algorithm: sig=${alg.sig}`,
+        `Unsupported algorithm: ${name}=${String(alg[name])}`,
         'UNSUPPORTED_ALGORITHM',
       );
     }
   }
 
+  if (!isCanonicalTimestamp(obj.createdAt)) {
+    throw new QvaultImportError(
+      'Corrupted data in createdAt: expected a canonical ISO timestamp',
+      'CORRUPTED_DATA',
+    );
+  }
+
   // 6. Decode and validate binary fields
-  const ciphertext = decodeBase64Field(obj.ciphertext as string, 'ciphertext');
-  const nonce = decodeBase64Field(obj.nonce as string, 'nonce');
-  const signature = decodeBase64Field(obj.signature as string, 'signature');
+  const ciphertext = decodeBase64Field(obj.ciphertext, 'ciphertext');
+  const nonce = decodeBase64Field(obj.nonce, 'nonce');
+  const signature = decodeBase64Field(obj.signature, 'signature');
   const sigPublicKey = decodeBase64Field(
-    obj.signaturePublicKey as string,
+    obj.signaturePublicKey,
     'signaturePublicKey',
   );
 
@@ -232,6 +294,13 @@ export function deserializeFromQvault(json: string): SealedBox {
   ).map((p, i) => {
     const prefix = `participants[${i}]`;
 
+    if (typeof p !== 'object' || p === null || Array.isArray(p)) {
+      throw new QvaultImportError(
+        `Corrupted data in ${prefix}`,
+        'CORRUPTED_DATA',
+      );
+    }
+
     assertField(p, 'kemCiphertext');
     assertField(p, 'wrappedSecretKey');
     assertField(p, 'wrappedShare');
@@ -239,41 +308,50 @@ export function deserializeFromQvault(json: string): SealedBox {
     assertField(p, 'kemPublicKey');
     assertField(p, 'shareNonce');
     assertField(p, 'skNonce');
+    assertField(p, 'label');
+
+    if (p.label !== PARTICIPANT_LABELS[i]) {
+      throw new QvaultImportError(
+        `Corrupted data in ${prefix}.label: expected ${PARTICIPANT_LABELS[i]}`,
+        'CORRUPTED_DATA',
+      );
+    }
 
     const kemCiphertext = decodeBase64Field(
-      p.kemCiphertext as string,
+      p.kemCiphertext,
       `${prefix}.kemCiphertext`,
     );
     const wrappedSecretKey = decodeBase64Field(
-      p.wrappedSecretKey as string,
+      p.wrappedSecretKey,
       `${prefix}.wrappedSecretKey`,
     );
     const wrappedShare = decodeBase64Field(
-      p.wrappedShare as string,
+      p.wrappedShare,
       `${prefix}.wrappedShare`,
     );
     const salt = decodeBase64Field(
-      p.pbkdf2Salt as string,
+      p.pbkdf2Salt,
       `${prefix}.pbkdf2Salt`,
     );
     const publicKey = decodeBase64Field(
-      p.kemPublicKey as string,
+      p.kemPublicKey,
       `${prefix}.kemPublicKey`,
     );
     const shareNonce = decodeBase64Field(
-      p.shareNonce as string,
+      p.shareNonce,
       `${prefix}.shareNonce`,
     );
-    const skNonce = decodeBase64Field(p.skNonce as string, `${prefix}.skNonce`);
+    const skNonce = decodeBase64Field(p.skNonce, `${prefix}.skNonce`);
 
     assertLen(kemCiphertext, EXPECTED.kemCiphertext, `${prefix}.kemCiphertext`);
+    assertLen(wrappedShare, EXPECTED.wrappedShare, `${prefix}.wrappedShare`);
     assertLen(salt, EXPECTED.salt, `${prefix}.pbkdf2Salt`);
     assertLen(publicKey, EXPECTED.publicKey, `${prefix}.kemPublicKey`);
+    assertLen(wrappedSecretKey, EXPECTED.wrappedSecretKey, `${prefix}.wrappedSecretKey`);
     assertLen(shareNonce, EXPECTED.shareNonce, `${prefix}.shareNonce`);
     assertLen(skNonce, EXPECTED.skNonce, `${prefix}.skNonce`);
 
-    const iterations =
-      typeof p.iterations === 'number' ? p.iterations : 100_000;
+    const iterations = parseIterations(p.iterations, `${prefix}.iterations`);
 
     return {
       salt,
@@ -293,7 +371,7 @@ export function deserializeFromQvault(json: string): SealedBox {
     wrappedShares,
     signature,
     sigPublicKey,
-    createdAt: obj.createdAt as string,
+    createdAt: obj.createdAt,
   };
 }
 
@@ -351,6 +429,7 @@ export function exportQvault(box: SealedBox, boxNumber: string): void {
  * Throws QvaultImportError on any validation failure.
  */
 export async function importQvault(file: File): Promise<SealedBox> {
+  assertImportFileSize(file);
   const text = await file.text();
 
   // Deserialize with structure validation
@@ -372,27 +451,7 @@ export async function importQvault(file: File): Promise<SealedBox> {
  * Convert a VaultBox (localStorage format) to SealedBox for export.
  */
 export function vaultBoxToSealedBox(vb: VaultBox): SealedBox {
-  const wrappedShares: WrappedShare[] = vb.wrappedShares.map(
-    (ws: WrappedShareSerialized) => ({
-      salt: fromBase64(ws.salt),
-      kemCiphertext: fromBase64(ws.kemCiphertext),
-      wrappedShare: fromBase64(ws.wrappedShare),
-      shareNonce: fromBase64(ws.shareNonce),
-      publicKey: fromBase64(ws.publicKey),
-      wrappedSecretKey: fromBase64(ws.wrappedSecretKey),
-      skNonce: fromBase64(ws.skNonce),
-      iterations: ws.iterations ?? 100_000,
-    }),
-  );
-
-  return {
-    ciphertext: fromBase64(vb.ciphertext),
-    nonce: fromBase64(vb.nonce),
-    wrappedShares,
-    signature: fromBase64(vb.signature),
-    sigPublicKey: fromBase64(vb.sigPublicKey),
-    createdAt: vb.createdAt,
-  };
+  return deserializeSealedBox(vb);
 }
 
 // ---- Full vault export / import ----
@@ -432,6 +491,7 @@ export function exportFullVault(state: VaultState): void {
  * Returns a new VaultState on success.
  */
 export async function importFullVault(file: File): Promise<VaultState> {
+  assertImportFileSize(file);
   const text = await file.text();
 
   let parsed: unknown;
@@ -469,9 +529,16 @@ export async function importFullVault(file: File): Promise<VaultState> {
       );
     }
 
-    const box = rawBox as VaultBox;
-
     // Basic structure check
+    if (
+      typeof rawBox !== 'object' || rawBox === null || Array.isArray(rawBox)
+    ) {
+      throw new QvaultImportError(
+        `Incomplete container in box ${key}`,
+        'MISSING_FIELD',
+      );
+    }
+    const box = rawBox as VaultBox;
     if (
       !box.ciphertext || !box.nonce || !box.signature ||
       !box.sigPublicKey || !box.createdAt ||
@@ -484,7 +551,15 @@ export async function importFullVault(file: File): Promise<VaultState> {
     }
 
     // Verify HAETAE signature
-    const sealedBox = vaultBoxToSealedBox(box);
+    let sealedBox: SealedBox;
+    try {
+      sealedBox = vaultBoxToSealedBox(box);
+    } catch {
+      throw new QvaultImportError(
+        `Corrupted data in box ${key}`,
+        'CORRUPTED_DATA',
+      );
+    }
     const containerData = buildContainerData(sealedBox);
     const valid = haetaeVerify(sealedBox.signature, containerData, sealedBox.sigPublicKey);
     if (!valid) {

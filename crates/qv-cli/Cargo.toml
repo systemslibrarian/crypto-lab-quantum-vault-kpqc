@@ -16,14 +16,16 @@ path = "src/main.rs"
 default = ["dev-backend"]
 dev-backend  = ["qv-core/dev-backend"]
 kpqc-native  = ["qv-core/kpqc-native"]
+# Pass-through for core-library scaffold tests; the CLI intentionally rejects it.
 kpqc-wasm    = ["qv-core/kpqc-wasm"]
 
 [dependencies]
-qv-core = { path = "../qv-core" }
+qv-core = { path = "../qv-core", default-features = false }
 anyhow.workspace = true
 base64.workspace = true
 clap.workspace = true
 serde_json.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 assert_cmd = "2.0"

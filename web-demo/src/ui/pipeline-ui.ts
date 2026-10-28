@@ -149,7 +149,7 @@ export async function animateOpenPipeline(
     );
   }
 
-  // Step 3 — Shamir reconstruct (real key-strip re-forms, or lands wrong)
+  // Step 3 — Shamir reconstruct (real key-strip re-forms or shows a candidate)
   setStep(container, 'shamir', 'active');
   narrate(container, 'narrShamirRecon');
   await sleep(500);
@@ -168,9 +168,9 @@ export async function animateOpenPipeline(
   if (!enough) {
     // Amber, not red: this is a confidentiality shortfall (too few shares), a
     // DIFFERENT failure mode from the red HAETAE integrity failure above. The
-    // key reconstructs to the WRONG bytes, so AES-GCM will reject it downstream.
+    // core has already rejected this under-threshold candidate with AES-GCM.
     setStep(container, 'shamir', 'warn');
-    return; // below threshold — key is wrong, AES will reject it
+    return; // below threshold — do not animate AES as a policy-success step
   }
   setStep(container, 'shamir', 'done');
 

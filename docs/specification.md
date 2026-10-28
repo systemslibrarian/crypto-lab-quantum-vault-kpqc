@@ -1,8 +1,8 @@
 # Quantum Vault — Formal Cryptographic Specification
 
-**Version:** 1.0  
-**Date:** 2026-03  
-**Status:** Stable
+**Version:** 1.1
+**Date:** 2026-10-23
+**Status:** Educational specification; Rust v2 and browser formats differ
 
 ---
 
@@ -10,12 +10,15 @@
 
 Quantum Vault is a *threshold* encryption platform: a file can be encrypted such
 that at least *t* out of *n* designated recipients must cooperate to decrypt it.
-The key-encapsulation layer uses post-quantum algorithms (SMAUG-T, HAETAE) from
-the Korean Post-Quantum Cryptography (KpqC) competition, ensuring confidentiality
-against both classical and quantum adversaries.
+The asymmetric layer uses SMAUG-T for key encapsulation and HAETAE for
+signatures. Both are final algorithms from the Korean Post-Quantum Cryptography
+(KpqC) competition; competition selection is not publication as a Korean
+Standard. Their intended security relies on the stated lattice assumptions and
+correct implementation rather than being established by this demo.
 
-This document is the normative specification of the cryptographic protocol.
-Implementations must produce outputs indistinguishable from those described here.
+This document describes the implemented constructions. The Rust v2 container
+and browser container have different field sets and wrapping details and are not
+wire-compatible; their differences are called out below.
 
 ---
 
@@ -49,24 +52,35 @@ Verifier         — holds the encryptor's signature public key sig_pk
 
 | Parameter | Value | Reference |
 |-----------|-------|-----------|
-| KEM | SMAUG-T Level 1 | KpqC Round 2 (selected 2025) |
-| Signature | HAETAE Mode 2 | KpqC Round 2 (selected 2025) |
+| Browser KEM | SMAUG-T Level 1 | Pinned KpqC reference source |
+| Browser signature | HAETAE Mode 2 | Pinned KpqC reference source |
+| Conditional Rust native KEM/signature | SMAUG-T Level 3 / HAETAE Mode 3 | Requires separately supplied, authenticated reference source trees |
+| Ordinary Rust checkout | Test-only `dev-backend`; `kpqc-wasm` is an error-only scaffold | No production cryptography claim |
 | Symmetric cipher | AES-256-GCM | NIST SP 800-38D |
 | Secret sharing | Shamir over GF(2⁸) | Shamir 1979 |
-| Container format | JSON v1 | docs/container-format.md |
-| Share wrapping | AES-256-GCM (aead_protect) | §6.3 |
+| Rust container format | JSON v2 (`QVKP`) | docs/container-format.md |
+| Browser container format | `qvault-v1` export around local state v2 | web-demo/src/vault/file.ts |
+| Share wrapping | Rust: HKDF-derived key/nonce + AES-GCM; browser: KEM secret as AES key + random nonce | §6.3 |
 
 ### 3.3 Key Sizes
 
-| Algorithm | Public key | Private key | Ciphertext / Signature |
-|-----------|-----------|-------------|------------------------|
-| SMAUG-T Level 1 | 672 B | 832 B | CT: 672 B, SS: 32 B |
-| HAETAE Mode 2   | 992 B | 1 408 B | ≤ 1 474 B |
+| Algorithm / path | Public key | Private key | Ciphertext / Signature |
+|------------------|-----------|-------------|------------------------|
+| Browser SMAUG-T Level 1 | 672 B | 832 B | CT: 672 B, SS: 32 B |
+| Browser HAETAE Mode 2 | 992 B | 1 408 B | signature ≤ 1 474 B |
+| Conditional native SMAUG-T Level 3 | 1 088 B | 1 312 B | CT: 992 B, SS: 32 B |
+| Conditional native HAETAE Mode 3 | 1 472 B | 2 112 B | signature ≤ 2 349 B |
 | AES-256-GCM | — | 32 B | plaintext + 16 B tag |
 
 ---
 
 ## 4. Encryption Algorithm
+
+This section specifies the Rust v2 construction. The browser uses the
+differences called out below: it generates its per-share SMAUG-T keypairs inside
+the sealing flow, samples the outer and share nonces directly, wraps each
+SMAUG-T secret key under a password-derived key, and signs the browser corpus in
+§6.2.
 
 ### 4.1 Inputs
 
@@ -83,9 +97,14 @@ threshold t, count n
 
 $$K \xleftarrow{\$} \{0,1\}^{256}$$
 
-**Step 2 — Generate a random nonce:**
+**Step 2 — Generate a random container identifier and derive the Rust nonce:**
 
-$$\text{nonce} \xleftarrow{\$} \{0,1\}^{96}$$
+$$\text{container\_id} \xleftarrow{\$} \{0,1\}^{128}$$
+
+$$\text{nonce} \leftarrow \text{HKDF-SHA256}(\text{container\_id},
+\text{"qvault-v2"},\text{"qvault-container-nonce"})[0..12]$$
+
+The browser construction instead samples its 12-byte AES-GCM nonce directly.
 
 **Step 3 — Encrypt the plaintext with AES-256-GCM:**
 
@@ -131,7 +150,9 @@ $$\sigma \leftarrow \text{SIG.Sign}(\text{sig\_sk},\ M_\text{canon})$$
 ```
 function Encrypt(F, pks, sig_sk, n, t):
   K   ← random(32)
-  IV  ← random(12)
+  created_at  ← current_unix_seconds()
+  container_id ← random(16)
+  IV  ← HKDF-SHA256(container_id, "qvault-v2", "qvault-container-nonce")[0..12]
   AAD ← serialize_aad(cipher, container_id, created_at, kem_alg,
                       nonce=IV, share_count=n, sig_alg, threshold=t, version)
   C   ← AES_GCM_Encrypt(K, IV, F, AAD)
@@ -145,9 +166,12 @@ function Encrypt(F, pks, sig_sk, n, t):
     zeroize(ss_i)
     encrypted_shares.append({index: i, kem_ciphertext: ct_i, encrypted_share: E_i})
 
-  container ← {version, cipher, kem_alg, sig_alg, t, n, IV, C, encrypted_shares, sig: ∅}
+  container ← {magic: "QVKP", version: 2, cipher, kem_algorithm: kem_alg,
+               sig_algorithm: sig_alg, threshold: t, share_count: n,
+               created_at, container_id, nonce: IV, ciphertext: C,
+               shares: encrypted_shares, signature: ∅}
   M         ← canonical_bytes(container)
-  container.sig ← SIG.Sign(sig_sk, M)
+  container.signature ← SIG.Sign(sig_sk, M)
   return container
 ```
 
@@ -158,7 +182,7 @@ function Encrypt(F, pks, sig_sk, n, t):
 ### 5.1 Inputs
 
 ```
-container            JSON v1 container
+container            parsed `QVKP` JSON v2 Rust container
 privkeys             [sk_{i1}, ..., sk_{im}]   (m ≥ t KEM private keys)
 share_indices        [i1, ..., im]              (indices in container.shares)
 sig_pk               signature verification key
@@ -236,11 +260,10 @@ See `crates/qv-core/src/encrypt.rs::aad_bytes` for the authoritative constructio
 
 ### 6.2 Signing Canonical Byte String
 
-The signed corpus is the UTF-8 encoding of a JSON object with **keys sorted
-alphabetically at every level** and byte arrays base64-encoded.  The
-`signature` field is excluded.  Using field names as delimiters rather than
-raw byte concatenation makes the encoding injective — no two distinct
-containers can produce the same byte string.
+Each signed corpus is compact UTF-8 JSON with deterministic keys; the
+`signature` field is excluded. The browser base64-encodes byte arrays. The Rust
+core uses JSON arrays of decimal byte values. Using named JSON fields rather
+than raw byte concatenation provides unambiguous field boundaries.
 
 **Web demo (TypeScript) corpus:**
 
@@ -269,11 +292,13 @@ containers can produce the same byte string.
 
 ```json
 {
-  "ciphertext":     [<bytes>],
   "cipher":         "Aes256Gcm",
+  "ciphertext":     [<uint8>, ...],
+  "container_id":   [<uint8>, ...],
+  "created_at":     <uint64>,
   "kem_algorithm":  "<string>",
-  "magic":          "QVLT1",
-  "nonce":          [<bytes>],
+  "magic":          "QVKP",
+  "nonce":          [<uint8>, ...],
   "share_count":    <uint8>,
   "shares":         [{...}],
   "sig_algorithm":  "<string>",
@@ -282,26 +307,34 @@ containers can produce the same byte string.
 }
 ```
 
-Both implementations sort keys alphabetically and sign the UTF-8 JSON bytes.
-The field sets differ because the two implementations use different container
-formats (see §3.2); they are not cross-compatible at the container level.
+Both implementations sign deterministic UTF-8 JSON bytes. The Rust top-level
+keys appear in the alphabetical order shown, and its byte arrays are not
+base64. The field sets differ because the two implementations use different
+container formats (see §3.2); they are not cross-compatible at the container
+level.
 
 ### 6.3 AeadProtect Share Wrapping
 
-Each Shamir share is wrapped with AES-256-GCM using the KEM shared secret as
-the encryption key:
+The Rust core derives a distinct AES-256-GCM key and deterministic nonce from
+the KEM shared secret with HKDF-SHA-256 and separate labels:
 
 ```
 function AeadProtect(share_data, kem_shared_secret):
-  key   ← kem_shared_secret          # 32 bytes
-  nonce ← random(12)                 # 96-bit IV (stored in container)
+  key   ← HKDF(kem_shared_secret, "qvault-v2", "qvault-share-key", 32)
+  nonce ← HKDF(kem_shared_secret, "qvault-v2", "qvault-share-nonce", 12)
   E     ← AES-256-GCM-Encrypt(key, nonce, share_data, AAD="")
-  return (nonce, E)                  # E includes the 16-byte auth tag
+  return nonce || E                  # E includes the 16-byte auth tag
 
-function AeadProtect⁻¹(nonce, E, kem_shared_secret):
-  key ← kem_shared_secret
+function AeadProtect⁻¹(nonce || E, kem_shared_secret):
+  expected_nonce ← HKDF(kem_shared_secret, "qvault-v2", "qvault-share-nonce", 12)
+  abort unless nonce == expected_nonce
+  key ← HKDF(kem_shared_secret, "qvault-v2", "qvault-share-key", 32)
   return AES-256-GCM-Decrypt(key, nonce, E, AAD="")  # aborts if tag invalid
 ```
+
+The browser path instead imports the 32-byte KEM shared secret directly as its
+AES key, samples and stores a random 12-byte share nonce, and separately wraps
+the KEM private key under a password-derived AES key.
 
 Authentication tag verification provides integrity and prevents an attacker
 who corrupts a share ciphertext from learning anything about the share content.
@@ -319,11 +352,16 @@ $\text{GF}(2^8)$ with irreducible polynomial $p(x) = x^8 + x^4 + x^3 + x^2 + 1$
 > `0x11d` is used here because 2 is a primitive element of order 255.
 
 **Split:**  
-For each byte $b$ of the secret, sample a random polynomial of degree $t-1$:
+For each byte $b$ of the secret, sample a random polynomial of degree at most
+$t-1$:
 
 $$f_b(x) = b + a_1 x + a_2 x^2 + \cdots + a_{t-1} x^{t-1} \in \text{GF}(2^8)[x]$$
 
-with $a_j \xleftarrow{\$} \text{GF}(2^8)^*$ (rejection-sampled to avoid zero).  
+with every $a_j \xleftarrow{\$} \text{GF}(2^8)$ independently and uniformly,
+including zero. Forcing the leading coefficient to be nonzero would make one
+candidate secret inconsistent with any fixed set of $t-1$ shares, violating
+perfect secrecy. A zero leading coefficient merely lowers the degree and does
+not affect reconstruction or the adversary's view.
 Share $i$ receives the evaluation $f_b(i)$ for $i = 1, \ldots, n$.
 
 **Reconstruct:**  
@@ -339,9 +377,10 @@ where all arithmetic is in $\text{GF}(2^8)$.
 
 ### 7.1 Confidentiality
 
-The file key $K$ is computationally indistinguishable from random given fewer
-than $t$ encrypted shares, under the IND-CPA security of SMAUG-T and the
-information-theoretic security of Shamir Secret Sharing.
+The file key $K$ is intended to remain hidden given fewer than $t$ recovered
+shares, conditional on the stated SMAUG-T security, the AEAD/KDF construction,
+password strength in the browser path, and the information-theoretic security
+of correctly implemented Shamir Secret Sharing.
 
 ### 7.2 Integrity
 
@@ -377,8 +416,10 @@ regardless of the adversary's computational power.
 
 - The file key $K$ and all intermediate keying material must be zeroized from
   memory after use (using the `zeroize` crate).
-- Signature verification must occur *before* any decryption operation to
-  prevent oracle attacks.
+- Signature verification occurs *before* KEM decapsulation to reduce exposure
+  of the decrypt path to inputs that fail under the selected verification key;
+  this does not replace a full chosen-ciphertext argument or authenticate the
+  browser's embedded key.
 - The `dev-backend` uses SHA-256/XOR stubs and is **not secure**; it exists
   only for tests and local development.
 - Container parsing enforces strict structural validation before any

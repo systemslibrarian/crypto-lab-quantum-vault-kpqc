@@ -113,12 +113,12 @@
 </head>
 <body>
   <h1>🔬 SMAUG-T Level 1 — Timing Side-Channel Harness</h1>
-  <p>This harness tests for timing differences that could enable a <strong>KyberSlash-style attack</strong> against the FO transform's implicit rejection mechanism.</p>
+  <p>This exploratory harness collects timing evidence around SMAUG-T operations. A measured difference can motivate investigation, but this page alone cannot establish constant-time behavior, exploitability, or a KyberSlash-style key-recovery attack.</p>
   
   <div class="panel critical-panel">
     <span class="test-label test-a">TEST A — CRITICAL</span>
-    <h2>Valid vs Invalid Ciphertext Timing (KyberSlash Test)</h2>
-    <p><strong>Attack model:</strong> An attacker modifies the KEM ciphertext in <code>localStorage</code> and measures decapsulation time. If valid and invalid ciphertexts have distinguishable timing, the FO transform's implicit rejection leaks information → potential key recovery.</p>
+    <h2>Valid vs Invalid Ciphertext Timing Probe</h2>
+    <p><strong>Model:</strong> Compare decapsulation measurements for valid and modified KEM ciphertexts. A reproducible difference would be a signal to investigate under a defined attacker/query model; statistical separation by itself does not demonstrate secret-key recovery.</p>
     <p>
       <label>Iterations per group: <input type="number" id="iterationsA" value="500" min="100" max="5000"></label>
     </p>
@@ -139,8 +139,8 @@
     </div>
     <div class="interpretation critical" id="interpretA">
       <h3>📖 Test A Interpretation</h3>
-      <p><strong>Overlapping distributions + non-significant Welch t-test:</strong> <span class="success">Good.</span> The FO implicit rejection is constant-time at measurable resolution.</p>
-      <p><strong>Separable distributions + significant Welch t-test (p &lt; 0.001):</strong> <span class="danger">CRITICAL.</span> The decapsulation leaks ciphertext validity — this is the KyberSlash attack surface. An attacker can distinguish valid from invalid ciphertexts and potentially recover the secret key via chosen-ciphertext queries.</p>
+      <p><strong>Overlapping distributions + non-significant Welch t-test:</strong> no difference was detected in that sample. This is not evidence that the implementation is constant-time.</p>
+      <p><strong>Separable distributions + significant Welch t-test (p &lt; 0.001):</strong> repeat with interleaving, multiple-testing controls, a negative control and representative systems. Only then assess whether the difference is stable, attacker-observable and secret-dependent.</p>
     </div>
   </div>
 
@@ -162,7 +162,7 @@
     </div>
     <div class="interpretation" id="interpretB">
       <h3>📖 Test B Interpretation</h3>
-      <p><strong>Tight unimodal:</strong> <span class="success">Good.</span> HWT sampling is constant-time.</p>
+      <p><strong>Tight unimodal:</strong> no obvious multimodality was observed in that sample; this does not prove HWT sampling is constant-time.</p>
       <p><strong>Bimodal or heavy-tailed:</strong> <span class="warning">Concerning.</span> May indicate rejection sampling variance in sparse secret generation.</p>
     </div>
   </div>
@@ -185,7 +185,7 @@
     </div>
     <div class="interpretation" id="interpretC">
       <h3>📖 Test C Interpretation</h3>
-      <p><strong>Tight unimodal:</strong> <span class="success">Good.</span> CBD sampling and encryption are constant-time.</p>
+      <p><strong>Tight unimodal:</strong> no obvious multimodality was observed in that sample; this does not prove CBD sampling or encryption is constant-time.</p>
       <p><strong>Multimodal:</strong> <span class="warning">Concerning.</span> May indicate data-dependent branching in polynomial operations.</p>
     </div>
   </div>
@@ -195,7 +195,7 @@
     <p><code>performance.now()</code> resolution depends on Cross-Origin Isolation headers:</p>
     <pre>Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp</pre>
-    <p>Without these headers (e.g., on GitHub Pages), timer resolution is degraded to ~100µs. Run via <code>npm run dev</code> with Vite to get ~5µs resolution.</p>
+    <p>Cross-origin isolation can affect timer resolution, but the exact value is browser/platform dependent. Use the measured value below and record the complete environment with exported samples.</p>
     <p>Current resolution: <strong id="timerRes">measuring...</strong></p>
   </div>
 
@@ -329,6 +329,7 @@ Cross-Origin-Embedder-Policy: require-corp</pre>
     window.runTestA = async function() {
       const btn = document.getElementById('runBtnA');
       const status = document.getElementById('statusA');
+      let secretKey = null;
       btn.disabled = true;
       status.textContent = 'Initializing WASM module...';
 
@@ -336,10 +337,13 @@ Cross-Origin-Embedder-Policy: require-corp</pre>
         if (!smaugModule) await initSmaug();
 
         status.textContent = 'Generating keypair...';
-        const { publicKey, secretKey } = smaugKeypair();
+        const keypair = smaugKeypair();
+        const publicKey = keypair.publicKey;
+        secretKey = keypair.secretKey;
         
         status.textContent = 'Creating valid ciphertext...';
         const { ciphertext: validCT, sharedSecret: validSS } = smaugEncapsulate(publicKey);
+        validSS.fill(0);
         
         // Create an invalid ciphertext by flipping one byte
         const invalidCT = validCT.slice();
@@ -351,8 +355,8 @@ Cross-Origin-Embedder-Policy: require-corp</pre>
         // Warm-up
         status.textContent = 'Warming up (20 iterations each)...';
         for (let i = 0; i < 20; i++) {
-          smaugDecapsulate(validCT, secretKey);
-          smaugDecapsulate(invalidCT, secretKey);
+          smaugDecapsulate(validCT, secretKey).fill(0);
+          smaugDecapsulate(invalidCT, secretKey).fill(0);
         }
 
         // Interleaved benchmark to minimize systematic drift
@@ -369,26 +373,29 @@ Cross-Origin-Embedder-Policy: require-corp</pre>
             const ssV = smaugDecapsulate(validCT, secretKey);
             let end = performance.now();
             timingDataA.valid.push({ iteration: i, timeMs: end - start });
+            ssV.fill(0);
 
             start = performance.now();
             const ssI = smaugDecapsulate(invalidCT, secretKey);
             end = performance.now();
             timingDataA.invalid.push({ iteration: i, timeMs: end - start });
+            ssI.fill(0);
           } else {
             // Invalid first
             let start = performance.now();
             const ssI = smaugDecapsulate(invalidCT, secretKey);
             let end = performance.now();
             timingDataA.invalid.push({ iteration: i, timeMs: end - start });
+            ssI.fill(0);
 
             start = performance.now();
             const ssV = smaugDecapsulate(validCT, secretKey);
             end = performance.now();
             timingDataA.valid.push({ iteration: i, timeMs: end - start });
+            ssV.fill(0);
           }
         }
 
-        secretKey.fill(0);
         status.textContent = `Completed ${iterations}×2 decapsulation operations.`;
         document.getElementById('downloadBtnA').disabled = false;
 
@@ -401,6 +408,7 @@ Cross-Origin-Embedder-Policy: require-corp</pre>
         status.textContent = `Error: ${e.message}`;
         console.error(e);
       } finally {
+        secretKey?.fill(0);
         btn.disabled = false;
       }
     }
@@ -447,14 +455,14 @@ Cross-Origin-Embedder-Policy: require-corp</pre>
       const isLeak = p < 0.001;
       resultDiv.className = isLeak ? 'leak' : 'safe';
       resultDiv.innerHTML = isLeak
-        ? `<strong class="danger">⚠️ POTENTIAL TIMING LEAK DETECTED</strong><br>
+        ? `<strong class="danger">⚠️ STATISTICAL TIMING DIFFERENCE DETECTED</strong><br>
            Welch t-test: t=${t.toFixed(3)}, df=${df.toFixed(1)}, <strong>p=${p.toExponential(3)}</strong><br>
            Mean difference: ${meanDiff.toFixed(1)} µs (valid - invalid)<br>
-           <em>The distributions are statistically distinguishable. This could enable a KyberSlash-style attack.</em>`
-        : `<strong class="success">✓ No significant timing difference detected</strong><br>
+           <em>Repeat and investigate the cause; this result alone does not establish exploitability or key recovery.</em>`
+        : `<strong class="success">✓ No significant timing difference detected in this sample</strong><br>
            Welch t-test: t=${t.toFixed(3)}, df=${df.toFixed(1)}, p=${p.toFixed(4)}<br>
            Mean difference: ${meanDiff.toFixed(1)} µs (valid - invalid)<br>
-           <em>The FO implicit rejection appears to be constant-time at this measurement resolution.</em>`;
+           <em>A non-significant result does not establish constant-time behavior.</em>`;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

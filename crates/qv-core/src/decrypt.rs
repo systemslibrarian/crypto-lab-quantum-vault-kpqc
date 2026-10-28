@@ -13,7 +13,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Key, Nonce,
 };
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Decrypts a [`QuantumVaultContainer`] back to plaintext bytes.
 ///
@@ -36,6 +36,12 @@ pub fn decrypt_file(
     }
     if options.share_indices.len() < container.threshold as usize {
         return Err(QvError::InvalidInput("insufficient shares supplied"));
+    }
+    if container.kem_algorithm != kem.algorithm_id() {
+        return Err(QvError::UnsupportedAlgorithm("KEM backend mismatch"));
+    }
+    if container.sig_algorithm != signer.algorithm_id() {
+        return Err(QvError::UnsupportedAlgorithm("signature backend mismatch"));
     }
 
     // 1. Verify the signature before touching any ciphertext material.
@@ -72,8 +78,9 @@ pub fn decrypt_file(
         let mut ss = kem
             .decapsulate(privkey, &enc_share.kem_ciphertext)
             .map_err(|_| QvError::DecryptionFailed)?;
-        let share_data = aead_unprotect(&enc_share.encrypted_share, &ss)?;
+        let share_result = aead_unprotect(&enc_share.encrypted_share, &ss);
         ss.zeroize();
+        let share_data = share_result?;
         shares.push(Share {
             index: enc_share.index,
             data: share_data,
@@ -81,7 +88,8 @@ pub fn decrypt_file(
     }
 
     // 3. Reconstruct the file key from the recovered shares.
-    let mut file_key = reconstruct_secret(&shares).map_err(|_| QvError::DecryptionFailed)?;
+    let mut file_key =
+        Zeroizing::new(reconstruct_secret(&shares).map_err(|_| QvError::DecryptionFailed)?);
 
     // Zeroize share data before the early-return path.
     for s in shares.iter_mut() {

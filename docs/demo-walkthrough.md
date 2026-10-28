@@ -1,30 +1,35 @@
 # Quantum Vault — Demo Walkthrough
 
 **Version:** 1.0  
-**Date:** 2026-03  
+**Date:** 2026-10-23
 **Applies to:** Web demo v5.1 (real KpqC WASM)
 
 ---
 
 ## Overview
 
-The web demo is a single-page application that presents a 4×3 grid of twelve
-numbered safety deposit boxes (01–12).  Three of them (03, 06, 09) are
-pre-sealed on first load using **real** SMAUG-T Level 1 KEM and HAETAE Mode 2
-signatures — the same algorithms from the KpqC competition.  The remaining nine
-boxes are empty and can be filled with your own secrets.
+The web demo is a single-page application that presents a 3×3 grid of nine
+numbered safety deposit boxes (01–09). In English, three of them (03, 06, 09)
+are pre-sealed on first use with SMAUG-T Level 1 KEM and HAETAE Mode 2
+signatures from the KpqC competition reference implementations. The remaining
+six boxes are empty and can be filled with your own secrets.
 
-Every cryptographic operation runs inside Emscripten-compiled WebAssembly; there
-are no mock implementations, HMAC substitutes, or pre-computed values.
+The SMAUG-T and HAETAE operations run inside Emscripten-compiled WebAssembly.
+AES-GCM and PBKDF2 use the browser's Web Crypto API, and Shamir splitting and
+reconstruction use the TypeScript implementation in this repository. The
+active browser pipeline has no mock KEM/signature substitutions or pre-computed
+cryptographic results.
 
 ---
 
 ## 1. The Vault Wall
 
-On first visit the application calls `generateDemoBoxes()`, which runs three full
-`sealMessage()` pipelines (one per demo box) before rendering the wall.  Because
-fresh random keys and nonces are derived each time, the ciphertext stored in
-session state is always unique — but the documented passwords always unlock it.
+On first use the application calls `generateDemoBoxes()`, which runs three full
+`sealMessage()` pipelines (one per demo box) before rendering the wall. Fresh
+random keys, salts and nonces make each newly generated container different,
+while the documented passwords still unlock it. The generated boxes persist in
+`localStorage`; an ordinary reload reuses that stored state rather than sealing
+the demos again.
 
 Box appearance:
 
@@ -42,8 +47,10 @@ form.
 
 ## 2. Pre-Loaded Demo Boxes
 
-These three boxes are available on every fresh page load. If you delete them,
-reloading the page will restore them to their original state.
+These three boxes are generated on first use and by the explicit **Reset vault**
+action. Switching language replaces tracked demo boxes with that language's demo
+set. **Clear vault** deliberately persists an empty vault, so an ordinary reload
+does not restore cleared boxes.
 
 | Box | Secret | Alice's key | Bob's key | Carol's key |
 |-----|--------|-------------|-----------|-------------|
@@ -104,20 +111,29 @@ For each participant:
 4. The SMAUG-T secret key itself is encrypted with a key derived by
    PBKDF2-SHA-256 (600 000 iterations) from the participant's password.
 
-All four SMAUG-T outputs (salt, KEM ciphertext, wrapped share, wrapped SK) plus
-their nonces are stored as a `WrappedShare` record.
+Only the KEM ciphertext and shared secret in that sequence are SMAUG-T outputs.
+The password salt and AES-GCM nonces come from browser randomness, while Web
+Crypto produces the encrypted share and encrypted secret key. The persisted
+salt, KEM ciphertext, wrapped share, wrapped secret key and nonces form a
+`WrappedShare` record; the shared secret itself is not stored.
 
 **HAETAE sign**  
-A one-time HAETAE Mode 2 keypair (992-byte VK, 1408-byte SK) is generated.
-The hash input is the concatenation of all persistent container fields:
+A one-time HAETAE Mode 2 keypair (992-byte VK, 1408-byte SK) is generated. The
+signed message is compact UTF-8 JSON with alphabetically ordered keys and
+base64-encoded byte arrays. It contains these persistent `SealedBox` fields:
 
 ```
-nonce ‖ ciphertext ‖ [salt ‖ kemCT ‖ wrappedShare ‖ shareNonce ‖ pk ‖ wrappedSK ‖ skNonce] × 3
+ciphertext, createdAt, nonce, sigPublicKey,
+wrappedShares[iterations, kemCiphertext, publicKey, salt,
+              shareNonce, skNonce, wrappedSecretKey, wrappedShare]
 ```
 
 `haetae_sign()` produces a signature of up to 1474 bytes.  The verification
 key VK is stored in `sigPublicKey` alongside the container.  The signing key SK
-is discarded.
+is discarded. Because the verification key travels inside the same container
+and is not pinned to an external identity, this demonstrates consistency under
+the included key, not original-sender authentication against wholesale
+key-and-signature replacement.
 
 ### 3.3 Result
 
@@ -148,12 +164,14 @@ HAETAE verify  →  SMAUG-T unlock  →  Shamir reconstruct  →  AES-256-GCM
 
 **HAETAE verify**  
 Before any decryption is attempted, `haetae_verify()` (WASM) checks the
-container signature over the same byte-concatenation used at seal time.  A
+container signature over the same canonical JSON used at seal time. A
 return value of zero means the container is intact; non-zero stops the pipeline
 immediately and returns a failure result without touching the ciphertext.
 
-This step catches bit-flips, truncation, reordering of shares, or any other
-tampering with the stored container bytes.
+This step catches bit-flips, truncation, reordering of shares, or other changes
+to the signed fields under the selected embedded key. It does not establish who
+created the container, because an attacker who can replace the whole container
+can also supply a new key and signature.
 
 **SMAUG-T unlock** (per non-empty password)  
 For each field that was filled in:
@@ -167,18 +185,21 @@ For each field that was filled in:
 
 **Shamir reconstruct**  
 `reconstructSecret()` runs Lagrange interpolation over GF(2⁸) with however many
-valid shares were recovered.  If validShares < 2, the output is mathematically
-wrong but the function does not throw — the error is caught in the next step.
+valid shares were recovered. With one share it returns an underdetermined
+candidate rather than throwing; that candidate is authenticated in the next
+step.
 
-If the threshold is not met, the pipeline indicator marks `Shamir reconstruct`
-as `failed` (red) and stops.  The step indicator for AES-256-GCM is never
-activated.
+With one valid share, the core still passes the Lagrange output to AES-GCM so
+the authentication tag provides the actual acceptance decision. The UI then
+marks `Shamir reconstruct` as a warning and does not animate the AES step. With
+zero valid shares, reconstruction and AES-GCM are skipped.
 
 **AES-256-GCM**  
 `crypto.subtle.decrypt` attempts to decrypt the ciphertext with the reconstructed
-key.  If exactly 1 valid share was recovered, the key is incorrect and the
-16-byte GCM auth tag will not match → another `DOMException`; the failure path
-is taken.  If 2 or 3 valid shares were recovered, decryption succeeds.
+key. With exactly one valid share, the reconstruction is independent of the
+unknown secret from the attacker's view and normally fails the 16-byte GCM
+authentication tag. With two or three valid shares, decryption succeeds. The
+tag—not the share count—is the core's final acceptance test.
 
 ### 4.3 Success Path
 
@@ -190,27 +211,29 @@ is genuine decryption output, not pre-stored plaintext.
 
 In **every** failure path the cycling gibberish shown before ACCESS DENIED is
 freshly generated by `crypto.getRandomValues` in `pipeline.ts` — it is never
-derived from key or share material.  `showGibberish` in `ui/reveal.ts` then XORs
+derived from key or share material. The display input is bounded to 8–256 bytes,
+regardless of ciphertext size. `showGibberish` in `ui/reveal.ts` then XORs
 those random bytes against `cycle * 37 + i` on each of its four ~120 ms frames
-purely to make the strip flicker.  The *key strip* is the part that shows real
-bytes: it renders the genuine Lagrange output, right or wrong.
+purely to make the strip flicker. The *key strip* is the part that shows real
+bytes: it renders the genuine Lagrange candidate, whether authenticated or not.
 
 **Wrong password(s) — threshold not met:**  
-The pipeline reaches `Shamir reconstruct` and marks it `warn` (a confidentiality
-shortfall, distinct from the red integrity failure below), then stops.  The key
-strip shows the genuine incorrect Lagrange output; the ~480 ms gibberish strip
-before ACCESS DENIED is random bytes.
+With one recovered share, the core reconstructs a candidate and attempts
+AES-GCM authentication; the UI animation reaches `Shamir reconstruct`, marks it
+`warn` and does not animate the already-completed AES attempt. The key strip
+shows that genuine candidate; the ~480 ms gibberish strip before ACCESS DENIED
+is random bytes. With no recovered share, there is no Lagrange output to show.
 
 **HAETAE verify fails (tampered container):**  
 The pipeline halts before SMAUG-T unlock.  No share is unwrapped and no
 decryption of any sort is performed, so there is no Lagrange output to show —
 only the random-byte gibberish strip.
 
-**Wrong key at exact threshold (1 valid share only):**  
-SMAUG-T unlock succeeds for one share; Shamir reconstruct runs with 1 share and
-produces a wrong key; AES-GCM rejects it on the auth tag.  This is the same code
-path as the first case: the key strip shows the real wrong reconstruction, and
-the gibberish strip is again random bytes.
+**One valid share:**
+SMAUG-T unlock succeeds for one share; Shamir reconstruction produces a
+candidate key; AES-GCM normally rejects it on the authentication tag. This is
+the one-share case described above: the key strip shows the real reconstruction
+candidate, and the gibberish strip is again random bytes.
 
 ---
 
@@ -226,7 +249,7 @@ the gibberish strip is again random bytes.
 | Pipeline step animation timing | Visual only (500 ms `sleep()` per step) |
 | Letter-by-letter reveal | Visual only (the decrypted string is known before animation starts) |
 | Gibberish animation cycles | Visual only — fresh `crypto.getRandomValues` bytes, displayed with cycling XOR masks |
-| Key strip after a failed open | Yes — the genuine (wrong) Lagrange reconstruction |
+| Key strip after a failed open | Yes — the genuine, unauthenticated Lagrange candidate |
 
 ---
 

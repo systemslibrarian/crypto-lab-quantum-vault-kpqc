@@ -29,6 +29,11 @@ function zeroizeOpenVisual(v: OpenVisual): void {
   for (const s of v.recoveredShares) s?.fill(0);
 }
 
+function zeroizeSealVisual(v: { key: Uint8Array; shares: Uint8Array[] }): void {
+  v.key.fill(0);
+  for (const s of v.shares) s.fill(0);
+}
+
 const initDiagnostics: string[] = [];
 
 function recordInitStep(step: string): void {
@@ -148,10 +153,12 @@ async function init(): Promise<void> {
     // Run crypto first so the split animation can show the REAL key + shares.
     // (Crypto typically completes in ~4–6 s: 3 × PBKDF2 600k iterations.)
     const { box: sealedBox, visual } = await sealMessageWithVisual(message, passwords);
-    await animateSealPipeline(pipelineArea, visual);
-    // Zeroize the visualization copies of the key + shares once rendered.
-    visual.key.fill(0);
-    for (const s of visual.shares) s.fill(0);
+    try {
+      await animateSealPipeline(pipelineArea, visual);
+    } finally {
+      // Animation errors must not retain copies of the key or shares.
+      zeroizeSealVisual(visual);
+    }
 
     state.boxes[boxNumber] = serializeSealedBox(sealedBox);
     saveVaultState(state);
@@ -185,9 +192,12 @@ async function init(): Promise<void> {
 
     // Animate pipeline from the REAL open result — distinct failure modes and
     // the genuine reconstructed key-strip are driven by result.visual.
-    await animateOpenPipeline(pipelineArea, result.visual);
-    // Zeroize the visualization copies of key material once rendered.
-    zeroizeOpenVisual(result.visual);
+    try {
+      await animateOpenPipeline(pipelineArea, result.visual);
+    } finally {
+      // Animation errors must not retain recovered shares or reconstructed keys.
+      zeroizeOpenVisual(result.visual);
+    }
 
     if (result.success) {
       updateRetrieveTitle(panelEl, `Box ${boxNumber} — ${t('decrypted')}`);
@@ -238,8 +248,11 @@ async function init(): Promise<void> {
     tampered.ciphertext[0] ^= 0xff; // flip one byte — genuine, not simulated
 
     const result = await openBox(tampered, [null, null, null]);
-    await animateOpenPipeline(pipelineArea, result.visual);
-    zeroizeOpenVisual(result.visual);
+    try {
+      await animateOpenPipeline(pipelineArea, result.visual);
+    } finally {
+      zeroizeOpenVisual(result.visual);
+    }
 
     updateRetrieveTitle(panelEl, `Box ${boxNumber} — ${t('accessDenied')}`);
     const msgEl = document.createElement('div');

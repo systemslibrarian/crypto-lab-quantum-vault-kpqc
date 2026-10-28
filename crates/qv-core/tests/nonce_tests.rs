@@ -81,6 +81,7 @@ fn nonce_length_is_12_bytes() {
 ///
 /// This checks the full pipeline, not just the helper function.
 #[test]
+#[cfg(feature = "dev-backend")]
 fn pipeline_nonces_are_distinct() {
     use qv_core::{decrypt_bytes, encrypt_bytes};
 

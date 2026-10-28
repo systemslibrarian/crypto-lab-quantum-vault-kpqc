@@ -1,4 +1,5 @@
-// Real SMAUG-T (KpqC standard) key encapsulation for Shamir share wrapping.
+// Real SMAUG-T (a final KpqC competition algorithm and Korean-standardization
+// candidate, not itself a published standard) for Shamir share wrapping.
 //
 // Deposit flow for each participant:
 //   1. Generate a fresh SMAUG-T keypair
@@ -30,13 +31,21 @@ export interface WrappedShare {
 
 /** Derive a 256-bit AES key from a password using PBKDF2-SHA-256. */
 async function derivePasswordKey(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
-  const pwKey = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveKey'],
-  );
+  const passwordBytes = new TextEncoder().encode(password);
+  let pwKey: CryptoKey;
+  try {
+    pwKey = await crypto.subtle.importKey(
+      'raw',
+      passwordBytes,
+      'PBKDF2',
+      false,
+      ['deriveKey'],
+    );
+  } finally {
+    // The JavaScript string remains managed by the engine, but do not retain an
+    // additional encoded byte copy after Web Crypto has imported it.
+    passwordBytes.fill(0);
+  }
   return crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt: buf(salt), iterations, hash: 'SHA-256' },
     pwKey,
@@ -65,30 +74,36 @@ export async function wrapShare(
 
   // 1. Generate a fresh SMAUG-T keypair for this share
   const { publicKey, secretKey } = smaugKeypair();
+  try {
+    // 2. Encapsulate against the public key → KEM ciphertext + shared secret
+    const { ciphertext: kemCiphertext, sharedSecret } = smaugEncapsulate(publicKey);
+    let wrappedShare: Uint8Array;
+    let shareNonce: Uint8Array;
+    try {
+      shareNonce = crypto.getRandomValues(new Uint8Array(12));
+      // 3. AES-GCM encrypt the Shamir share using the KEM shared secret
+      const shareWrapKey = await importSharedSecretAsKey(sharedSecret);
+      const wrappedShareBuf = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: buf(shareNonce) }, shareWrapKey, buf(shareData),
+      );
+      wrappedShare = new Uint8Array(wrappedShareBuf);
+    } finally {
+      sharedSecret.fill(0);
+    }
 
-  // 2. Encapsulate against the public key → KEM ciphertext + shared secret
-  const { ciphertext: kemCiphertext, sharedSecret } = smaugEncapsulate(publicKey);
+    // 4. Encrypt the SMAUG-T secret key with the password-derived AES key
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const passwordKey = await derivePasswordKey(password, salt, PBKDF2_ITERATIONS);
+    const skNonce = crypto.getRandomValues(new Uint8Array(12));
+    const wrappedSKBuf = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: buf(skNonce) }, passwordKey, buf(secretKey),
+    );
+    const wrappedSecretKey = new Uint8Array(wrappedSKBuf);
 
-  // 3. AES-GCM encrypt the Shamir share using the KEM shared secret
-  const shareWrapKey = await importSharedSecretAsKey(sharedSecret);
-  const shareNonce = crypto.getRandomValues(new Uint8Array(12));
-  const wrappedShareBuf = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: buf(shareNonce) }, shareWrapKey, buf(shareData),
-  );
-  const wrappedShare = new Uint8Array(wrappedShareBuf);
-  sharedSecret.fill(0);
-
-  // 4. Encrypt the SMAUG-T secret key with the password-derived AES key
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const passwordKey = await derivePasswordKey(password, salt, PBKDF2_ITERATIONS);
-  const skNonce = crypto.getRandomValues(new Uint8Array(12));
-  const wrappedSKBuf = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: buf(skNonce) }, passwordKey, buf(secretKey),
-  );
-  const wrappedSecretKey = new Uint8Array(wrappedSKBuf);
-  secretKey.fill(0);
-
-  return { salt, kemCiphertext, wrappedShare, shareNonce, publicKey, wrappedSecretKey, skNonce, iterations: PBKDF2_ITERATIONS };
+    return { salt, kemCiphertext, wrappedShare, shareNonce, publicKey, wrappedSecretKey, skNonce, iterations: PBKDF2_ITERATIONS };
+  } finally {
+    secretKey.fill(0);
+  }
 }
 
 export async function unwrapShare(
@@ -103,16 +118,20 @@ export async function unwrapShare(
     { name: 'AES-GCM', iv: buf(wrapped.skNonce) }, passwordKey, buf(wrapped.wrappedSecretKey),
   );
   const secretKey = new Uint8Array(skBuf);
-
-  // 3. SMAUG-T decapsulate → recover the KEM shared secret
-  const sharedSecret = smaugDecapsulate(wrapped.kemCiphertext, secretKey);
-  secretKey.fill(0);
-
-  // 4. AES-GCM decrypt the Shamir share using the recovered shared secret
-  const shareWrapKey = await importSharedSecretAsKey(sharedSecret);
-  const shareBytes = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: buf(wrapped.shareNonce) }, shareWrapKey, buf(wrapped.wrappedShare),
-  );
-  sharedSecret.fill(0);
-  return new Uint8Array(shareBytes);
+  try {
+    // 3. SMAUG-T decapsulate → recover the KEM shared secret
+    const sharedSecret = smaugDecapsulate(wrapped.kemCiphertext, secretKey);
+    try {
+      // 4. AES-GCM decrypt the Shamir share using the recovered shared secret
+      const shareWrapKey = await importSharedSecretAsKey(sharedSecret);
+      const shareBytes = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: buf(wrapped.shareNonce) }, shareWrapKey, buf(wrapped.wrappedShare),
+      );
+      return new Uint8Array(shareBytes);
+    } finally {
+      sharedSecret.fill(0);
+    }
+  } finally {
+    secretKey.fill(0);
+  }
 }

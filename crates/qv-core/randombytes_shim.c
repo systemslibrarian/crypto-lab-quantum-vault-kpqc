@@ -2,10 +2,10 @@
  * randombytes_shim.c
  *
  * Provides the `randombytes` function required by SMAUG-T and HAETAE reference
- * implementations. Uses OS-level entropy (getrandom / arc4random / /dev/urandom)
- * instead of the NIST SP 800-90A CTR-DRBG in the reference implementations'
- * own randombytes.c, which is intended for KAT testing only and MUST NOT be
- * used in production.
+ * implementations. It provides one reviewed cross-platform OS-entropy path
+ * (getrandom / arc4random / /dev/urandom) in place of the upstream platform
+ * adapters. The separate SMAUG-T rng.c KAT/seed-expander implementation is
+ * deliberately not linked by build.rs.
  */
 
 #include <stddef.h>
@@ -16,7 +16,7 @@
 # include <stdlib.h>
 # include <sys/random.h>
 
-void randombytes(uint8_t *x, size_t xlen) {
+int randombytes(uint8_t *x, size_t xlen) {
     size_t done = 0;
     while (done < xlen) {
         ssize_t n = getrandom(x + done, xlen - done, 0);
@@ -29,13 +29,15 @@ void randombytes(uint8_t *x, size_t xlen) {
             abort();
         }
     }
+    return 0;
 }
 
 #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
 # include <stdlib.h>
 
-void randombytes(uint8_t *x, size_t xlen) {
+int randombytes(uint8_t *x, size_t xlen) {
     arc4random_buf(x, xlen);
+    return 0;
 }
 
 #else
@@ -44,7 +46,7 @@ void randombytes(uint8_t *x, size_t xlen) {
 # include <stdio.h>
 # include <stdlib.h>
 
-void randombytes(uint8_t *x, size_t xlen) {
+int randombytes(uint8_t *x, size_t xlen) {
     FILE *f = fopen("/dev/urandom", "rb");
     if (f == NULL) {
         abort();
@@ -59,5 +61,6 @@ void randombytes(uint8_t *x, size_t xlen) {
         done += n;
     }
     fclose(f);
+    return 0;
 }
 #endif

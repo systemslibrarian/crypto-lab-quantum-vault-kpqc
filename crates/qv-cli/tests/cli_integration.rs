@@ -106,10 +106,11 @@ fn encrypt_decrypt_roundtrip_2_of_2() {
 
     assert!(output_path.exists());
 
-    // Read private keys for decryption
-    let alice_priv = fs::read_to_string(tmp.path().join("alice.kem.priv")).unwrap();
-    let bob_priv = fs::read_to_string(tmp.path().join("bob.kem.priv")).unwrap();
-    let privkeys = format!("{},{}", alice_priv.trim(), bob_priv.trim());
+    let privkeys = format!(
+        "1:{},2:{}",
+        tmp.path().join("alice.kem.priv").display(),
+        tmp.path().join("bob.kem.priv").display(),
+    );
 
     // Decrypt
     qv().args([
@@ -189,10 +190,12 @@ fn encrypt_decrypt_roundtrip_2_of_3() {
     .assert()
     .success();
 
-    // Decrypt with only alice + bob (skipping carol) — should work with 2-of-3
-    let alice_priv = fs::read_to_string(tmp.path().join("alice.kem.priv")).unwrap();
-    let bob_priv = fs::read_to_string(tmp.path().join("bob.kem.priv")).unwrap();
-    let privkeys = format!("{},{}", alice_priv.trim(), bob_priv.trim());
+    // Decrypt with non-consecutive Alice + Carol shares — should work with 2-of-3.
+    let privkeys = format!(
+        "1:{},3:{}",
+        tmp.path().join("alice.kem.priv").display(),
+        tmp.path().join("carol.kem.priv").display(),
+    );
 
     qv().args([
         "decrypt",
@@ -262,35 +265,27 @@ fn decrypt_fails_with_insufficient_keys() {
     .assert()
     .success();
 
-    // Try to decrypt with only alice's key (1-of-2) — should fail or produce garbage
-    let alice_priv = fs::read_to_string(tmp.path().join("alice.kem.priv")).unwrap();
+    // Try to decrypt with only Alice's key (1-of-2): the CLI must fail closed
+    // before Shamir interpolation and must not create plaintext output.
+    let alice_priv = format!("1:{}", tmp.path().join("alice.kem.priv").display());
 
-    let _result = qv()
-        .args([
-            "decrypt",
-            "--in",
-            output_path.to_str().unwrap(),
-            "--out",
-            recovered_path.to_str().unwrap(),
-            "--privkeys",
-            alice_priv.trim(),
-            "--verify-key",
-            tmp.path().join("alice.sig.pub").to_str().unwrap(),
-            "--backend",
-            "dev",
-        ])
-        .assert();
-
-    // The CLI should either fail outright or produce incorrect output
-    // (due to Shamir reconstruction with fewer than threshold shares)
-    if recovered_path.exists() {
-        let recovered = fs::read(&recovered_path).unwrap();
-        assert_ne!(
-            recovered, plaintext,
-            "decryption with insufficient keys should not produce correct plaintext"
-        );
-    }
-    // If the command failed, that's also acceptable
+    qv().args([
+        "decrypt",
+        "--in",
+        output_path.to_str().unwrap(),
+        "--out",
+        recovered_path.to_str().unwrap(),
+        "--privkeys",
+        &alice_priv,
+        "--verify-key",
+        tmp.path().join("alice.sig.pub").to_str().unwrap(),
+        "--backend",
+        "dev",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("insufficient shares supplied"));
+    assert!(!recovered_path.exists());
 }
 
 #[test]
@@ -332,7 +327,7 @@ fn decrypt_rejects_invalid_container() {
         .assert()
         .success();
 
-    let priv_key = fs::read_to_string(tmp.path().join("qv-key.kem.priv")).unwrap();
+    let priv_key = format!("1:{}", tmp.path().join("qv-key.kem.priv").display());
 
     qv().args([
         "decrypt",
@@ -341,7 +336,7 @@ fn decrypt_rejects_invalid_container() {
         "--out",
         tmp.path().join("out.txt").to_str().unwrap(),
         "--privkeys",
-        priv_key.trim(),
+        &priv_key,
         "--verify-key",
         tmp.path().join("qv-key.sig.pub").to_str().unwrap(),
     ])

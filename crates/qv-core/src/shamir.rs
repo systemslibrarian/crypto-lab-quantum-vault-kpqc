@@ -26,7 +26,7 @@
 
 use anyhow::{anyhow, Result};
 use rand::{rngs::OsRng, RngCore};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 // ---------------------------------------------------------------------------
 // GF(2^8) arithmetic
@@ -147,7 +147,7 @@ pub fn split_secret(secret: &[u8], share_count: u8, threshold: u8) -> Result<Vec
     for &byte in secret {
         // Build a random polynomial of degree AT MOST threshold-1 whose constant
         // term is `byte`.
-        let mut coeffs = vec![0u8; threshold as usize];
+        let mut coeffs = Zeroizing::new(vec![0u8; threshold as usize]);
         coeffs[0] = byte;
 
         // ALL non-constant coefficients — including the leading one — are uniform
@@ -175,8 +175,6 @@ pub fn split_secret(secret: &[u8], share_count: u8, threshold: u8) -> Result<Vec
         for share in shares.iter_mut() {
             share.data.push(poly_eval(&coeffs, share.index));
         }
-
-        coeffs.zeroize();
     }
 
     Ok(shares)
@@ -185,8 +183,9 @@ pub fn split_secret(secret: &[u8], share_count: u8, threshold: u8) -> Result<Vec
 /// Reconstruct the secret from `shares` using Lagrange interpolation at x = 0.
 ///
 /// Any `threshold` (or more) valid shares will yield the correct secret.
-/// Providing fewer shares than the threshold will silently produce garbage —
-/// the caller is responsible for supplying enough shares.
+/// Providing fewer shares than the threshold yields an underdetermined candidate
+/// rather than an error. That candidate is not authenticated by this function;
+/// the caller is responsible for enforcing its threshold policy.
 ///
 /// # Errors
 /// Returns an error if `shares` is empty, share indices are not unique, any
@@ -273,18 +272,16 @@ mod tests {
     }
 
     #[test]
-    fn too_few_shares_produces_garbage() {
+    fn too_few_shares_return_an_unauthenticated_candidate() {
         let secret = b"test secret value";
         let shares = split_secret(secret, 3, 3).unwrap();
-        // Two shares for a 3-of-3 scheme should NOT reconstruct correctly.
-        // Each byte coincidentally matches with probability 1/256 (the case where
-        // that byte's leading coefficient was drawn as 0 — see `split_secret`), so
-        // this 17-byte secret matches with probability 256^-17. Deterministic
-        // enough for a fixed-length unit test; see the property test
-        // `shamir_under_threshold_reconstructs_uniformly` for the general claim,
-        // which must NOT assert per-byte inequality.
-        let wrong = reconstruct_secret(&shares[0..2]).unwrap();
-        assert_ne!(wrong, secret.as_slice());
+        // The interpolation primitive does not know the policy threshold. Two
+        // shares therefore produce a candidate of the right shape, but the
+        // caller must not treat it as authenticated. It may even equal the real
+        // secret by chance; asserting inequality would encode the wrong secrecy
+        // property. The property test checks the candidate distribution.
+        let candidate = reconstruct_secret(&shares[0..2]).unwrap();
+        assert_eq!(candidate.len(), secret.len());
     }
 
     #[test]

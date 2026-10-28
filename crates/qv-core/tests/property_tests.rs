@@ -6,14 +6,15 @@
 //! Run with: `cargo test --test property_tests`
 
 use proptest::prelude::*;
+use qv_core::{container::QuantumVaultContainer, reconstruct_secret, split_secret, KeyShare};
+#[cfg(feature = "dev-backend")]
 use qv_core::{
-    container::QuantumVaultContainer,
     crypto::{
         backend::dev::{DevKem, DevSignature},
         kem::Kem,
         signature::Signature,
     },
-    decrypt_bytes, encrypt_bytes, reconstruct_secret, split_secret, KeyShare,
+    decrypt_bytes, encrypt_bytes,
 };
 
 /// Helper to convert anyhow::Error to proptest::TestCaseError
@@ -216,6 +217,7 @@ proptest! {
 // Encryption Pipeline Properties
 // ============================================================================
 
+#[cfg(feature = "dev-backend")]
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
@@ -309,6 +311,7 @@ proptest! {
 // Container Serialization Properties
 // ============================================================================
 
+#[cfg(feature = "dev-backend")]
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(200))]
 
@@ -374,6 +377,7 @@ fn shamir_max_reasonable_share_count() {
 }
 
 #[test]
+#[cfg(feature = "dev-backend")]
 fn pipeline_empty_plaintext_rejected_or_handled() {
     // Empty plaintext: either rejected or handled gracefully
     let result = encrypt_bytes(b"");
@@ -382,6 +386,7 @@ fn pipeline_empty_plaintext_rejected_or_handled() {
 }
 
 #[test]
+#[cfg(feature = "dev-backend")]
 fn container_rejects_truncated_input() {
     let (ct_bytes, _, _) = encrypt_bytes(b"test data").unwrap();
     // Truncate at various points

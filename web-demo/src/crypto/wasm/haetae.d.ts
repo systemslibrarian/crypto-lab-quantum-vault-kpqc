@@ -1,3 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const createHaetaeModule: (opts?: Record<string, unknown>) => Promise<any>;
+import type { EmscriptenModuleFactory, HaetaeModule } from '../wasm-types';
+
+declare const createHaetaeModule: EmscriptenModuleFactory<HaetaeModule>;
 export default createHaetaeModule;
