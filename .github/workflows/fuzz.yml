@@ -14,6 +14,11 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# Both jobs only build and run fuzz targets from this repository. Neither
+# needs any write scope, so nothing inherits one.
+permissions:
+  contents: read
+
 jobs:
   fuzz-build:
     name: Build all fuzz targets (nightly)

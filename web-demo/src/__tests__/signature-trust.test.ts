@@ -15,7 +15,15 @@ describe('signature trust explanation', () => {
       expect(attribute).toBe(t('signatureTrust'));
     }
     setLang('en');
-    expect(paragraph.replace(/<[^>]+>/g, '').trim()).toBe(t('signatureTrust'));
+    // Capture the paragraph's own text rather than stripping tags out of it.
+    // `.replace(/<[^>]+>/g, '')` is a single-pass HTML filter, which CodeQL
+    // reports as js/incomplete-multi-character-sanitization — and it was never
+    // the right tool here: this element has no child elements (asserted
+    // below), so its content IS its text, and one capture is exact where a
+    // strip is approximate.
+    const inner = paragraph.match(/<p[^>]*>([\s\S]*)<\/p>/)?.[1] ?? '';
+    expect(inner).not.toContain('<');
+    expect(inner.trim()).toBe(t('signatureTrust'));
   });
 
   it('states the included-key replacement limit in English without weakening the invalid-signature gate', () => {
