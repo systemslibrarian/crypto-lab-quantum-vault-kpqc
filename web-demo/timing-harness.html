@@ -63,7 +63,6 @@
       font-size: 0.9rem;
     }
     .warning { color: #f0883e; }
-    .success { color: #3fb950; }
     pre {
       background: #0d1117;
       padding: 1rem;
@@ -95,10 +94,10 @@
 
   <div id="interpretation" class="panel">
     <h2>📖 Interpretation Guide</h2>
-    <p><strong>Tight, unimodal distribution:</strong> <span class="success">Good.</span> The rejection loop iteration count is not the dominant timing factor. JS engine noise masks the signal.</p>
+    <p><strong>Tight, unimodal distribution:</strong> no iteration-count structure was visible in this sample. That is not evidence of constant-time behaviour: it shows only that the rejection loop's iteration count was not the dominant factor here, and JS engine noise can mask a signal that more samples would recover.</p>
     <p><strong>Bimodal or multimodal distribution:</strong> <span class="warning">Concerning.</span> Each cluster likely corresponds to a different iteration count (2, 3, 4, ...). The spacing indicates per-iteration cost.</p>
     <p><strong>Long tail (right-skewed):</strong> <span class="warning">Moderate concern.</span> High-iteration signing operations are distinguishable but harder to exploit than bimodal.</p>
-    <p><strong>Uniform/noisy:</strong> <span class="success">Good for security.</span> The JS engine's execution environment adds enough noise to bury the signal.</p>
+    <p><strong>Uniform/noisy:</strong> no structure was visible in this sample. Noise is not a countermeasure, so this is not evidence of constant-time behaviour either: a difference buried in one sample can be recovered by averaging many.</p>
   </div>
 
   <div class="panel">
