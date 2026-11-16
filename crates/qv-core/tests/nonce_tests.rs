@@ -7,7 +7,7 @@
 //! A 96-bit (12-byte) nonce drawn from a uniform CSPRNG has a collision
 //! probability of ≈ n² / 2^{97} for n samples.  For n = 10 000:
 //!
-//!   P(collision) ≈ (10_000)² / 2^{97}  ≈  6.2 × 10⁻²⁴
+//!   P(collision) ≈ (10_000)² / 2^{97}  ≈  6.3 × 10⁻²²
 //!
 //! Any collision at this sample size would indicate a catastrophic RNG failure.
 //!
@@ -23,7 +23,7 @@ use std::collections::HashSet;
 /// Generates 10 000 nonces and asserts no two are equal.
 ///
 /// A collision here would indicate a CSPRNG failure — the probability of
-/// a legitimate collision is astronomically small (≲ 10⁻²³).
+/// a legitimate collision is astronomically small (≲ 10⁻²¹).
 #[test]
 fn nonces_are_unique_over_10k() {
     let mut seen = HashSet::with_capacity(10_000);
