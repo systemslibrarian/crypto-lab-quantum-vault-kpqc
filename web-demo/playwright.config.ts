@@ -19,7 +19,7 @@ export default defineConfig({
   retries: CI ? 2 : 0,
   reporter: CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: 'http://localhost:4213/crypto-lab-quantum-vault-kpqc/',
+    baseURL: 'http://localhost:4249/crypto-lab-quantum-vault-kpqc/',
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
@@ -38,8 +38,8 @@ export default defineConfig({
     // server sends the COOP/COEP headers from `vite.config.ts`'s `server`
     // block, which GitHub Pages cannot send at all, so the dev server was never
     // the document that ships.
-    command: 'npm run build && npm run preview -- --port 4213 --strictPort',
-    port: 4213,
+    command: 'npm run build && npm run preview -- --port 4249 --strictPort',
+    port: 4249,
     reuseExistingServer: !CI,
     timeout: 180_000,
   },
