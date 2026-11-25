@@ -172,7 +172,7 @@ export function showDepositPanel(
     const bobEl = qs<HTMLInputElement>(panel, '#pw-bob');
     const carolEl = qs<HTMLInputElement>(panel, '#pw-carol');
 
-    const message = messageEl.value.trim();
+    const message = messageEl.value;
     const alice = aliceEl.value.trim();
     const bob = bobEl.value.trim();
     const carol = carolEl.value.trim();
@@ -183,7 +183,7 @@ export function showDepositPanel(
     });
 
     let valid = true;
-    if (!message) {
+    if (!message.trim()) {
       (panel.querySelector('#err-message') as HTMLElement).textContent = t('msgEmpty');
       valid = false;
     }

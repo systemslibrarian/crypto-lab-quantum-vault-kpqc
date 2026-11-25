@@ -141,16 +141,19 @@ test.describe('Quantum Vault — seal/open pipeline', () => {
   }) => {
     await gotoLoadedVault(page);
 
-    const secret = 'e2e round-trip secret 42';
+    const secret = '  e2e round-trip\n한글 📚\n  ';
     const pws = ['alpha-key', 'bravo-key', 'charlie-key'];
 
     // Deposit into empty box 02.
     await page.locator('[data-box="02"]').click();
     await expect(page.locator('#deposit-message')).toBeVisible();
-    await page.fill('#deposit-message', secret);
     await page.fill('#pw-alice', pws[0]);
     await page.fill('#pw-bob', pws[1]);
     await page.fill('#pw-carol', pws[2]);
+    await page.fill('#deposit-message', '  \n  ');
+    await page.click('#btn-seal');
+    await expect(page.locator('#err-message')).not.toBeEmpty();
+    await page.fill('#deposit-message', secret);
     await page.click('#btn-seal');
 
     // Seal succeeds → panel switches to retrieve with a success notice.
@@ -164,9 +167,9 @@ test.describe('Quantum Vault — seal/open pipeline', () => {
     await page.fill('#rpw-carol', pws[2]);
     await page.click('#btn-open');
 
-    await expect(page.locator('#retrieve-result')).toContainText(secret, {
-      timeout: 30_000,
-    });
+    await expect(page.locator('#retrieve-result .reveal-text')).toHaveJSProperty(
+      'textContent', secret, { timeout: 30_000 },
+    );
   });
 
   test('a successful open shows the Shamir key-strip re-forming (real bytes)', async ({
